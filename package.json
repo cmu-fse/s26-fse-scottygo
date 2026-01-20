@@ -17,7 +17,6 @@
     "watch": "nodemon --watch client --watch server --watch .env -e js,ts,html,pug,css,json --exec npm-run-all build start",
     "lint": "eslint ./",
     "pug": "ts-node ./tools/pug-compile",
-    "postfixCalc": "ts-node ./trials/ts-eg/postfixCalc",
     "serve": "ts-node server/serve",
     "later": "echo \"Some future command...\" && exit 1"
   },
