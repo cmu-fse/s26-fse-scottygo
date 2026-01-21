@@ -1,6 +1,6 @@
 {
   "id": 343563,
-  "name": "fsd-branch-ruleset",
+  "name": "fse-branch-ruleset",
   "target": "branch",
   "source_type": "Repository",
   "enforcement": "active",
