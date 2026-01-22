@@ -5,15 +5,9 @@
 ## Repo Artifacts
 
 ## Selected Technology
-HTML, CSS : this is the tech stack everyone on the team is comfortable with for frontend
-TS, Express Js: class standards
-Websocket, Socket.IO: live data streaming
-MongoDB: database we are all familiar with and provides great schema flexibility
-Render: deploying the application
-Parcel: building the packages
-Google Map API: map and stop visualization
-Pittsburgh Open Transit True Time API: real-time live data of bus status
-CMU Shuttle Tripshot data: XHR Data packets containing live shuttle updates
+
+HTML, CSS : this is the tech stack everyone on the team is comfortable with for frontend TS, Express Js: class standards Websocket, Socket.IO: live data streaming MongoDB: database we are all familiar with and provides great schema flexibility Render: deploying the application Parcel: building the packages Google Map API: map and stop visualization Pittsburgh Open Transit True Time API: real-time live data of bus status CMU Shuttle Tripshot data: XHR Data packets containing live shuttle updates
+
 ### Architecture Haiku (add link to Google doc)
 
 ### [Kanban Board](https://github.com/orgs/cmu-fse/projects/10)
