@@ -1,10 +1,9 @@
 ---
 name: Bug Report
 about: Create a report to document your bug
-title: "[BUG]: Short description"
+title: '[BUG]: Short description'
 labels: bug report
 assignees: ''
-
 ---
 
 **Description:** A clear and concise description of what the bug or the problem is.
