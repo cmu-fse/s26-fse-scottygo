@@ -1,3 +1,3 @@
 export const compilePug = () => {
-  return "not-implemented";
+  return 'not-implemented';
 };

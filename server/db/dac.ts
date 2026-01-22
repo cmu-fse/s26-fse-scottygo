@@ -3,14 +3,12 @@
 // It is used to decouple the database from the rest of the application
 // It is accessed by the models, which are used by the controllers
 
-
 export interface IDatabase {
   connect(): Promise<void>;
 
   init(): Promise<void>;
 
   close(): Promise<void>;
-
 }
 
 /* Data Access Class */

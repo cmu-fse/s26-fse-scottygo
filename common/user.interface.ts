@@ -1,4 +1,3 @@
-
 // data for the user model
 
 export interface ILogin {
