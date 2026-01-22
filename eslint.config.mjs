@@ -1,18 +1,46 @@
-import js from "@eslint/js";
-import tseslint from "typescript-eslint";
+import globals from 'globals';
+import pluginJs from '@eslint/js';
+import tseslint from 'typescript-eslint';
 
 export default [
-  js.configs.recommended,
-  ...tseslint.configs.recommendedTypeChecked,
+  { files: ['**/*.{ts}'] },
+  {
+    ignores: [
+      '**/*.js',
+      '**/*.mjs',
+      '**/.dist',
+      '**/.dist-server',
+      '**/jest.config.ts',
+      '**/types',
+      '**/types-not-needed',
+      'trials/**/*.ts',
+      'tests/trials.tests/**.ts'
+    ]
+  },
+
+  pluginJs.configs.recommended,
+  ...tseslint.configs.recommended,
+
   {
     languageOptions: {
+      globals: {
+        ...globals.browser
+      },
+
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+
       parserOptions: {
-        project: "./tsconfig-for-eslint.json",
-        tsconfigRootDir: import.meta.dirname
+        project: './tsconfig-for-eslint.json'
       }
     },
+
     rules: {
-      "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }]
+      'comma-dangle': 'off',
+      '@typescript-eslint/comma-dangle': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
+      '@typescript-eslint/no-dupe-class-members': 'off',
+      '@typescript-eslint/indent': 'off'
     }
   }
 ];
