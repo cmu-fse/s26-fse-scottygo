@@ -1,0 +1,85 @@
+# This is used to define the continuous integration workflow with GitHub Actions
+# Contents will be provided later
+
+# This workflow will do a clean installation of node dependencies, cache/restore them, build the source code and run tests across different versions of node
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-nodejs
+
+name: CI-CD
+
+on:
+  push:
+    branches: ['main']
+  # disable pull request for now
+  # pull_request:
+  # branches: ["main"]
+jobs:
+  integrate:
+    name: Integrate (Check, Build, Test)
+    if: true
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20.x]
+        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
+    steps:
+      - run: echo "Job auto-triggered by a ${{ github.event_name }} event..."
+      - run: echo "Running on a ${{ runner.os }} server hosted by GitHub..."
+      - run: echo "For branch ${{ github.ref }} of repo ${{ github.repository }}..."
+      - name: Check out repository code...
+        uses: actions/checkout@v4
+      - name: Create env file...
+        env:
+          DOT_ENV: ${{ secrets.DOT_ENV }}
+        run: |
+          touch .env
+          echo "MY_VAR=xyz" >> .env
+          echo "${{ env.DOT_ENV }}" >> .env
+          echo -- Environment Vars
+          cat .env
+      - name: Setup Node.js with version ${{ matrix.node-version }}...
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+      - name: Clean install npm...
+        run: npm ci
+      - name: Check with Eslint...
+        run: npm run lint
+      - name: Build project...
+        run: npm run build
+      - name: Run client tests...
+        if: false
+        run: npm run test:client
+      - name: Run server tests...
+        if: false
+        run: npm run test:rest
+  deploy:
+    # make sure auto-deploy is off in service settings on Render
+    name: Render Deployment - auto-triggered by a ${{ github.event_name }}
+    # set if property to false to prevent deploy job
+    env:
+      SRV_ID: ${{ secrets.SRV_ID }}
+      SRV_KEY: ${{ secrets.SRV_KEY }}
+      SRV_TK: ${{ secrets.SRV_TK }}
+    if: true
+    needs: integrate
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Job auto-triggered by a ${{ github.event_name }} event..."
+      - run: echo "Running on a ${{ runner.os }} server hosted by GitHub..."
+      - run: echo "For branch ${{ github.ref }} of repo ${{ github.repository }}..."
+        # issue a get request first using the deploy hook (with service-id and key)
+        # this is necessary for the service to be found during deployment
+        # hooks/ids/tokens could be read from a github repo secret rather than be out in the open here
+        # github repo secrets is defined under repo Settings > Security > Actions
+      - name: Issue a get request with Render deploy hook make sure deployment is found...
+        run: curl "https://api.render.com/deploy/${{ env.SRV_ID }}?key=${{ env.SRV_KEY }}"
+      - name: Deploying to Render...
+        uses: bounceapp/render-action@0.8.0
+        with:
+          service-id: ${{ env.SRV_ID }}
+          render-token: ${{ env.SRV_TK }}
+          github-token: ${{ github.token }}
+          retries: 50
+          wait: 3000
+          sleep: 0

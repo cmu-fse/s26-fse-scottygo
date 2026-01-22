@@ -1,14 +1,23 @@
-import express from "express";
-import { env } from "./env.js";
+import path from 'path';
+import App from './app';
 
-const app = express();
+import { MongoDB } from './db/mongo.db';
+import { PORT, HOST, STAGE, ENV } from './env';
+import { DB_CONN_STR as dbURL } from './env'; 
+import HomeController from './controllers/home.controller';
 
-app.get("/health", (_req, res) => {
-  res.json({ ok: true, stage: env.stage });
-});
+const app = new App(
+  [
+    new HomeController('/'),
+  ],
+  {
+    clientDir: path.join(__dirname, '../.dist/client'),
+    db: new MongoDB(dbURL),
+    port: PORT,
+    host: HOST,
+    url: `${HOST}${ENV === 'LOCAL' ? ':' + PORT.toString() : ''}`,
+    initOnStart: STAGE === 'PROD' ? false : true
+  }
+);
 
-const port = env.port || 1000;
-app.listen(port, () => {
-  // eslint-disable-next-line no-console
-  console.log(`Server listening on ${port}`);
-});
+app.listen();
