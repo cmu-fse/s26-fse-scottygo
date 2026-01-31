@@ -170,3 +170,6 @@ When generating code for this project:
 8. **Follow ESLint and Prettier** formatting rules
 9. **Write responsive CSS** that works across different screen sizes
 10. **Handle API rate limits** when working with TrueTime API
+11. **Prefix interface names with "I"**: All TypeScript interfaces should be prefixed with "I" (e.g., IUser, IRoute, IStop)
+12. **Always use the DAC singleton**: Use the DAC (Database Access Controller) singleton in `db/` for all database connections
+13. **Isolate data source logic in services layer**: All external data source logic (e.g., fetching from TrueTime or Tripshot APIs) must be isolated in the `services/` layer
