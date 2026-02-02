@@ -6,11 +6,11 @@ CMU transit hub integrating real-time public and shuttle data with student-contr
 
 ## Architecture Diagrams
 
-> **Note**: Check [`.github/diagrams/`](.github/diagrams/) for the latest UML diagrams. Always verify diagram dates and look for new views (e.g., class diagrams, sequence diagrams) that may have been added since this document was last updated.
+> **Note**: Check [`.github/diagrams/`](diagrams/) for the latest UML diagrams. Always verify diagram dates and look for new views (e.g., class diagrams, sequence diagrams) that may have been added since this document was last updated.
 
 ### Development View
 
-**Reference**: [development-view-31jan26.png](.github/diagrams/development-view-31jan26.png)
+**Reference**: [development-view-31jan26.png](diagrams/development-view-31jan26.png)
 
 The development view shows the layered architecture and package structure:
 
@@ -30,7 +30,7 @@ The development view shows the layered architecture and package structure:
 
 ### Deployment View
 
-**Reference**: [deployment-view-31jan26.png](.github/diagrams/deployment-view-31jan26.png)
+**Reference**: [deployment-view-31jan26.png](diagrams/deployment-view-31jan26.png)
 
 The deployment view illustrates the runtime environment and infrastructure:
 

@@ -67,4 +67,18 @@ export class MongoDB implements IDatabase {
     }
     await mongoose.disconnect();
   }
+
+  async saveUser(user: IUser): Promise<IUser> {
+    const newUser = new MUser(user);
+    const savedUser = await newUser.save(); // mongoose document with .toObject() method
+    // convert to plain object from mongoose document (which has extra methods/properties) and return
+    return savedUser.toObject();
+  }
+
+  async findUserByUsername(username: string): Promise<IUser | null> {
+    const user: IUser | null = await MUser.findOne({
+      'credentials.username': username
+    }).lean(); // returns plain object from mongoose document (which has extra methods/properties)
+    return user;
+  }
 }
