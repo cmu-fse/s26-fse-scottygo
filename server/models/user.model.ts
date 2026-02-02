@@ -10,12 +10,12 @@ import { json } from 'stream/consumers';
 
 export class User implements IUser {
   credentials: ILogin;
-  extra?: string; // this carries the displayName of the user
+  email?: string; // this carries the email of the user
   _id?: string;
 
-  constructor(credentials: ILogin, extra?: string) {
+  constructor(credentials: ILogin, email?: string) {
     this.credentials = credentials;
-    this.extra = extra;
+    this.email = email;
     this._id = uuidV4();
   }
 
@@ -114,7 +114,7 @@ export class User implements IUser {
         username: this.credentials.username,
         password: passwordToStore
       },
-      extra: this.extra,
+      email: this.email,
       _id: this._id
     };
 
