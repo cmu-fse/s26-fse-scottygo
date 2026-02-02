@@ -12,7 +12,7 @@ const UserSchema = new Schema<IUser>({
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true }
   },
-  extra: { type: String, required: false },
+  email: { type: String, required: false },
   _id: { type: String, required: true } // required in DB
 });
 

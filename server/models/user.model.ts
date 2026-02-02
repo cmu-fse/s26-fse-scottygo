@@ -10,10 +10,10 @@ import { json } from 'stream/consumers';
 
 export class User implements IUser {
   credentials: ILogin;
-  email?: string; // this carries the email of the user
+  email: string; // this carries the email of the user
   _id?: string;
 
-  constructor(credentials: ILogin, email?: string) {
+  constructor(credentials: ILogin, email: string) {
     this.credentials = credentials;
     this.email = email;
     this._id = uuidV4();

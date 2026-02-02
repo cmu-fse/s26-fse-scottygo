@@ -10,5 +10,5 @@ export interface IUser {
   // represents a user's data
   credentials: ILogin;
   _id?: string; // a unique user id
-  email?: string; // stores the user's email provided in a request
+  email: string; // stores the user's email provided in a request
 }
