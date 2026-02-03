@@ -23,7 +23,7 @@ export type SuccessName =
   | 'LoginSuccess';
 
 export type ClientErrorName =
-  | 'MissingDisplayName'
+  | 'MissingEmail'
   | 'MissingUsername'
   | 'MissingPassword'
   | 'MissingToken'
@@ -33,6 +33,7 @@ export type ClientErrorName =
   | 'UnregisteredUser'
   | 'IncorrectPassword'
   | 'InvalidPassword'
+  | 'InvalidEmail'
   | 'InvalidToken'
   | 'WeakPassword'
   | 'InvalidUsername';
@@ -44,7 +45,6 @@ export type ServerErrorName =
   | 'GetRequestFailure'
   | 'PatchRequestFailure'
   | 'DeleteRequestFailure'
-  | 'InMemoryDBError'
   | 'MongoDBError';
 
 export type IPayload =

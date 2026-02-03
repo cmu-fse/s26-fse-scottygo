@@ -41,7 +41,8 @@ export default class AuthController extends Controller {
     // Extract user data from request body (IUser format)
     const reqUsername = req.body.credentials?.username;
     const reqPassword = req.body.credentials?.password;
-    const reqExtra = req.body.extra;
+    const reqEmail = req.body.email;
+    const reqAgreed = req.body.agreed;
 
     if (!reqUsername) {
       const errorRes: responses.IAppError = {
@@ -57,18 +58,19 @@ export default class AuthController extends Controller {
         message: 'Password is required'
       };
       return res.status(400).json(errorRes);
-    } else if (!reqExtra) {
+    } else if (!reqEmail) {
       const errorRes: responses.IAppError = {
         type: 'ClientError',
-        name: 'MissingDisplayName',
-        message: 'Name is required'
+        name: 'MissingEmail',
+        message: 'Email address is required'
       };
       return res.status(400).json(errorRes);
     }
     try {
       const newUser = new User(
         { username: reqUsername, password: reqPassword },
-        reqExtra
+        reqEmail,
+        reqAgreed
       );
 
       const savedUser = await newUser.join();
@@ -103,7 +105,7 @@ export default class AuthController extends Controller {
       // Handle error not raised as IAppError - create one to wrap unexpected error
       const unexpectedError: responses.IAppError = {
         type: 'ServerError',
-        name: appStage === 'EARLY' ? 'InMemoryDBError' : 'MongoDBError',
+        name: 'MongoDBError',
         message: 'An unexpected error occurred during registration'
       };
       return res.status(500).json(unexpectedError);
@@ -186,7 +188,7 @@ export default class AuthController extends Controller {
       // Unexpected error
       const unexpectedError: responses.IAppError = {
         type: 'ServerError',
-        name: appStage === 'EARLY' ? 'InMemoryDBError' : 'MongoDBError',
+        name: 'MongoDBError',
         message: 'An unexpected error occurred during login'
       };
       return res.status(500).json(unexpectedError);
