@@ -11,4 +11,5 @@ export interface IUser {
   credentials: ILogin;
   _id?: string; // a unique user id
   email: string; // stores the user's email provided in a request
+  agreed: boolean; // stores whether user agreed to Terms of Services
 }

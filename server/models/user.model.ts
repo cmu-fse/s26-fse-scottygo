@@ -11,11 +11,13 @@ import { json } from 'stream/consumers';
 export class User implements IUser {
   credentials: ILogin;
   email: string; // this carries the email of the user
+  agreed: boolean; // reflects if user agreed to Terms of Services
   _id?: string;
 
-  constructor(credentials: ILogin, email: string) {
+  constructor(credentials: ILogin, email: string, agreed: boolean) {
     this.credentials = credentials;
     this.email = email;
+    this.agreed = agreed;
     this._id = uuidV4();
   }
 
@@ -35,7 +37,7 @@ export class User implements IUser {
       const error: IAppError = {
         type: 'ClientError',
         name: 'InvalidUsername',
-        message: 'Username must be a valid email address'
+        message: 'Username must be valid'
       };
       throw error;
     }
@@ -115,6 +117,7 @@ export class User implements IUser {
         password: passwordToStore
       },
       email: this.email,
+      agreed: this.agreed,
       _id: this._id
     };
 
