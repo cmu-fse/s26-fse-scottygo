@@ -1,0 +1,271 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: white;
+}
+
+/* Header Styles */
+.app-header {
+  background-color: #c41230;
+  height: 56px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 16px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.back-icon {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: white;
+}
+
+.menu-icon {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 24px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.menu-icon span {
+  display: block;
+  height: 2px;
+  width: 100%;
+  background-color: white;
+  border-radius: 2px;
+}
+
+/* Content Styles */
+.content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 16px;
+}
+
+.logo {
+  color: #c41230;
+  font-size: 48px;
+  font-weight: bold;
+  margin-bottom: 32px;
+  text-shadow: 0px 2px 4px rgba(0, 0, 0, 0.2);
+  letter-spacing: -0.5px;
+}
+
+/* Auth Card Styles */
+.auth-card {
+  width: 100%;
+  max-width: 360px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 24px;
+  background-color: white;
+}
+
+.form-group {
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group label {
+  font-size: 16px;
+  color: #000;
+  margin-bottom: 8px;
+}
+
+.form-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d1d1;
+  border-radius: 6px;
+  font-size: 16px;
+  color: #333;
+  line-height: 1.4;
+  height: 48px;
+  background-color: #fff;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.form-input--error {
+  border-color: #c41230;
+  border-width: 2px;
+}
+
+.form-group input::placeholder {
+  color: #a0a0a0;
+}
+
+.checkbox-group {
+  flex-direction: row;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.checkbox-group input[type='checkbox'] {
+  margin-top: 4px;
+  width: 18px;
+  height: 18px;
+  border: 1px solid #333;
+  border-radius: 2px;
+  margin-right: 12px;
+  cursor: pointer;
+}
+
+.checkbox-label {
+  display: flex;
+  flex-direction: column;
+}
+
+.terms-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-bottom: 2px;
+  font-weight: 400;
+  font-size: 16px;
+  color: #000;
+  text-align: left;
+  cursor: pointer;
+}
+
+.terms-link:hover,
+.terms-link:focus {
+  text-decoration: underline;
+}
+
+.checkbox-label .subtext {
+  font-size: 14px;
+  color: #757575;
+}
+
+.submit-btn {
+  width: 100%;
+  background-color: #c41230;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 12px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: background-color 0.2s;
+}
+
+.submit-btn:hover {
+  background-color: #a00f28;
+}
+
+.submit-btn:active {
+  box-shadow: none;
+  transform: translateY(1px);
+}
+
+.status {
+  margin-top: 16px;
+  font-size: 14px;
+  color: #2e7d32;
+  min-height: 18px;
+  text-align: center;
+}
+
+.status--error {
+  color: #c62828;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 20;
+}
+
+.modal-backdrop.is-open {
+  display: flex;
+}
+
+.modal {
+  background: #fff;
+  border: 2px solid #c41230;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 320px;
+  padding: 16px;
+  text-align: center;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+}
+
+.modal--terms {
+  max-width: 360px;
+}
+
+.modal-title {
+  font-size: 16px;
+  margin-bottom: 16px;
+}
+
+.modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.modal-btn {
+  border: none;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.modal-btn--primary {
+  background-color: #c41230;
+  color: #fff;
+}
+
+.modal-btn--secondary {
+  background-color: #6d6d6d;
+  color: #fff;
+}
+
+.terms-box {
+  border: 2px solid #c41230;
+  border-radius: 8px;
+  padding: 12px;
+  height: 300px;
+  overflow-y: auto;
+  text-align: left;
+  font-size: 14px;
+}
+
+.terms-note {
+  font-size: 12px;
+  margin-top: 8px;
+  color: #4a4a4a;
+  text-align: left;
+}
