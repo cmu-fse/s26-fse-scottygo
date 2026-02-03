@@ -71,7 +71,8 @@
   "targets": {
     "client": {
       "source": [
-        "client/pages/index.html"
+        "client/pages/home.html",
+        "client/pages/auth.html"
       ],
       "distDir": ".dist/client",
       "context": "browser"

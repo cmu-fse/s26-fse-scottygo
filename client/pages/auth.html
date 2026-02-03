@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ScottyGo - Auth</title>
+    <link rel="stylesheet" href="../styles/auth.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <a href="home.html" class="back-icon">
+        <svg
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M20 11H7.83L13.42 5.41L12 4L4 12L12 20L13.41 18.59L7.83 13H20V11Z"
+            fill="white"
+          />
+        </svg>
+      </a>
+      <div class="menu-icon">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </header>
+    <main class="content">
+      <h1 class="logo">ScottyGo</h1>
+      <div class="auth-card">
+        <form id="auth-form">
+          <div class="form-group">
+            <label for="username">Username</label>
+            <input
+              type="text"
+              id="username"
+              name="username"
+              class="form-input"
+              placeholder="Value"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="email">Email (only for registration)</label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              class="form-input"
+              placeholder="Value"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="password">Password</label>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              class="form-input"
+              placeholder="Value"
+            />
+          </div>
+
+          <div class="form-group checkbox-group">
+            <input
+              type="checkbox"
+              id="tos"
+              name="tos"
+              aria-label="Agree to Terms of Service"
+            />
+            <div class="checkbox-label">
+              <button type="button" class="terms-link" id="terms-link"
+                >Terms of Service</button
+              >
+              <span class="subtext">check to agree</span>
+            </div>
+          </div>
+
+          <button type="submit" class="submit-btn" id="submit-btn"
+            >Login/Register</button
+          >
+        </form>
+        <p id="status" class="status" role="status" aria-live="polite"></p>
+      </div>
+    </main>
+    <div id="confirm-modal" class="modal-backdrop" inert>
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-title"
+      >
+        <h2 id="confirm-title" class="modal-title"
+          >Do you really want to create an account?</h2
+        >
+        <div class="modal-actions">
+          <button
+            type="button"
+            class="modal-btn modal-btn--primary"
+            id="confirm-yes"
+            >Confirm</button
+          >
+          <button
+            type="button"
+            class="modal-btn modal-btn--secondary"
+            id="confirm-no"
+            >Cancel</button
+          >
+        </div>
+      </div>
+    </div>
+    <div id="terms-modal" class="modal-backdrop" inert>
+      <div
+        class="modal modal--terms"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="terms-title"
+      >
+        <h2 id="terms-title" class="modal-title">Terms of Service</h2>
+        <div class="terms-box">
+          <ol>
+            <li>xxx</li>
+          </ol>
+        </div>
+        <p class="terms-note"
+          >*To continue, you need to accept the terms of service</p
+        >
+        <div class="modal-actions">
+          <button
+            type="button"
+            class="modal-btn modal-btn--primary"
+            id="terms-accept"
+            >Accept</button
+          >
+          <button
+            type="button"
+            class="modal-btn modal-btn--secondary"
+            id="terms-decline"
+            >Decline</button
+          >
+        </div>
+      </div>
+    </div>
+    <script type="module" src="../scriptes/auth.ts"></script>
+  </body>
+</html>

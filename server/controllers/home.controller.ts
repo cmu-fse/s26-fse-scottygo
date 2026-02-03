@@ -17,10 +17,10 @@ export default class HomeController extends Controller {
   }
 
   public indexPage(req: Request, res: Response): void {
-    return res.redirect('/pages/index.html');
+    return res.redirect('/home.html');
   }
 
   public homePage(req: Request, res: Response): void {
-    return res.redirect('/');
+    return res.redirect('/home.html');
   }
 }
