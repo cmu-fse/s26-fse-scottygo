@@ -12,15 +12,11 @@ export default class HomeController extends Controller {
   // Plus a an about page generated on the fly
 
   public initializeRoutes(): void {
-    this.router.get('/', this.indexPage);
+    this.router.get('/', this.homePage);
     this.router.get('/home', this.homePage);
   }
 
-  public indexPage(req: Request, res: Response): void {
-    return res.redirect('/home.html');
-  }
-
   public homePage(req: Request, res: Response): void {
-    return res.redirect('/home.html');
+    return res.redirect('/pages/home.html');
   }
 }
