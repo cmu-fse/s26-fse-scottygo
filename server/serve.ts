@@ -5,8 +5,9 @@ import { MongoDB } from './db/mongo.db';
 import { PORT, HOST, STAGE, ENV } from './env';
 import { DB_CONN_STR as dbURL } from './env';
 import HomeController from './controllers/home.controller';
+import AuthController from './controllers/auth.controller';
 
-const app = new App([new HomeController('/')], {
+const app = new App([new HomeController('/'), new AuthController('/auth')], {
   clientDir: path.join(__dirname, '../.dist/client'),
   db: new MongoDB(dbURL),
   port: PORT,

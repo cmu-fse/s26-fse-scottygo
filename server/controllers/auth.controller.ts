@@ -4,7 +4,7 @@
 import { ILogin, IUser } from '../../common/user.interface';
 import { User } from '../models/user.model';
 import Controller from './controller';
-import { NextFunction, Request, Response } from 'express';
+import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import {
   JWT_KEY as secretKey,
@@ -22,11 +22,7 @@ export default class AuthController extends Controller {
     this.router.get('/', this.authPage);
     this.router.post('/users', this.register);
     this.router.post('/tokens/:username?', this.login);
-    this.router.patch(
-      '/users/:username?agreed=true',
-      this.authorize,
-      this.agreed
-    );
+    this.router.patch('/users/:username?agreed=true', this.agreed);
   }
 
   public async authPage(req: Request, res: Response): Promise<void> {
@@ -191,43 +187,6 @@ export default class AuthController extends Controller {
     }
   }
 
-  public async authorize(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    // Extracts token from header's authorization field ("Bearer <token>")
-    const token = req.headers.authorization?.split(' ')[1];
-
-    // Handle missing token
-    if (!token) {
-      const errorRes: responses.IAppError = {
-        type: 'ClientError',
-        name: 'MissingToken',
-        message: 'Token is required'
-      };
-      res.status(401).json(errorRes);
-      return; // Stop execution
-    }
-
-    // Verify and decode token with secretKey
-    try {
-      const decodedToken: ILogin = jwt.verify(token, secretKey) as ILogin;
-      const userOnToken = decodedToken.username; // Extract username from decoded token
-      req.body.userOnToken = userOnToken; // Attach username to request object
-      next(); // Continue to next middleware
-    } catch (error) {
-      // Handle JWT verification error (invalid token)
-      const errorRes: responses.IAppError = {
-        type: 'ClientError',
-        name: 'InvalidToken',
-        message: 'Invalid token'
-      };
-      res.status(401).json(errorRes);
-      return;
-    }
-  }
-
   public async agreed(req: Request, res: Response) {
     // Username comes from URL params (:username?)
     if (!req.params.username) {
@@ -238,39 +197,27 @@ export default class AuthController extends Controller {
       };
       return res.status(400).json(errorRes);
     }
+    // Password comes from request body
+    if (!req.body.password) {
+      const errorRes: responses.IAppError = {
+        type: 'ClientError',
+        name: 'MissingPassword',
+        message: 'Password is required'
+      };
+      return res.status(400).json(errorRes);
+    }
 
-    const userOnToken = req.body.userOnToken;
-    const userWhoAgreed = req.params.username;
+    const credentials: ILogin = {
+      username: req.params.username, // Extract username from URL params
+      password: req.body.password // Extract password from body
+    };
+
     let userToUpdate: IUser;
 
-    // First check for and handle IAppErrors, such as user not existing, user on token
-    // not matching username on patch request, and other IAppErrors before updating DB
     try {
-      const userFromDB: IUser | null =
-        await User.getUserForUsername(userWhoAgreed);
-      if (!userFromDB || userFromDB === null) {
-        const errorRes: responses.IAppError = {
-          type: 'ClientError',
-          name: 'UserNotFound',
-          message: 'The user could not be found'
-        };
-        return res.status(400).json(errorRes);
-      } else if (userFromDB.credentials.username !== userOnToken) {
-        // If the username (user who agreed) doesn't match identity of existing authenticated User,
-        // refuse agreed request as unauthorized and tell User that agreeing Terms of Service
-        // on behalf of another User isn't permitted
-        const errorRes: responses.IAppError = {
-          type: 'ClientError',
-          name: 'UnauthorizedRequest',
-          message:
-            'Agreeing Terms of Service on behalf of another user is not permitted'
-        };
-        return res.status(401).json(errorRes);
-      }
-      userToUpdate = userFromDB;
-      userToUpdate.agreed = true;
+      userToUpdate = await User.validateUser(credentials);
     } catch (error: unknown) {
-      // Handle errors from model/database
+      // Handle errors from model and database
       if (
         error &&
         typeof error === 'object' &&
@@ -289,7 +236,7 @@ export default class AuthController extends Controller {
       };
       return res.status(500).json(unexpectedError);
     }
-    // Now try to edit chat message and return response
+    // Now try to update user agreed status and return response
     try {
       const agreedUser: IUser = await User.setUserAgreedToTrue(userToUpdate);
       // Return success response
