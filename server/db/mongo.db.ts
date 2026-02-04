@@ -81,4 +81,17 @@ export class MongoDB implements IDatabase {
     }).lean(); // returns plain object from mongoose document (which has extra methods/properties)
     return user;
   }
+
+  async setUserAgreedToTrue(user: IUser): Promise<IUser | null> {
+    const agreedUser: IUser | null = await MUser.findByIdAndUpdate(
+      user._id,
+      {
+        agreed: user.agreed
+      },
+      {
+        new: true // true here returns UPDATED user rather than original
+      }
+    ).lean();
+    return agreedUser;
+  }
 }

@@ -161,4 +161,35 @@ export class User implements IUser {
 
     return user;
   }
+
+  static async getUserForUsername(username: string): Promise<IUser | null> {
+    // get user from database
+    const user = await DAC.db.findUserByUsername(username);
+    if (!user) {
+      // if user not found, throw error
+      const error: IAppError = {
+        type: 'ClientError',
+        name: 'UserNotFound',
+        message: 'User not found - user does not exist'
+      };
+      throw error;
+    }
+    return user;
+  }
+
+  static async setUserAgreedToTrue(user: IUser): Promise<IUser> {
+    user.agreed = true;
+    const userWhoAgreed: IUser | null = await DAC.db.setUserAgreedToTrue(user);
+    if (!userWhoAgreed) {
+      // If patch fails, tell User
+      // ServerErrorName = 'PatchRequestFailure'
+      const error: IAppError = {
+        type: 'ServerError',
+        name: 'PatchRequestFailure',
+        message: 'Update of user agreed status failed'
+      };
+      throw error;
+    }
+    return userWhoAgreed;
+  }
 }

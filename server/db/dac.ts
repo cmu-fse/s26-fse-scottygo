@@ -15,6 +15,8 @@ export interface IDatabase {
   saveUser(userData: IUser): Promise<IUser>;
 
   findUserByUsername(username: string): Promise<IUser | null>;
+
+  setUserAgreedToTrue(user: IUser): Promise<IUser | null>;
 }
 
 /* Data Access Class */
