@@ -46,7 +46,8 @@ const termsLink = document.getElementById(
 ) as HTMLButtonElement | null;
 
 let pendingRegisterPayload: IUser | null = null;
-let pendingAgreementUserId: string | null = null;
+let pendingAgreementUsername: string | null = null;
+let pendingAgreementPassword: string | null = null;
 let pendingRedirectToHome = false;
 
 const setStatus = (message: string, isError = false) => {
@@ -159,11 +160,15 @@ const loginUser = async (username: string, password: string) => {
   return { response, data };
 };
 
-const confirmAgreement = async (userId: string) => {
+const confirmAgreement = async (username: string, password: string) => {
   const response = await fetch(
-    `/auth/users/${encodeURIComponent(userId)}?agreed=true`,
+    `/auth/users/${encodeURIComponent(username)}?agreed=true`,
     {
-      method: 'PATCH'
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ password })
     }
   );
 
@@ -187,14 +192,15 @@ const closeModal = (modal: HTMLDivElement | null) => {
   modal.setAttribute('inert', '');
 };
 
-const openTermsModal = (userId: string, shouldRedirect: boolean) => {
-  pendingAgreementUserId = userId;
+const openTermsModal = (username: string, password: string, shouldRedirect: boolean) => {
+  pendingAgreementUsername = username;
+  pendingAgreementPassword = password;
   pendingRedirectToHome = shouldRedirect;
   openModal(termsModal);
 };
 
 const handleAgreementAccept = async () => {
-  if (!pendingAgreementUserId) {
+  if (!pendingAgreementUsername || !pendingAgreementPassword) {
     if (tosInput) {
       tosInput.checked = true;
     }
@@ -204,7 +210,7 @@ const handleAgreementAccept = async () => {
 
   setSubmitting(true);
   try {
-    const agreementResult = await confirmAgreement(pendingAgreementUserId);
+    const agreementResult = await confirmAgreement(pendingAgreementUsername, pendingAgreementPassword);
     if (!agreementResult.response.ok) {
       const agreementMessage = getResponseMessage(
         agreementResult.data,
@@ -231,7 +237,8 @@ const handleAgreementAccept = async () => {
         : 'Network error. Please try again.';
     setStatus(message, true);
   } finally {
-    pendingAgreementUserId = null;
+    pendingAgreementUsername = null;
+    pendingAgreementPassword = null;
     pendingRedirectToHome = false;
     setSubmitting(false);
   }
@@ -283,12 +290,14 @@ form?.addEventListener('submit', async (event) => {
       return;
     }
 
-    const authenticatedUser =
+    const authPayload =
       data && isSuccess(data) && data.payload && 'user' in data.payload
-        ? (data.payload as IAuthenticatedUser).user
+        ? (data.payload as IAuthenticatedUser)
         : null;
-    if (authenticatedUser?._id && authenticatedUser.agreed === false) {
-      openTermsModal(authenticatedUser._id, true);
+    const authenticatedUser = authPayload?.user ?? null;
+    if (authenticatedUser && authenticatedUser.agreed === false) {
+      // User hasn't agreed yet - show terms modal with password for PATCH
+      openTermsModal(authenticatedUser.credentials.username, payload.credentials.password, true);
       return;
     }
 
@@ -338,8 +347,17 @@ confirmYes?.addEventListener('click', async () => {
         ? (data.payload as IUser)
         : null;
 
-    if (shouldAgree && user?._id) {
-      const agreementResult = await confirmAgreement(user._id);
+    if (!user) {
+      setStatus('Registration succeeded but user data is missing.', true);
+      return;
+    }
+
+    if (shouldAgree) {
+      // User checked ToS checkbox - send PATCH with password
+      const agreementResult = await confirmAgreement(
+        user.credentials.username,
+        registerBody.credentials.password
+      );
       if (!agreementResult.response.ok) {
         const agreementMessage = getResponseMessage(
           agreementResult.data,
@@ -356,9 +374,8 @@ confirmYes?.addEventListener('click', async () => {
       return;
     }
 
-    if (user?._id) {
-      openTermsModal(user._id, true);
-    }
+    // User didn't check ToS checkbox - show terms modal
+    openTermsModal(user.credentials.username, registerBody.credentials.password, true);
   } catch (error) {
     const message =
       error instanceof Error
@@ -381,7 +398,8 @@ termsAccept?.addEventListener('click', async () => {
 });
 
 termsLink?.addEventListener('click', () => {
-  pendingAgreementUserId = null;
+  pendingAgreementUsername = null;
+  pendingAgreementPassword = null;
   pendingRedirectToHome = false;
   openModal(termsModal);
 });
