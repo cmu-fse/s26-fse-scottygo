@@ -46,8 +46,9 @@ const termsLink = document.getElementById(
 ) as HTMLButtonElement | null;
 
 let pendingRegisterPayload: IUser | null = null;
-let pendingAgreementUserId: string | null = null;
+let pendingAgreementUsername: string | null = null;
 let pendingRedirectToHome = false;
+let pendingToken: string | null = null;
 
 const setStatus = (message: string, isError = false) => {
   if (!statusEl) {
@@ -159,11 +160,14 @@ const loginUser = async (username: string, password: string) => {
   return { response, data };
 };
 
-const confirmAgreement = async (userId: string) => {
+const confirmAgreement = async (username: string, token: string) => {
   const response = await fetch(
-    `/auth/users/${encodeURIComponent(userId)}?agreed=true`,
+    `/auth/users/${encodeURIComponent(username)}?agreed=true`,
     {
-      method: 'PATCH'
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
     }
   );
 
@@ -187,14 +191,15 @@ const closeModal = (modal: HTMLDivElement | null) => {
   modal.setAttribute('inert', '');
 };
 
-const openTermsModal = (userId: string, shouldRedirect: boolean) => {
-  pendingAgreementUserId = userId;
+const openTermsModal = (username: string, token: string, shouldRedirect: boolean) => {
+  pendingAgreementUsername = username;
+  pendingToken = token;
   pendingRedirectToHome = shouldRedirect;
   openModal(termsModal);
 };
 
 const handleAgreementAccept = async () => {
-  if (!pendingAgreementUserId) {
+  if (!pendingAgreementUsername || !pendingToken) {
     if (tosInput) {
       tosInput.checked = true;
     }
@@ -204,7 +209,7 @@ const handleAgreementAccept = async () => {
 
   setSubmitting(true);
   try {
-    const agreementResult = await confirmAgreement(pendingAgreementUserId);
+    const agreementResult = await confirmAgreement(pendingAgreementUsername, pendingToken);
     if (!agreementResult.response.ok) {
       const agreementMessage = getResponseMessage(
         agreementResult.data,
@@ -231,7 +236,8 @@ const handleAgreementAccept = async () => {
         : 'Network error. Please try again.';
     setStatus(message, true);
   } finally {
-    pendingAgreementUserId = null;
+    pendingAgreementUsername = null;
+    pendingToken = null;
     pendingRedirectToHome = false;
     setSubmitting(false);
   }
@@ -283,12 +289,14 @@ form?.addEventListener('submit', async (event) => {
       return;
     }
 
-    const authenticatedUser =
+    const authPayload =
       data && isSuccess(data) && data.payload && 'user' in data.payload
-        ? (data.payload as IAuthenticatedUser).user
+        ? (data.payload as IAuthenticatedUser)
         : null;
-    if (authenticatedUser?._id && authenticatedUser.agreed === false) {
-      openTermsModal(authenticatedUser._id, true);
+    const authenticatedUser = authPayload?.user ?? null;
+    const token = authPayload?.token ?? null;
+    if (authenticatedUser && token && authenticatedUser.agreed === false) {
+      openTermsModal(authenticatedUser.credentials.username, token, true);
       return;
     }
 
@@ -338,8 +346,45 @@ confirmYes?.addEventListener('click', async () => {
         ? (data.payload as IUser)
         : null;
 
-    if (shouldAgree && user?._id) {
-      const agreementResult = await confirmAgreement(user._id);
+    if (!user) {
+      setStatus('Registration succeeded but user data is missing.', true);
+      return;
+    }
+
+    // Auto-login to get token after successful registration
+    const loginResult = await loginUser(
+      registerBody.credentials.username,
+      registerBody.credentials.password
+    );
+
+    if (!loginResult.response.ok) {
+      const loginMessage = getResponseMessage(
+        loginResult.data,
+        'Auto-login failed after registration.'
+      );
+      setStatus(loginMessage, true);
+      return;
+    }
+
+    const loginPayload =
+      loginResult.data &&
+      isSuccess(loginResult.data) &&
+      loginResult.data.payload &&
+      'user' in loginResult.data.payload
+        ? (loginResult.data.payload as IAuthenticatedUser)
+        : null;
+    const token = loginPayload?.token ?? null;
+
+    if (!token) {
+      setStatus('Failed to retrieve authentication token.', true);
+      return;
+    }
+
+    if (shouldAgree) {
+      const agreementResult = await confirmAgreement(
+        user.credentials.username,
+        token
+      );
       if (!agreementResult.response.ok) {
         const agreementMessage = getResponseMessage(
           agreementResult.data,
@@ -356,9 +401,8 @@ confirmYes?.addEventListener('click', async () => {
       return;
     }
 
-    if (user?._id) {
-      openTermsModal(user._id, true);
-    }
+    // User didn't check ToS checkbox - show terms modal
+    openTermsModal(user.credentials.username, token, true);
   } catch (error) {
     const message =
       error instanceof Error
@@ -381,7 +425,8 @@ termsAccept?.addEventListener('click', async () => {
 });
 
 termsLink?.addEventListener('click', () => {
-  pendingAgreementUserId = null;
+  pendingAgreementUsername = null;
+  pendingToken = null;
   pendingRedirectToHome = false;
   openModal(termsModal);
 });
