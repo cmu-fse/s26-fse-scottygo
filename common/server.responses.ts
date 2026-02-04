@@ -17,9 +17,7 @@ export type SuccessName =
   | 'UserRegistered'
   | 'UserFound'
   | 'UsersFound'
-  | 'UserUpdated'
-  | 'NoUsersYet'
-  | 'UserDeleted'
+  | 'UserAgreed'
   | 'LoginSuccess';
 
 export type ClientErrorName =
@@ -44,7 +42,6 @@ export type ServerErrorName =
   | 'PostRequestFailure'
   | 'GetRequestFailure'
   | 'PatchRequestFailure'
-  | 'DeleteRequestFailure'
   | 'MongoDBError';
 
 export type IPayload =
