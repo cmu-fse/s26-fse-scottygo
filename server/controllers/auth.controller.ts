@@ -19,10 +19,10 @@ export default class AuthController extends Controller {
   }
 
   public initializeRoutes(): void {
-    this.router.get('/', this.authPage);
-    this.router.post('/users', this.register);
-    this.router.post('/tokens/:username?', this.login);
-    this.router.patch('/users/:username?agreed=true', this.agreed);
+    this.router.get('/', this.authPage.bind(this));
+    this.router.post('/users', this.register.bind(this));
+    this.router.post('/tokens/:username?', this.login.bind(this));
+    this.router.patch('/users/:username', this.agreed.bind(this));
   }
 
   public async authPage(req: Request, res: Response): Promise<void> {
