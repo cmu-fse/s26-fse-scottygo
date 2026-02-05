@@ -13,6 +13,7 @@ const UserSchema = new Schema<IUser>({
     password: { type: String, required: true }
   },
   email: { type: String, required: true },
+  agreed: { type: Boolean, required: true },
   _id: { type: String, required: true } // required in DB
 });
 
