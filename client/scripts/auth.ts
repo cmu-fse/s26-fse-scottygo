@@ -180,7 +180,7 @@ const confirmAgreement = async (
       method: 'patch',
       headers: { 'Content-Type': 'application/json' },
       data: { password },
-      url: `/auth/users/${encodeURIComponent(username)}?agreed=true`,
+      url: `/auth/users/${encodeURIComponent(username)}`,
       validateStatus: () => true
     });
     return { status: res.status, data: res.data };
@@ -322,8 +322,60 @@ form?.addEventListener('submit', async (event: SubmitEvent) => {
     );
 
     if (status < 200 || status >= 300) {
-      const message = getResponseMessage(data, 'Login failed.');
       const errorName = data && 'name' in data ? data.name : '';
+      if (errorName === 'UnauthorizedRequest') {
+        // If user already checked the ToS checkbox, process agreement directly
+        if (shouldAgree) {
+          const agreementResult = await confirmAgreement(
+            payload.credentials.username,
+            payload.credentials.password
+          );
+          if (agreementResult.status < 200 || agreementResult.status >= 300) {
+            const agreementMessage = getResponseMessage(
+              agreementResult.data,
+              'Agreement update failed.'
+            );
+            setStatus(agreementMessage, true);
+            return;
+          }
+
+          // After agreement, login to get a fresh token
+          const loginResult = await loginUser(
+            payload.credentials.username,
+            payload.credentials.password
+          );
+          if (loginResult.status >= 200 && loginResult.status < 300) {
+            const loginPayload =
+              loginResult.data &&
+              isSuccess(loginResult.data) &&
+              loginResult.data.payload &&
+              'user' in loginResult.data.payload
+                ? (loginResult.data.payload as IAuthenticatedUser)
+                : null;
+            if (loginPayload?.token && loginPayload?.user) {
+              storeAuth(
+                loginPayload.token,
+                loginPayload.user.credentials.username
+              );
+            }
+          }
+
+          setStatus('Agreement accepted. Redirecting to directory...');
+          window.setTimeout(() => {
+            window.location.href = 'app_directory.html';
+          }, 1200);
+          return;
+        }
+
+        // Checkbox not checked — open the terms modal
+        openTermsModal(
+          payload.credentials.username,
+          payload.credentials.password,
+          true
+        );
+        return;
+      }
+      const message = getResponseMessage(data, 'Login failed.');
       setInputError(errorName);
       setStatus(message, true);
       return;

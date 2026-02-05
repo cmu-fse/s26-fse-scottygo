@@ -26,7 +26,6 @@ const updateAuthUI = () => {
   }
 };
 
-
 const handleLogout = () => {
   clearAuth();
   window.location.href = 'home.html';
