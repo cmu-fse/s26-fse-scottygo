@@ -8,10 +8,6 @@ import { isSuccess } from '../../common/server.responses';
 
 export {};
 
-/**
- * Store authentication token and username after successful login.
- * Stores in both sessionStorage and localStorage for persistence.
- */
 const storeAuth = (token: string, username: string): void => {
   sessionStorage.setItem('token', token);
   localStorage.setItem('token', token);

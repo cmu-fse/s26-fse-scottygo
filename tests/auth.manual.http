@@ -88,12 +88,11 @@ Content-Type: application/json
 ###
 
 // Update agreement after user accepts terms
-PUT http://localhost:8080/auth/users/testuser2@cmu.edu/agreement
+PATCH http://localhost:8080/auth/users/testuser2@cmu.edu?agreed=true
 Content-Type: application/json
-Authorization: Bearer <TOKEN>
 
 {
-    "agreed": true
+    "password": "Test123!@"
 }
 ###
 
