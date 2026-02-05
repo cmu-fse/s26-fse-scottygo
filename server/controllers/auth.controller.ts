@@ -132,6 +132,18 @@ export default class AuthController extends Controller {
     try {
       const user: IUser = await User.validateUser(credentials);
 
+      // Check whether user has agreed Terms of Service, and if not, reject login
+      if (user.agreed === false) {
+        const error: responses.IAppError = {
+          type: 'ClientError',
+          name: 'UnauthorizedRequest',
+          message:
+            'User not authorized to log in and access app until agrees to Terms of Service'
+        };
+        res.status(401).json(error);
+        return; // Stop execution
+      }
+
       const tokenPayload: ILogin = user.credentials;
       // In tokenExpiry ever changed in .env, handle BOTH cases of
       // token expiry: actual time period and 'never'
