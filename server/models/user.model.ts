@@ -373,10 +373,39 @@ export class User implements IUser {
       this.credentials.username.toLowerCase()
     );
     if (existingUser) {
+      // Compare provided password with stored hashed password
+      const isValid = await bcrypt.compare(
+        this.credentials.password,
+        existingUser.credentials.password
+      );
+
+      if (!isValid) {
+        // Wrong password - either existing user entered wrong password or new user
+        // entered username that already exists
+
+        // Handle case where existing user entered wrong password
+        if (this.email === existingUser.email) {
+          const error: IAppError = {
+            type: 'ClientError',
+            name: 'IncorrectPassword',
+            message: 'Re-enter username and/or password'
+          };
+          throw error;
+        }
+        // Handle case where new user entered username that already exists
+        const error: IAppError = {
+          type: 'ClientError',
+          name: 'InvalidUsername',
+          message: 'Please provide a different username'
+        };
+        throw error;
+      }
+
       const error: IAppError = {
         type: 'ClientError',
         name: 'UserExists',
-        message: 'A user with this username already exists'
+        message:
+          'User with this username and password already exists - please log in'
       };
       throw error;
     }
