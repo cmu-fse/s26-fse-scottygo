@@ -1,0 +1,157 @@
+// REST tests for authentication services (login/logout)
+// NOTE: Username must be a valid email format (backend validation)
+
+// ============================================================================
+// SETUP: Create test users first
+// ============================================================================
+
+// Create a registered user who agreed to terms
+POST http://localhost:8080/auth/users
+Content-Type: application/json
+
+{
+    "credentials": { 
+        "username": "testuser1@cmu.edu",
+        "password": "Test123!@"
+    },
+    "email": "testuser1@cmu.edu",
+    "agreed": true
+}
+###
+
+// Create a registered user who has NOT agreed to terms (for A2 flow)
+POST http://localhost:8080/auth/users
+Content-Type: application/json
+
+{
+    "credentials": { 
+        "username": "testuser2@cmu.edu",
+        "password": "Test123!@"
+    },
+    "email": "testuser2@cmu.edu",
+    "agreed": false
+}
+###
+
+// ============================================================================
+// BASIC FLOW: Login with existing user
+// ============================================================================
+
+// Step 3-4: Login with valid username and password (no email = login per R1)
+// Expected: 200 OK, returns token, user marked online
+POST http://localhost:8080/auth/tokens/testuser1@cmu.edu
+Content-Type: application/json
+
+{
+    "password": "Test123!@"
+}
+###
+
+// ============================================================================
+// BASIC FLOW: Logout
+// ============================================================================
+
+// Step 7-8: Logout - invalidate token, mark user offline
+// Replace <TOKEN> with actual token from login response
+DELETE http://localhost:8080/auth/tokens
+Content-Type: application/json
+Authorization: Bearer <TOKEN>
+
+###
+
+// ============================================================================
+// ALTERNATIVE FLOW A1: NonexistingMember (triggers registration)
+// ============================================================================
+
+// Login attempt with non-existing username
+// Expected: 404 or error indicating user doesn't exist
+POST http://localhost:8080/auth/tokens/nonexistent@cmu.edu
+Content-Type: application/json
+
+{
+    "password": "Test123!@"
+}
+###
+
+// ============================================================================
+// ALTERNATIVE FLOW A2: User exists but hasn't agreed to terms
+// ============================================================================
+
+// Login with user who hasn't agreed to terms
+// Expected: Returns user with agreed=false, frontend shows terms modal
+POST http://localhost:8080/auth/tokens/testuser2@cmu.edu
+Content-Type: application/json
+
+{
+    "password": "Test123!@"
+}
+###
+
+// Update agreement after user accepts terms
+PATCH http://localhost:8080/auth/users/testuser2@cmu.edu?agreed=true
+Content-Type: application/json
+
+{
+    "password": "Test123!@"
+}
+###
+
+// ============================================================================
+// RULE R1: OnlyUsernamePassword - Email triggers Register
+// ============================================================================
+
+// If email is provided, this should trigger registration flow, not login
+// This test verifies that the frontend sends appropriate data
+// (Frontend logic: email field empty = login, email field filled = register)
+
+// ============================================================================
+// ERROR CASES: Login failures
+// ============================================================================
+
+// Missing password
+POST http://localhost:8080/auth/tokens/testuser1@cmu.edu
+Content-Type: application/json
+
+{
+}
+###
+
+// Wrong password
+POST http://localhost:8080/auth/tokens/testuser1@cmu.edu
+Content-Type: application/json
+
+{
+    "password": "WrongPassword123!"
+}
+###
+
+// Empty username in URL
+POST http://localhost:8080/auth/tokens/
+Content-Type: application/json
+
+{
+    "password": "Test123!@"
+}
+###
+
+// ============================================================================
+// TOKEN VALIDATION
+// ============================================================================
+
+// Test authenticated endpoint with valid token
+// Replace <TOKEN> with actual token from login
+GET http://localhost:8080/auth/users/testuser1@cmu.edu
+Authorization: Bearer <TOKEN>
+
+###
+
+// Test authenticated endpoint with invalid/expired token
+GET http://localhost:8080/auth/users/testuser1@cmu.edu
+Authorization: Bearer invalid_token_here
+
+###
+
+// Test authenticated endpoint with no token
+GET http://localhost:8080/auth/users/testuser1@cmu.edu
+
+###

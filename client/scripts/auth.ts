@@ -1,3 +1,4 @@
+import axios, { AxiosResponse } from 'axios';
 import type { ILogin, IUser } from '../../common/user.interface';
 import type {
   IAuthenticatedUser,
@@ -6,6 +7,12 @@ import type {
 import { isSuccess } from '../../common/server.responses';
 
 export {};
+
+const storeAuth = (token: string, username: string): void => {
+  sessionStorage.setItem('token', token);
+  localStorage.setItem('token', token);
+  localStorage.setItem('username', username);
+};
 
 const form = document.getElementById('auth-form') as HTMLFormElement | null;
 const statusEl = document.getElementById(
@@ -50,7 +57,7 @@ let pendingAgreementUsername: string | null = null;
 let pendingAgreementPassword: string | null = null;
 let pendingRedirectToHome = false;
 
-const setStatus = (message: string, isError = false) => {
+const setStatus = (message: string, isError = false): void => {
   if (!statusEl) {
     return;
   }
@@ -58,13 +65,13 @@ const setStatus = (message: string, isError = false) => {
   statusEl.classList.toggle('status--error', isError);
 };
 
-const clearInputErrors = () => {
+const clearInputErrors = (): void => {
   usernameInput?.classList.remove('form-input--error');
   emailInput?.classList.remove('form-input--error');
   passwordInput?.classList.remove('form-input--error');
 };
 
-const setInputError = (errorName: string) => {
+const setInputError = (errorName: string): void => {
   clearInputErrors();
   switch (errorName) {
     case 'MissingUsername':
@@ -87,7 +94,7 @@ const setInputError = (errorName: string) => {
   }
 };
 
-const setSubmitting = (isSubmitting: boolean) => {
+const setSubmitting = (isSubmitting: boolean): void => {
   if (!submitBtn) {
     return;
   }
@@ -95,15 +102,10 @@ const setSubmitting = (isSubmitting: boolean) => {
   submitBtn.textContent = isSubmitting ? 'Submitting...' : 'Login/Register';
 };
 
-const parseJson = async <T>(response: Response): Promise<T | null> => {
-  try {
-    return (await response.json()) as T;
-  } catch {
-    return null;
-  }
-};
-
-const getResponseMessage = (data: IResponse | null, fallback: string) => {
+const getResponseMessage = (
+  data: IResponse | null,
+  fallback: string
+): string => {
   if (!data) {
     return fallback;
   }
@@ -134,49 +136,60 @@ const getResponseMessage = (data: IResponse | null, fallback: string) => {
   return fallback;
 };
 
-const registerUser = async (body: IUser) => {
-  const response = await fetch('/auth/users', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(body)
-  });
-
-  const data = await parseJson<IResponse>(response);
-  return { response, data };
+const registerUser = async (
+  body: IUser
+): Promise<{ status: number; data: IResponse | null }> => {
+  try {
+    const res: AxiosResponse<IResponse> = await axios.request({
+      method: 'post',
+      headers: { 'Content-Type': 'application/json' },
+      data: body,
+      url: '/auth/users',
+      validateStatus: () => true
+    });
+    return { status: res.status, data: res.data };
+  } catch {
+    return { status: 500, data: null };
+  }
 };
 
-const loginUser = async (username: string, password: string) => {
-  const response = await fetch(`/auth/tokens/${encodeURIComponent(username)}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ password })
-  });
-
-  const data = await parseJson<IResponse>(response);
-  return { response, data };
+const loginUser = async (
+  username: string,
+  password: string
+): Promise<{ status: number; data: IResponse | null }> => {
+  try {
+    const res: AxiosResponse<IResponse> = await axios.request({
+      method: 'post',
+      headers: { 'Content-Type': 'application/json' },
+      data: { password },
+      url: `/auth/tokens/${encodeURIComponent(username)}`,
+      validateStatus: () => true
+    });
+    return { status: res.status, data: res.data };
+  } catch {
+    return { status: 500, data: null };
+  }
 };
 
-const confirmAgreement = async (username: string, password: string) => {
-  const response = await fetch(
-    `/auth/users/${encodeURIComponent(username)}?agreed=true`,
-    {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ password })
-    }
-  );
-
-  const data = await parseJson<IResponse>(response);
-  return { response, data };
+const confirmAgreement = async (
+  username: string,
+  password: string
+): Promise<{ status: number; data: IResponse | null }> => {
+  try {
+    const res: AxiosResponse<IResponse> = await axios.request({
+      method: 'patch',
+      headers: { 'Content-Type': 'application/json' },
+      data: { password },
+      url: `/auth/users/${encodeURIComponent(username)}?agreed=true`,
+      validateStatus: () => true
+    });
+    return { status: res.status, data: res.data };
+  } catch {
+    return { status: 500, data: null };
+  }
 };
 
-const openModal = (modal: HTMLDivElement | null) => {
+const openModal = (modal: HTMLDivElement | null): void => {
   if (!modal) {
     return;
   }
@@ -184,7 +197,7 @@ const openModal = (modal: HTMLDivElement | null) => {
   modal.removeAttribute('inert');
 };
 
-const closeModal = (modal: HTMLDivElement | null) => {
+const closeModal = (modal: HTMLDivElement | null): void => {
   if (!modal) {
     return;
   }
@@ -192,14 +205,18 @@ const closeModal = (modal: HTMLDivElement | null) => {
   modal.setAttribute('inert', '');
 };
 
-const openTermsModal = (username: string, password: string, shouldRedirect: boolean) => {
+const openTermsModal = (
+  username: string,
+  password: string,
+  shouldRedirect: boolean
+): void => {
   pendingAgreementUsername = username;
   pendingAgreementPassword = password;
   pendingRedirectToHome = shouldRedirect;
   openModal(termsModal);
 };
 
-const handleAgreementAccept = async () => {
+const handleAgreementAccept = async (): Promise<void> => {
   if (!pendingAgreementUsername || !pendingAgreementPassword) {
     if (tosInput) {
       tosInput.checked = true;
@@ -210,8 +227,11 @@ const handleAgreementAccept = async () => {
 
   setSubmitting(true);
   try {
-    const agreementResult = await confirmAgreement(pendingAgreementUsername, pendingAgreementPassword);
-    if (!agreementResult.response.ok) {
+    const agreementResult = await confirmAgreement(
+      pendingAgreementUsername,
+      pendingAgreementPassword
+    );
+    if (agreementResult.status < 200 || agreementResult.status >= 300) {
       const agreementMessage = getResponseMessage(
         agreementResult.data,
         'Agreement update failed.'
@@ -224,10 +244,29 @@ const handleAgreementAccept = async () => {
       tosInput.checked = true;
     }
     closeModal(termsModal);
-    setStatus('Agreement accepted. Redirecting to home...');
+
+    // After agreement, login to get a fresh token
+    const loginResult = await loginUser(
+      pendingAgreementUsername,
+      pendingAgreementPassword
+    );
+    if (loginResult.status >= 200 && loginResult.status < 300) {
+      const loginPayload =
+        loginResult.data &&
+        isSuccess(loginResult.data) &&
+        loginResult.data.payload &&
+        'user' in loginResult.data.payload
+          ? (loginResult.data.payload as IAuthenticatedUser)
+          : null;
+      if (loginPayload?.token && loginPayload?.user) {
+        storeAuth(loginPayload.token, loginPayload.user.credentials.username);
+      }
+    }
+
+    setStatus('Agreement accepted. Redirecting to directory...');
     if (pendingRedirectToHome) {
       window.setTimeout(() => {
-        window.location.href = 'home.html';
+        window.location.href = 'app_directory.html';
       }, 1200);
     }
   } catch (error) {
@@ -244,7 +283,7 @@ const handleAgreementAccept = async () => {
   }
 };
 
-form?.addEventListener('submit', async (event) => {
+form?.addEventListener('submit', async (event: SubmitEvent) => {
   event.preventDefault();
   setStatus('');
   clearInputErrors();
@@ -277,12 +316,12 @@ form?.addEventListener('submit', async (event) => {
   setSubmitting(true);
 
   try {
-    const { response, data } = await loginUser(
+    const { status, data } = await loginUser(
       payload.credentials.username,
       payload.credentials.password
     );
 
-    if (!response.ok) {
+    if (status < 200 || status >= 300) {
       const message = getResponseMessage(data, 'Login failed.');
       const errorName = data && 'name' in data ? data.name : '';
       setInputError(errorName);
@@ -295,15 +334,26 @@ form?.addEventListener('submit', async (event) => {
         ? (data.payload as IAuthenticatedUser)
         : null;
     const authenticatedUser = authPayload?.user ?? null;
+    const token = authPayload?.token ?? null;
+
     if (authenticatedUser && authenticatedUser.agreed === false) {
       // User hasn't agreed yet - show terms modal with password for PATCH
-      openTermsModal(authenticatedUser.credentials.username, payload.credentials.password, true);
+      openTermsModal(
+        authenticatedUser.credentials.username,
+        payload.credentials.password,
+        true
+      );
       return;
     }
 
-    setStatus('Login successful. Redirecting to home...');
+    // Store token in localStorage for RESTful auth
+    if (token && authenticatedUser) {
+      storeAuth(token, authenticatedUser.credentials.username);
+    }
+
+    setStatus('Login successful. Redirecting to directory...');
     window.setTimeout(() => {
-      window.location.href = 'home.html';
+      window.location.href = 'app_directory.html';
     }, 1200);
   } catch (error) {
     const message =
@@ -332,9 +382,9 @@ confirmYes?.addEventListener('click', async () => {
   };
 
   try {
-    const { response, data } = await registerUser(registerBody);
+    const { status, data } = await registerUser(registerBody);
 
-    if (!response.ok) {
+    if (status < 200 || status >= 300) {
       const message = getResponseMessage(data, 'Registration failed.');
       const errorName = data && 'name' in data ? data.name : '';
       setInputError(errorName);
@@ -358,7 +408,7 @@ confirmYes?.addEventListener('click', async () => {
         user.credentials.username,
         registerBody.credentials.password
       );
-      if (!agreementResult.response.ok) {
+      if (agreementResult.status < 200 || agreementResult.status >= 300) {
         const agreementMessage = getResponseMessage(
           agreementResult.data,
           'Agreement update failed.'
@@ -367,15 +417,37 @@ confirmYes?.addEventListener('click', async () => {
         return;
       }
 
-      setStatus('Registered and agreed. Redirecting to home...');
+      // After agreement, login to get a token
+      const loginResult = await loginUser(
+        user.credentials.username,
+        registerBody.credentials.password
+      );
+      if (loginResult.status >= 200 && loginResult.status < 300) {
+        const loginPayload =
+          loginResult.data &&
+          isSuccess(loginResult.data) &&
+          loginResult.data.payload &&
+          'user' in loginResult.data.payload
+            ? (loginResult.data.payload as IAuthenticatedUser)
+            : null;
+        if (loginPayload?.token && loginPayload?.user) {
+          storeAuth(loginPayload.token, loginPayload.user.credentials.username);
+        }
+      }
+
+      setStatus('Registered and agreed. Redirecting to directory...');
       window.setTimeout(() => {
-        window.location.href = 'home.html';
+        window.location.href = 'app_directory.html';
       }, 1200);
       return;
     }
 
     // User didn't check ToS checkbox - show terms modal
-    openTermsModal(user.credentials.username, registerBody.credentials.password, true);
+    openTermsModal(
+      user.credentials.username,
+      registerBody.credentials.password,
+      true
+    );
   } catch (error) {
     const message =
       error instanceof Error
