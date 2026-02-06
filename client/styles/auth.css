@@ -226,6 +226,13 @@ body {
   margin-bottom: 16px;
 }
 
+.modal-message {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #333;
+  margin: 0;
+}
+
 .modal-actions {
   display: flex;
   flex-direction: column;

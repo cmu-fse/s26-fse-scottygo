@@ -145,6 +145,27 @@
         </div>
       </div>
     </div>
+    <div id="decline-modal" class="modal-backdrop" inert>
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="decline-title"
+      >
+        <h2 id="decline-title" class="modal-title">Terms Declined</h2>
+        <p class="modal-message"
+          >You will not be able to access any ScottyGo functionality before agreeing to the terms. You are now being directed back to the login page.</p
+        >
+        <div class="modal-actions">
+          <button
+            type="button"
+            class="modal-btn modal-btn--primary"
+            id="decline-ok"
+            >OK</button
+          >
+        </div>
+      </div>
+    </div>
     <script type="module" src="../scripts/auth.ts"></script>
   </body>
 </html>

@@ -51,6 +51,12 @@ const termsDecline = document.getElementById(
 const termsLink = document.getElementById(
   'terms-link'
 ) as HTMLButtonElement | null;
+const declineModal = document.getElementById(
+  'decline-modal'
+) as HTMLDivElement | null;
+const declineOk = document.getElementById(
+  'decline-ok'
+) as HTMLButtonElement | null;
 
 let pendingRegisterPayload: IUser | null = null;
 let pendingAgreementUsername: string | null = null;
@@ -530,5 +536,10 @@ termsLink?.addEventListener('click', () => {
 
 termsDecline?.addEventListener('click', () => {
   closeModal(termsModal);
+  openModal(declineModal);
+});
+
+declineOk?.addEventListener('click', () => {
+  closeModal(declineModal);
   window.location.href = 'home.html';
 });
