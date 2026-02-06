@@ -295,7 +295,7 @@ Content-Type: application/json
 
 {
     "credentials": { 
-        "username": "testuser2@cmu.edu",
+        "username": "testuser2",
         "password": "Test123!@"
     },
     "email": "testuser2@cmu.edu",
@@ -309,7 +309,7 @@ Content-Type: application/json
 
 // Step 3-4: Login with valid username and password (no email = login per R1)
 // Expected: 200 OK, returns token, user marked online
-POST http://localhost:8080/auth/tokens/testuser1@cmu.edu
+POST http://localhost:8080/auth/tokens/testuser1
 Content-Type: application/json
 
 {
@@ -323,7 +323,7 @@ Content-Type: application/json
 
 // Login attempt with non-existing username
 // Expected: 404 or error indicating user doesn't exist
-POST http://localhost:8080/auth/tokens/nonexistent@cmu.edu
+POST http://localhost:8080/auth/tokens/nonexistent
 Content-Type: application/json
 
 {
@@ -336,8 +336,8 @@ Content-Type: application/json
 // ============================================================================
 
 // Login with user who hasn't agreed to terms
-// Expected: Returns user with agreed=false, frontend shows terms modal
-POST http://localhost:8080/auth/tokens/testuser2@cmu.edu
+// Expected: 401 UnauthorizedRequest response, frontend shows terms modal
+POST http://localhost:8080/auth/tokens/testuser2
 Content-Type: application/json
 
 {
@@ -345,8 +345,8 @@ Content-Type: application/json
 }
 ###
 
-// Update agreement after user accepts terms
-PATCH http://localhost:8080/auth/users/testuser2@cmu.edu?agreed=true
+// Update agreement after user accepts terms - 200 UserAgreed response
+PATCH http://localhost:8080/auth/users/testuser2
 Content-Type: application/json
 
 {
@@ -367,7 +367,7 @@ Content-Type: application/json
 // ============================================================================
 
 // Missing password
-POST http://localhost:8080/auth/tokens/testuser1@cmu.edu
+POST http://localhost:8080/auth/tokens/testuser1
 Content-Type: application/json
 
 {
@@ -383,7 +383,7 @@ Content-Type: application/json
 }
 ###
 
-// Empty username in URL
+// Missing username (param in URL)
 POST http://localhost:8080/auth/tokens/
 Content-Type: application/json
 
