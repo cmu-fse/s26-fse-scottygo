@@ -120,6 +120,7 @@
         aria-modal="true"
         aria-labelledby="terms-title"
       >
+        <p class="modal-welcome">Welcome to ScottyGO</p>
         <h2 id="terms-title" class="modal-title">Terms of Service</h2>
         <div class="terms-box">
           <ol>
@@ -141,6 +142,27 @@
             class="modal-btn modal-btn--secondary"
             id="terms-decline"
             >Decline</button
+          >
+        </div>
+      </div>
+    </div>
+    <div id="decline-modal" class="modal-backdrop" inert>
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="decline-title"
+      >
+        <h2 id="decline-title" class="modal-title">Terms Declined</h2>
+        <p class="modal-message"
+          >You will not be able to access any ScottyGo functionality before agreeing to the terms. You are now being directed back to the login page.</p
+        >
+        <div class="modal-actions">
+          <button
+            type="button"
+            class="modal-btn modal-btn--primary"
+            id="decline-ok"
+            >OK</button
           >
         </div>
       </div>
