@@ -1,8 +1,278 @@
-// REST tests for authentication services (login/logout)
-// NOTE: Username must be a valid email format (backend validation)
+// REST tests for authentication services (register, login/logout)
 
 // ============================================================================
-// SETUP: Create test users first
+// UC REGISTER - BASIC FLOW: Register a new user
+// ============================================================================
+// Member provides username, email, password → app validates → creates user
+// Expected: 201 Created, returns new user with agreed=false
+POST http://localhost:8080/auth/users
+Content-Type: application/json
+
+{
+    "credentials": { 
+        "username": "newmember",
+        "password": "Test123!@"
+    },
+    "email": "newmember@cmu.edu",
+    "agreed": false
+}
+###
+
+// After registration, user agrees to terms via PATCH
+// Expected: 200 OK, agreed updated to true
+PATCH http://localhost:8080/auth/users/newmember
+Content-Type: application/json
+
+{
+    "password": "Test123!@"
+}
+###
+
+// ============================================================================
+// UC REGISTER - A1: CanLogin (user already exists, correct password)
+// ============================================================================
+// Try to register with same username and correct password
+// Expected: 400, UserExists - "please log in"
+POST http://localhost:8080/auth/users
+Content-Type: application/json
+
+{
+    "credentials": { 
+        "username": "newmember",
+        "password": "Test123!@"
+    },
+    "email": "newmember@cmu.edu",
+    "agreed": false
+}
+###
+
+// ============================================================================
+// UC REGISTER - A2: EmailMissing (no email = assumed login, not register)
+// ============================================================================
+
+// Missing email field → should return error
+// Expected: 400, MissingEmail
+POST http://localhost:8080/auth/users
+Content-Type: application/json
+
+{
+    "credentials": { 
+        "username": "noemail",
+        "password": "Test123!@"
+    }
+}
+###
+
+// ============================================================================
+// UC REGISTER - A3: MemberExists (username exists, wrong password)
+// ============================================================================
+
+// Try to register with existing username but wrong password
+// Expected: 400, InvalidUsername - "Please provide a different username"
+POST http://localhost:8080/auth/users
+Content-Type: application/json
+
+{
+    "credentials": { 
+        "username": "newmember",
+        "password": "WrongPass1!"
+    },
+    "email": "differentemail@cmu.edu",
+    "agreed": false
+}
+###
+
+// Same username, same email, wrong password (existing user mistyped password)
+// Expected: 400, IncorrectPassword - "Re-enter username and/or password"
+POST http://localhost:8080/auth/users
+Content-Type: application/json
+
+{
+    "credentials": { 
+        "username": "newmember",
+        "password": "WrongPass1!"
+    },
+    "email": "newmember@cmu.edu",
+    "agreed": false
+}
+###
+
+// ============================================================================
+// UC REGISTER - A4: UsernameInvalid (R1 - Username Rule violations)
+// ============================================================================
+
+// Username too short (less than 4 characters)
+// Expected: 400, InvalidUsername - "at least 4 characters"
+POST http://localhost:8080/auth/users
+Content-Type: application/json
+
+{
+    "credentials": { 
+        "username": "ab",
+        "password": "Test123!@"
+    },
+    "email": "ab@cmu.edu",
+    "agreed": false
+}
+###
+
+// Username is a banned/reserved word
+// Expected: 400, InvalidUsername - "invalid"
+POST http://localhost:8080/auth/users
+Content-Type: application/json
+
+{
+    "credentials": { 
+        "username": "admin",
+        "password": "Test123!@"
+    },
+    "email": "admin@cmu.edu",
+    "agreed": false
+}
+###
+
+// Missing username
+// Expected: 400, MissingUsername
+POST http://localhost:8080/auth/users
+Content-Type: application/json
+
+{
+    "credentials": { 
+        "password": "Test123!@"
+    },
+    "email": "nouser@cmu.edu",
+    "agreed": false
+}
+###
+
+// ============================================================================
+// UC REGISTER - A5: PasswordInvalid (R2 - Password Rule violations)
+// ============================================================================
+
+// Password too short (less than 4 characters)
+// Expected: 400, WeakPassword - "at least 4 characters"
+POST http://localhost:8080/auth/users
+Content-Type: application/json
+
+{
+    "credentials": { 
+        "username": "weakpass1",
+        "password": "Ab1"
+    },
+    "email": "weakpass1@cmu.edu",
+    "agreed": false
+}
+###
+
+// Password missing letters
+// Expected: 400, WeakPassword - "at least one letter"
+POST http://localhost:8080/auth/users
+Content-Type: application/json
+
+{
+    "credentials": { 
+        "username": "weakpass2",
+        "password": "1234!@"
+    },
+    "email": "weakpass2@cmu.edu",
+    "agreed": false
+}
+###
+
+// Password missing numbers
+// Expected: 400, WeakPassword - "at least one number"
+POST http://localhost:8080/auth/users
+Content-Type: application/json
+
+{
+    "credentials": { 
+        "username": "weakpass3",
+        "password": "Abcd!@"
+    },
+    "email": "weakpass3@cmu.edu",
+    "agreed": false
+}
+###
+
+// Password missing special characters
+// Expected: 400, WeakPassword - "at least one special character"
+POST http://localhost:8080/auth/users
+Content-Type: application/json
+
+{
+    "credentials": { 
+        "username": "weakpass4",
+        "password": "Abcd12"
+    },
+    "email": "weakpass4@cmu.edu",
+    "agreed": false
+}
+###
+
+// Missing password
+// Expected: 400, MissingPassword
+POST http://localhost:8080/auth/users
+Content-Type: application/json
+
+{
+    "credentials": { 
+        "username": "nopass"
+    },
+    "email": "nopass@cmu.edu",
+    "agreed": false
+}
+###
+
+// ============================================================================
+// UC REGISTER - A5 (second): Ineligible (R3 - non-CMU email)
+// ============================================================================
+
+// Email is not a CMU domain
+// Expected: 400, InvalidEmail - "valid CMU email address"
+POST http://localhost:8080/auth/users
+Content-Type: application/json
+
+{
+    "credentials": { 
+        "username": "outsider",
+        "password": "Test123!@"
+    },
+    "email": "outsider@gmail.com",
+    "agreed": false
+}
+###
+
+// ============================================================================
+// UC REGISTER - A7: Disagreement (user does not agree to terms)
+// ============================================================================
+
+// Register user who does not agree
+// Expected: 201 Created with agreed=false
+POST http://localhost:8080/auth/users
+Content-Type: application/json
+
+{
+    "credentials": { 
+        "username": "disagreer",
+        "password": "Test123!@"
+    },
+    "email": "disagreer@cmu.edu",
+    "agreed": false
+}
+###
+
+// Try to login without agreeing - should be denied
+// Expected: 401, UnauthorizedRequest
+POST http://localhost:8080/auth/tokens/disagreer
+Content-Type: application/json
+
+{
+    "password": "Test123!@"
+}
+###
+
+// ============================================================================
+// SETUP: Create test users for login/logout tests
 // ============================================================================
 
 // Create a registered user who agreed to terms
@@ -11,7 +281,7 @@ Content-Type: application/json
 
 {
     "credentials": { 
-        "username": "testuser1@cmu.edu",
+        "username": "testuser1",
         "password": "Test123!@"
     },
     "email": "testuser1@cmu.edu",
@@ -45,18 +315,6 @@ Content-Type: application/json
 {
     "password": "Test123!@"
 }
-###
-
-// ============================================================================
-// BASIC FLOW: Logout
-// ============================================================================
-
-// Step 7-8: Logout - invalidate token, mark user offline
-// Replace <TOKEN> with actual token from login response
-DELETE http://localhost:8080/auth/tokens
-Content-Type: application/json
-Authorization: Bearer <TOKEN>
-
 ###
 
 // ============================================================================
@@ -117,7 +375,7 @@ Content-Type: application/json
 ###
 
 // Wrong password
-POST http://localhost:8080/auth/tokens/testuser1@cmu.edu
+POST http://localhost:8080/auth/tokens/testuser1
 Content-Type: application/json
 
 {
@@ -132,26 +390,4 @@ Content-Type: application/json
 {
     "password": "Test123!@"
 }
-###
-
-// ============================================================================
-// TOKEN VALIDATION
-// ============================================================================
-
-// Test authenticated endpoint with valid token
-// Replace <TOKEN> with actual token from login
-GET http://localhost:8080/auth/users/testuser1@cmu.edu
-Authorization: Bearer <TOKEN>
-
-###
-
-// Test authenticated endpoint with invalid/expired token
-GET http://localhost:8080/auth/users/testuser1@cmu.edu
-Authorization: Bearer invalid_token_here
-
-###
-
-// Test authenticated endpoint with no token
-GET http://localhost:8080/auth/users/testuser1@cmu.edu
-
 ###
