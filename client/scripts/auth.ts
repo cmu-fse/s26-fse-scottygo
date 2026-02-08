@@ -9,7 +9,6 @@ import { isSuccess } from '../../common/server.responses';
 export {};
 
 const storeAuth = (token: string, username: string): void => {
-  sessionStorage.setItem('token', token);
   localStorage.setItem('token', token);
   localStorage.setItem('username', username);
 };
