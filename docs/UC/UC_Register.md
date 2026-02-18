@@ -13,8 +13,8 @@ Flow of Events
 Basic Flow
 
 1. The use case starts when the Member accesses the app using its home page and elects to join the app community.  
-2. The app asks the Member to provide an username, email, and a password.  
-3. The Member provides a Membername and password.    
+2. The app asks the Member to provide a username, email, and a password.  
+3. The Member provides a username, email, and password.    
 4. The app validates the username and password (according to the **username Rule** and **Password Rule**.   
 5. The app  validates the Member’s eligibility to join the app community by relying on the email (according to the **Eligibility Rule**).   
 6. The app asks the Member to confirm the creation of a new user.  
@@ -34,9 +34,9 @@ Alternative Flows \[all mandatory\]
 * A3 MemberExists. In step 4, if the username already exists, but the password is incorrect (does not match the existing username), the app informs the Member that they need to re-enter the username and/or password. The use case returns to step 3\.  
 * A4 UsernameInvalid. In step 4, if the username does not satisfy the app’s username selection requirements (defined under Username Rule below), the system asks the Member to provide a different username. The use case returns to step 3\.  
 * A5 PasswordInvalid. In step 4, if the password does not satisfy the app’s password strength requirements (defined under **Password Rule** below), the app asks the Member to provide a different password. The use case returns to step 3\.  
-* A5. Ineligible. In step 5, if the Member cannot be confirmed to be eligible to join the app community, the app informs the Member of this situation. The use case returns to step 2\.  
-* A6. Cancels. In step 7, if the Member does not want to create a new user, the system returns to step 2\.  
-* A7. Disagreement. In step 12, if the Member does not agree to the terms, the app informs the Member that the Member will not be able to access the app (login request will be denied) and the app returns to the home page. 
+* A6. Ineligible. In step 5, if the Member cannot be confirmed to be eligible to join the app community, the app informs the Member of this situation. The use case returns to step 2\.  
+* A7. Cancels. In step 7, if the Member does not want to create a new user, the system returns to step 2\.  
+* A8. Disagreement. In step 12, if the Member does not agree to the terms, the app informs the Member that the Member will not be able to access the app (login request will be denied) and the app returns to the home page. 
 
 Rules
 
@@ -49,7 +49,7 @@ Implementation Notes
 
 * **Responsiveness**: While most users will use the application on a mobile device, the size of their devices will vary. Therefore, the application must be responsive to adjust to various screen sizes. Design your prototypes to look good on a “largish” phone screen.   
 * **Browser Restriction:** Your application should work on a **Chrome** browser. It’s not necessary to support other browsers.  
-* **Basic Security:** Authentication and client-server communication should follow standard security guidelines and practices. In particular, passwords should not be sent in the clear without encryption, nor stored as plain text (should be salted and hashed first before storing them). It should not be possible for an attacker to sniff a password in mid-transmission. The most practical way to achieve the latter is to use HTTPS/SSL, which will be possible when you deploy your application on the cloud (automatic with Redner). 
+* **Basic Security:** Authentication and client-server communication should follow standard security guidelines and practices. In particular, passwords should not be sent in the clear without encryption, nor stored as plain text (should be salted and hashed first before storing them). It should not be possible for an attacker to sniff a password in mid-transmission. The most practical way to achieve the latter is to use HTTPS/SSL, which will be possible when you deploy your application on the cloud (automatic with Render). 
 
 FAQs about the Use Case
 
