@@ -61,40 +61,19 @@ FAQs about the Use Case
   Answer: This is a potential future team use case: don’t add any bells and whistles now, or implement anything extra that you think would be “cool” at this moment. Any extras must be introduced explicitly through a team use case. 
 ---
 
-## Implementation Status Review (February 2026)
+## Implementation Status (February 2026)
 
-### Implemented Features
+### Implemented
+- Basic flow (Steps 1-12): Username/email/password input, validation, confirmation modal, ToS flow
+- R1 Username Rule: ≥4 chars, banned list, case-insensitive
+- R2 Password Rule: ≥4 chars + letter + number + special char (enhanced beyond UC)
+- R3 Eligibility: CMU email domain check only (no verification email)
+- All alternative flows (A1-A8)
+- Security: bcrypt hashing, JWT auth
 
-| Requirement | Status | Location |
-|-------------|--------|----------|
-| Username, email, password input | ✅ | `client/pages/auth.html`, `client/scripts/auth.ts` |
-| R1 Username Rule (≥4 chars) | ✅ | `server/models/user.model.ts` (line ~363) |
-| R1 Username Rule (banned list) | ✅ | `server/models/user.model.ts` (lines 47-353) |
-| R1 Username Rule (case insensitive) | ✅ | Username stored as lowercase |
-| R2 Password Rule (≥4 chars) | ✅ | `server/models/user.model.ts` (line ~417) |
-| R3 Eligibility Rule (CMU email) | ✅ | `server/models/user.model.ts` (lines 24-41) - regex for `@cmu.edu` and subdomains |
-| Step 6: Confirm account creation | ✅ | `client/pages/auth.html` - confirm-modal |
-| Step 10-12: Terms of Service flow | ✅ | `client/pages/auth.html` - terms-modal, `client/scripts/auth.ts` |
-| A1 CanLogin: Existing user redirect | ✅ | `server/models/user.model.ts` - `UserExists` error |
-| A2 EmailMissing: Treat as login | ✅ | `client/scripts/auth.ts` - `isRegister = payload.email.length > 0` |
-| A3 MemberExists: Wrong password | ✅ | `server/models/user.model.ts` - `IncorrectPassword` error |
-| A4 UsernameInvalid | ✅ | `server/models/user.model.ts` - `InvalidUsername` error |
-| A5 PasswordInvalid | ✅ | `server/models/user.model.ts` - `WeakPassword` error |
-| A5 Ineligible (email) | ✅ | `server/models/user.model.ts` - `InvalidEmail` error |
-| A6 Cancels: Cancel confirmation | ✅ | `client/scripts/auth.ts` - confirmNo handler |
-| A7 Disagreement: Terms declined | ✅ | `client/pages/auth.html` - decline-modal |
-| Basic Security (hashed passwords) | ✅ | `server/models/user.model.ts` - bcrypt hashing |
-| JWT-based authentication | ✅ | `server/controllers/auth.controller.ts` |
+### Not Implemented
+- Email verification (R3 Option 1) or Google OAuth (R3 Option 2)
 
-### Deviations from UC
-
-| Issue | Description |
-|-------|-------------|
-| **Extra password rules** | Implementation adds rules NOT in UC: must contain letter, number, and special character (`$%#@!*&~^-+`). Per UC, password only needs to be ≥4 chars. See `server/models/user.model.ts` lines ~425-457. **Consider removing or documenting as intentional enhancement.** |
-| **No email verification** | R3 suggests sending a verification email with a code, but current implementation only checks email domain format. **Email verification flow not implemented.** |
-| **After registration redirect** | UC Step 13 says "app returns to the home page", but implementation redirects to `app_directory.html` after agreeing to terms. **Behavior matches UC_LoginLogout A1 more closely.** |
-
-### Notes for Future Implementation
-
-- Consider implementing email verification (Option 1 in R3) or Google OAuth (Option 2)
-- The extra password rules should either be removed to match UC exactly, or documented as an intentional security enhancement
+### Design Decisions (differs from UC)
+- **Password**: Stricter rules than UC spec (requires letter, number, special char)
+- **Step 13**: Redirects to app directory instead of home page after registration + agreement

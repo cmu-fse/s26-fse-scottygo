@@ -44,74 +44,17 @@ Implementation Notes
 
 ---
 
-## Implementation Status Review (February 2026)
+## Implementation Status (February 2026)
 
-### Implemented Features
+### Implemented
+- Login/logout with JWT tokens (Steps 2-4, 9)
+- R1 OnlyUsernamePassword Rule
+- A2 Disagreement: Re-show terms if not agreed
+- Token-based authorization middleware
 
-| Requirement | Status | Location |
-|-------------|--------|----------|
-| Step 2-3: Username/password input | ✅ | `client/pages/auth.html`, `client/scripts/auth.ts` |
-| Step 4: Validate credentials | ✅ | `server/models/user.model.ts` - `validateUser()` |
-| Step 9: Return to home page on logout | ✅ | `client/scripts/app_directory.ts` - `handleLogout()` |
-| R1 OnlyUsernamePassword Rule | ✅ | `client/scripts/auth.ts` - `isRegister = payload.email.length > 0` |
-| A2 Disagreement: Re-show terms | ✅ | `server/controllers/auth.controller.ts` - `UnauthorizedRequest` when `agreed === false` |
-| JWT tokens for RESTful auth | ✅ | `server/controllers/auth.controller.ts`, localStorage storage |
-| Token-based authorization | ✅ | `server/controllers/appdir.controller.ts` - `authorize()` middleware |
-
-### NOT Implemented
-
-| Requirement | Description | Priority |
-|-------------|-------------|----------|
-| **Step 5: Mark member as online** | No `isOnline` field in IUser interface or database schema | HIGH |
-| **Step 6: App directory display** | No endpoint to fetch all users; no UI to list members | HIGH |
-| **Step 6: Alphabetical sorting** | No sorting logic (online first, then offline, both alphabetical) | HIGH |
-| **Step 8: Mark member as offline** | No status update on logout | HIGH |
-| **Online/Offline Status Update** | No dynamic status updates via Socket.io | HIGH |
-| **Window-close detection** | No `beforeunload` event handler to mark user offline | MEDIUM |
-| **A1 NonexistingMember** | Login with non-existing user doesn't trigger Register flow | MEDIUM |
-
-### Gaps to Address
-
-#### 1. User Online/Offline Status
-The `IUser` interface needs an `isOnline: boolean` field:
-```typescript
-// common/user.interface.ts - needs update
-export interface IUser {
-  credentials: ILogin;
-  _id?: string;
-  email: string;
-  agreed: boolean;
-  isOnline?: boolean;  // ADD THIS
-}
-```
-
-#### 2. App Directory Endpoints Needed
-```typescript
-// server/controllers/appdir.controller.ts - needs new routes
-GET /appdir/users          // Get all users (sorted: online first alphabetically, then offline alphabetically)
-PATCH /appdir/users/:id    // Update online status
-```
-
-#### 3. Database Functions Needed
-```typescript
-// server/db/mongo.db.ts - needs new methods
-findAllUsers(): Promise<IUser[]>
-updateUserOnlineStatus(userId: string, isOnline: boolean): Promise<IUser | null>
-```
-
-#### 4. Client-Side Needs
-- `client/scripts/app_directory.ts`: Fetch and render user list
-- `client/pages/app_directory.html`: Add container to display members
-- Window `beforeunload` event to call logout/offline API
-- Socket.io integration for real-time status updates
-
-#### 5. A1 NonexistingMember Flow
-When login fails with `UserNotFound`, the client should redirect to registration flow (show email field) instead of just showing an error. Current behavior shows "User not found" error.
-
-### Implementation Priority
-1. Add `isOnline` field to user model and database
-2. Implement `GET /appdir/users` endpoint
-3. Update `app_directory.html` to display user list
-4. Add online status update on login/logout
-5. Add `beforeunload` handler for browser close
-6. Implement Socket.io for real-time status updates 
+### Not Implemented
+- **Online/offline status** (Steps 5, 8): No `isOnline` field in user model
+- **App directory listing** (Step 6): No `GET /appdir/users` endpoint, no UI to list members
+- **Real-time status updates**: No Socket.io integration
+- **Browser close detection**: No `beforeunload` handler
+- **A1 NonexistingMember**: Shows error instead of redirecting to registration flow 
