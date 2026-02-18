@@ -49,4 +49,4 @@ yarn.lock
 # ignore parcel's cash
 .parcel-cache
 
-docs
+private
