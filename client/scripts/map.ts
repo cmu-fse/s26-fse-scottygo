@@ -33,7 +33,7 @@ async function getUser(username: string): Promise<IUser | null> {
     const res: AxiosResponse = await axios.request({
       method: 'get',
       headers: { Authorization: `Bearer ${token}` },
-      url: '/appdir/users/' + username,
+      url: '/map/users/' + username,
       validateStatus: () => true
     });
     // Now handle response
