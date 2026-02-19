@@ -18,6 +18,7 @@
     "lint": "eslint ./",
     "pug": "ts-node ./tools/pug-compile",
     "serve": "ts-node server/serve",
+    "test": "jest",
     "later": "echo \"Some future command...\" && exit 1"
   },
   "dependencies": {

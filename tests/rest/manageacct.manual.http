@@ -1,0 +1,556 @@
+// REST tests for ManageAcct use case (account management)
+// Base URL: http://localhost:8080/account
+
+// ============================================================================
+// SETUP: First, register and login to get tokens for testing
+// ============================================================================
+
+// Register an admin user (will need to manually set privilege in DB for initial admin)
+// Or use the default Admin account per R2: username=Admin, password=admin
+POST http://localhost:8080/auth/users
+Content-Type: application/json
+
+{
+    "credentials": { 
+        "username": "testadmin",
+        "password": "Admin123!"
+    },
+    "email": "testadmin@cmu.edu",
+    "agreed": false
+}
+###
+
+// Agree to terms for testadmin
+PATCH http://localhost:8080/auth/users/testadmin
+Content-Type: application/json
+
+{
+    "password": "Admin123!"
+}
+###
+
+// Register a regular member for testing
+POST http://localhost:8080/auth/users
+Content-Type: application/json
+
+{
+    "credentials": { 
+        "username": "testmember",
+        "password": "Member123!"
+    },
+    "email": "testmember@cmu.edu",
+    "agreed": false
+}
+###
+
+// Agree to terms for testmember
+PATCH http://localhost:8080/auth/users/testmember
+Content-Type: application/json
+
+{
+    "password": "Member123!"
+}
+###
+
+// Login as admin to get token
+// Expected: 200 OK, returns token
+// SAVE THE TOKEN from response for subsequent requests
+POST http://localhost:8080/auth/tokens/testadmin
+Content-Type: application/json
+
+{
+    "password": "Admin123!"
+}
+###
+
+// Login as member to get token
+// Expected: 200 OK, returns token
+// SAVE THE TOKEN from response for subsequent requests
+POST http://localhost:8080/auth/tokens/testmember
+Content-Type: application/json
+
+{
+    "password": "Member123!"
+}
+###
+
+// ============================================================================
+// GET USER ACCOUNT - Basic Flow
+// ============================================================================
+
+// Admin retrieves any user's account
+// Expected: 200 OK, AccountRetrieved with IUserAccount payload
+// Replace <ADMIN_TOKEN> with actual token from login
+GET http://localhost:8080/account/users/testmember
+Authorization: Bearer <ADMIN_TOKEN>
+###
+
+// Member retrieves own account
+// Expected: 200 OK, AccountRetrieved
+GET http://localhost:8080/account/users/testmember
+Authorization: Bearer <MEMBER_TOKEN>
+###
+
+// ============================================================================
+// GET USER ACCOUNT - Error Cases
+// ============================================================================
+
+// Member tries to view another user's account
+// Expected: 403 Forbidden, UnauthorizedRequest
+GET http://localhost:8080/account/users/testadmin
+Authorization: Bearer <MEMBER_TOKEN>
+###
+
+// Missing token
+// Expected: 401 Unauthorized, MissingToken
+GET http://localhost:8080/account/users/testmember
+###
+
+// Invalid token
+// Expected: 401 Unauthorized, InvalidToken
+GET http://localhost:8080/account/users/testmember
+Authorization: Bearer invalid_token_here
+###
+
+// Non-existent user
+// Expected: 400, UserNotFound
+GET http://localhost:8080/account/users/nonexistent
+Authorization: Bearer <ADMIN_TOKEN>
+###
+
+// ============================================================================
+// UPDATE ACCOUNT STATUS - Basic Flow
+// ============================================================================
+
+// Admin changes member's status to Inactive
+// Expected: 200 OK, StatusUpdated
+// Note: This will trigger forceLogout socket event to the user
+PATCH http://localhost:8080/account/users/testmember/status
+Authorization: Bearer <ADMIN_TOKEN>
+Content-Type: application/json
+
+{
+    "status": "Inactive"
+}
+###
+
+// Admin reactivates member's account
+// Expected: 200 OK, StatusUpdated
+PATCH http://localhost:8080/account/users/testmember/status
+Authorization: Bearer <ADMIN_TOKEN>
+Content-Type: application/json
+
+{
+    "status": "Active"
+}
+###
+
+// Member changes own status to Inactive (allowed per UC)
+// Expected: 200 OK, StatusUpdated
+PATCH http://localhost:8080/account/users/testmember/status
+Authorization: Bearer <MEMBER_TOKEN>
+Content-Type: application/json
+
+{
+    "status": "Inactive"
+}
+###
+
+// ============================================================================
+// UPDATE ACCOUNT STATUS - Error Cases (R1: At-Least-One-Administrator)
+// ============================================================================
+
+// Last admin tries to inactivate own account
+// Expected: 400, LastAdministrator
+// Note: Only test this if testadmin is the only active admin
+PATCH http://localhost:8080/account/users/testadmin/status
+Authorization: Bearer <ADMIN_TOKEN>
+Content-Type: application/json
+
+{
+    "status": "Inactive"
+}
+###
+
+// Member tries to change another user's status
+// Expected: 403 Forbidden, UnauthorizedRequest
+PATCH http://localhost:8080/account/users/testadmin/status
+Authorization: Bearer <MEMBER_TOKEN>
+Content-Type: application/json
+
+{
+    "status": "Inactive"
+}
+###
+
+// Invalid status value
+// Expected: 400, UnauthorizedRequest (invalid status)
+PATCH http://localhost:8080/account/users/testmember/status
+Authorization: Bearer <ADMIN_TOKEN>
+Content-Type: application/json
+
+{
+    "status": "Invalid"
+}
+###
+
+// ============================================================================
+// UPDATE PRIVILEGE LEVEL - Basic Flow (Admin Only)
+// ============================================================================
+
+// Admin promotes member to Coordinator
+// Expected: 200 OK, PrivilegeUpdated
+PATCH http://localhost:8080/account/users/testmember/privilege
+Authorization: Bearer <ADMIN_TOKEN>
+Content-Type: application/json
+
+{
+    "privilegeLevel": "Coordinator"
+}
+###
+
+// Admin promotes member to Administrator
+// Expected: 200 OK, PrivilegeUpdated
+PATCH http://localhost:8080/account/users/testmember/privilege
+Authorization: Bearer <ADMIN_TOKEN>
+Content-Type: application/json
+
+{
+    "privilegeLevel": "Administrator"
+}
+###
+
+// Admin demotes user back to Member
+// Expected: 200 OK, PrivilegeUpdated
+PATCH http://localhost:8080/account/users/testmember/privilege
+Authorization: Bearer <ADMIN_TOKEN>
+Content-Type: application/json
+
+{
+    "privilegeLevel": "Member"
+}
+###
+
+// ============================================================================
+// UPDATE PRIVILEGE LEVEL - Error Cases
+// ============================================================================
+
+// Member tries to change privilege (not allowed)
+// Expected: 403 Forbidden, UnauthorizedRequest
+PATCH http://localhost:8080/account/users/testmember/privilege
+Authorization: Bearer <MEMBER_TOKEN>
+Content-Type: application/json
+
+{
+    "privilegeLevel": "Administrator"
+}
+###
+
+// Invalid privilege level
+// Expected: 400, UnauthorizedRequest
+PATCH http://localhost:8080/account/users/testmember/privilege
+Authorization: Bearer <ADMIN_TOKEN>
+Content-Type: application/json
+
+{
+    "privilegeLevel": "SuperAdmin"
+}
+###
+
+// ============================================================================
+// UPDATE USERNAME - Basic Flow (Member Only, Own Account)
+// ============================================================================
+
+// Member changes own username
+// Expected: 200 OK, UsernameUpdated
+// Note: Token will still work but contains old username
+PATCH http://localhost:8080/account/users/testmember/username
+Authorization: Bearer <MEMBER_TOKEN>
+Content-Type: application/json
+
+{
+    "newUsername": "testmember2"
+}
+###
+
+// Change it back for other tests
+PATCH http://localhost:8080/account/users/testmember2/username
+Authorization: Bearer <MEMBER_TOKEN>
+Content-Type: application/json
+
+{
+    "newUsername": "testmember"
+}
+###
+
+// ============================================================================
+// UPDATE USERNAME - Error Cases
+// ============================================================================
+
+// Username too short (< 4 chars)
+// Expected: 400, InvalidUsername
+PATCH http://localhost:8080/account/users/testmember/username
+Authorization: Bearer <MEMBER_TOKEN>
+Content-Type: application/json
+
+{
+    "newUsername": "abc"
+}
+###
+
+// Reserved/banned username
+// Expected: 400, InvalidUsername
+PATCH http://localhost:8080/account/users/testmember/username
+Authorization: Bearer <MEMBER_TOKEN>
+Content-Type: application/json
+
+{
+    "newUsername": "admin"
+}
+###
+
+// Username already exists
+// Expected: 400, UsernameExists
+PATCH http://localhost:8080/account/users/testmember/username
+Authorization: Bearer <MEMBER_TOKEN>
+Content-Type: application/json
+
+{
+    "newUsername": "testadmin"
+}
+###
+
+// Member tries to change another user's username
+// Expected: 403 Forbidden, UnauthorizedRequest
+PATCH http://localhost:8080/account/users/testadmin/username
+Authorization: Bearer <MEMBER_TOKEN>
+Content-Type: application/json
+
+{
+    "newUsername": "newadminname"
+}
+###
+
+// Admin tries to change another user's username (not allowed per UC)
+// Expected: 403 Forbidden, UnauthorizedRequest
+PATCH http://localhost:8080/account/users/testmember/username
+Authorization: Bearer <ADMIN_TOKEN>
+Content-Type: application/json
+
+{
+    "newUsername": "adminchangedthis"
+}
+###
+
+// ============================================================================
+// UPDATE EMAIL - Basic Flow (Member Only, Own Account)
+// ============================================================================
+
+// Member changes own email
+// Expected: 200 OK, EmailUpdated
+PATCH http://localhost:8080/account/users/testmember/email
+Authorization: Bearer <MEMBER_TOKEN>
+Content-Type: application/json
+
+{
+    "email": "newemail@andrew.cmu.edu"
+}
+###
+
+// Change back to original
+PATCH http://localhost:8080/account/users/testmember/email
+Authorization: Bearer <MEMBER_TOKEN>
+Content-Type: application/json
+
+{
+    "email": "testmember@cmu.edu"
+}
+###
+
+// ============================================================================
+// UPDATE EMAIL - Error Cases
+// ============================================================================
+
+// Invalid email (non-CMU)
+// Expected: 400, InvalidEmail
+PATCH http://localhost:8080/account/users/testmember/email
+Authorization: Bearer <MEMBER_TOKEN>
+Content-Type: application/json
+
+{
+    "email": "testmember@gmail.com"
+}
+###
+
+// Member tries to change another user's email
+// Expected: 403 Forbidden, UnauthorizedRequest
+PATCH http://localhost:8080/account/users/testadmin/email
+Authorization: Bearer <MEMBER_TOKEN>
+Content-Type: application/json
+
+{
+    "email": "hacked@cmu.edu"
+}
+###
+
+// Admin tries to change another user's email (not allowed per UC)
+// Expected: 403 Forbidden, UnauthorizedRequest
+PATCH http://localhost:8080/account/users/testmember/email
+Authorization: Bearer <ADMIN_TOKEN>
+Content-Type: application/json
+
+{
+    "email": "adminchanged@cmu.edu"
+}
+###
+
+// ============================================================================
+// UPDATE PASSWORD - Basic Flow
+// ============================================================================
+
+// Member changes own password (requires current password)
+// Expected: 200 OK, PasswordUpdated
+PATCH http://localhost:8080/account/users/testmember/password
+Authorization: Bearer <MEMBER_TOKEN>
+Content-Type: application/json
+
+{
+    "currentPassword": "Member123!",
+    "newPassword": "NewMember123!"
+}
+###
+
+// Change back to original for other tests
+PATCH http://localhost:8080/account/users/testmember/password
+Authorization: Bearer <MEMBER_TOKEN>
+Content-Type: application/json
+
+{
+    "currentPassword": "NewMember123!",
+    "newPassword": "Member123!"
+}
+###
+
+// Admin changes another user's password (no current password needed)
+// Expected: 200 OK, PasswordUpdated
+PATCH http://localhost:8080/account/users/testmember/password
+Authorization: Bearer <ADMIN_TOKEN>
+Content-Type: application/json
+
+{
+    "newPassword": "AdminReset123!"
+}
+###
+
+// Reset back to original
+PATCH http://localhost:8080/account/users/testmember/password
+Authorization: Bearer <ADMIN_TOKEN>
+Content-Type: application/json
+
+{
+    "newPassword": "Member123!"
+}
+###
+
+// ============================================================================
+// UPDATE PASSWORD - Error Cases
+// ============================================================================
+
+// Member provides wrong current password
+// Expected: 400, IncorrectPassword
+PATCH http://localhost:8080/account/users/testmember/password
+Authorization: Bearer <MEMBER_TOKEN>
+Content-Type: application/json
+
+{
+    "currentPassword": "WrongPassword1!",
+    "newPassword": "NewPassword123!"
+}
+###
+
+// Member doesn't provide current password
+// Expected: 400, MissingPassword
+PATCH http://localhost:8080/account/users/testmember/password
+Authorization: Bearer <MEMBER_TOKEN>
+Content-Type: application/json
+
+{
+    "newPassword": "NewPassword123!"
+}
+###
+
+// Weak password - too short
+// Expected: 400, WeakPassword
+PATCH http://localhost:8080/account/users/testmember/password
+Authorization: Bearer <MEMBER_TOKEN>
+Content-Type: application/json
+
+{
+    "currentPassword": "Member123!",
+    "newPassword": "Ab1!"
+}
+###
+
+// Weak password - no letter
+// Expected: 400, WeakPassword
+PATCH http://localhost:8080/account/users/testmember/password
+Authorization: Bearer <MEMBER_TOKEN>
+Content-Type: application/json
+
+{
+    "currentPassword": "Member123!",
+    "newPassword": "12345678!"
+}
+###
+
+// Weak password - no number
+// Expected: 400, WeakPassword
+PATCH http://localhost:8080/account/users/testmember/password
+Authorization: Bearer <MEMBER_TOKEN>
+Content-Type: application/json
+
+{
+    "currentPassword": "Member123!",
+    "newPassword": "Abcdefgh!"
+}
+###
+
+// Weak password - no special character
+// Expected: 400, WeakPassword
+PATCH http://localhost:8080/account/users/testmember/password
+Authorization: Bearer <MEMBER_TOKEN>
+Content-Type: application/json
+
+{
+    "currentPassword": "Member123!",
+    "newPassword": "Abcdefgh1"
+}
+###
+
+// Member tries to change another user's password
+// Expected: 403 Forbidden, UnauthorizedRequest
+PATCH http://localhost:8080/account/users/testadmin/password
+Authorization: Bearer <MEMBER_TOKEN>
+Content-Type: application/json
+
+{
+    "currentPassword": "Admin123!",
+    "newPassword": "Hacked123!"
+}
+###
+
+// ============================================================================
+// CLEANUP: Optionally delete test users or reset state
+// ============================================================================
+// Note: There's no DELETE endpoint in ManageAcct - use database directly
+// or set accounts to Inactive
+
+// Set testmember to inactive for cleanup
+PATCH http://localhost:8080/account/users/testmember/status
+Authorization: Bearer <ADMIN_TOKEN>
+Content-Type: application/json
+
+{
+    "status": "Inactive"
+}
+###

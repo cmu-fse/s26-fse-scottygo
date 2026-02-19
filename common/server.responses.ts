@@ -1,6 +1,6 @@
-import { IUser, ILogin } from './user.interface';
+import { IUser, ILogin, IUserAccount } from './user.interface';
 
-// in a response, the password property of an ILogin object should always be objustcated, e.g., replaced by '*******';
+// in a response, the password property of an ILogin object should always be obfuscated, e.g., replaced by '*******';
 
 export interface IAuthenticatedUser {
   // when the user is authenticated through a login request, this is the response's payload
@@ -18,7 +18,13 @@ export type SuccessName =
   | 'UserFound'
   | 'UsersFound'
   | 'UserAgreed'
-  | 'LoginSuccess';
+  | 'LoginSuccess'
+  | 'AccountRetrieved'
+  | 'StatusUpdated'
+  | 'PrivilegeUpdated'
+  | 'UsernameUpdated'
+  | 'EmailUpdated'
+  | 'PasswordUpdated';
 
 export type ClientErrorName =
   | 'MissingEmail'
@@ -34,7 +40,9 @@ export type ClientErrorName =
   | 'InvalidEmail'
   | 'InvalidToken'
   | 'WeakPassword'
-  | 'InvalidUsername';
+  | 'InvalidUsername'
+  | 'LastAdministrator'
+  | 'UsernameExists';
 
 export type ServerErrorName =
   | 'FailedAuthentication'
@@ -48,6 +56,8 @@ export type IPayload =
   | IUser
   | ILogin
   | IUser[]
+  | IUserAccount
+  | IUserAccount[]
   | string[]
   | IAuthenticatedUser
   | null;

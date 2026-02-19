@@ -3,7 +3,12 @@
 // It is used to decouple the database from the rest of the application
 // It is accessed by the models, which are used by the controllers
 
-import { IUser } from '../../common/user.interface';
+import {
+  IUser,
+  IUserAccount,
+  IAccountStatus,
+  IPrivilegeLevel
+} from '../../common/user.interface';
 
 export interface IDatabase {
   connect(): Promise<void>;
@@ -16,7 +21,41 @@ export interface IDatabase {
 
   findUserByUsername(username: string): Promise<IUser | null>;
 
+  findUserById(userId: string): Promise<IUser | null>;
+
   setUserAgreedToTrue(user: IUser): Promise<IUser | null>;
+
+  // Account management methods
+  findUserAccountByUsername(username: string): Promise<IUserAccount | null>;
+
+  findUserAccountById(userId: string): Promise<IUserAccount | null>;
+
+  updateUserStatus(
+    username: string,
+    status: IAccountStatus
+  ): Promise<IUserAccount | null>;
+
+  updateUserPrivilege(
+    username: string,
+    privilegeLevel: IPrivilegeLevel
+  ): Promise<IUserAccount | null>;
+
+  updateUsername(
+    oldUsername: string,
+    newUsername: string
+  ): Promise<IUserAccount | null>;
+
+  updateUserEmail(
+    username: string,
+    email: string
+  ): Promise<IUserAccount | null>;
+
+  updateUserPassword(
+    username: string,
+    hashedPassword: string
+  ): Promise<IUserAccount | null>;
+
+  countAdministrators(): Promise<number>;
 }
 
 /* Data Access Class */

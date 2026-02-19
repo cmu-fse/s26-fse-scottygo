@@ -4,20 +4,32 @@
 import { IDatabase } from './dac';
 import mongoose from 'mongoose';
 import { Schema, model } from 'mongoose';
-import { IUser } from '../../common/user.interface';
+import {
+  IUser,
+  IUserAccount,
+  IAccountStatus,
+  IPrivilegeLevel
+} from '../../common/user.interface';
 import { IAppError } from '../../common/server.responses';
 
-const UserSchema = new Schema<IUser>({
+// Extended schema for user accounts with status and privilege
+const UserSchema = new Schema<IUserAccount>({
   credentials: {
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true }
   },
   email: { type: String, required: true },
   agreed: { type: Boolean, required: true },
-  _id: { type: String, required: true } // required in DB
+  _id: { type: String, required: true },
+  status: { type: String, default: 'Active', enum: ['Active', 'Inactive'] },
+  privilegeLevel: {
+    type: String,
+    default: 'Member',
+    enum: ['Administrator', 'Coordinator', 'Member']
+  }
 });
 
-const MUser = model<IUser>('User', UserSchema);
+const MUser = model<IUserAccount>('User', UserSchema);
 
 export class MongoDB implements IDatabase {
   public dbURL: string;
@@ -83,6 +95,11 @@ export class MongoDB implements IDatabase {
     return user;
   }
 
+  async findUserById(userId: string): Promise<IUser | null> {
+    const user: IUser |null = await MUser.findById(userId).lean();
+    return user;
+  }
+
   async setUserAgreedToTrue(user: IUser): Promise<IUser | null> {
     const agreedUser: IUser | null = await MUser.findByIdAndUpdate(
       user._id,
@@ -94,5 +111,89 @@ export class MongoDB implements IDatabase {
       }
     ).lean();
     return agreedUser;
+  }
+
+  // Account management methods
+
+  async findUserAccountByUsername(
+    username: string
+  ): Promise<IUserAccount | null> {
+    const user: IUserAccount | null = await MUser.findOne({
+      'credentials.username': username
+    }).lean();
+    return user;
+  }
+
+  async findUserAccountById(userId: string): Promise<IUserAccount | null> {
+    const user: IUserAccount | null = await MUser.findById(userId).lean();
+    return user;
+  }
+
+  async updateUserStatus(
+    username: string,
+    status: IAccountStatus
+  ): Promise<IUserAccount | null> {
+    const updatedUser: IUserAccount | null = await MUser.findOneAndUpdate(
+      { 'credentials.username': username },
+      { status },
+      { new: true }
+    ).lean();
+    return updatedUser;
+  }
+
+  async updateUserPrivilege(
+    username: string,
+    privilegeLevel: IPrivilegeLevel
+  ): Promise<IUserAccount | null> {
+    const updatedUser: IUserAccount | null = await MUser.findOneAndUpdate(
+      { 'credentials.username': username },
+      { privilegeLevel },
+      { new: true }
+    ).lean();
+    return updatedUser;
+  }
+
+  async updateUsername(
+    oldUsername: string,
+    newUsername: string
+  ): Promise<IUserAccount | null> {
+    const updatedUser: IUserAccount | null = await MUser.findOneAndUpdate(
+      { 'credentials.username': oldUsername },
+      { 'credentials.username': newUsername },
+      { new: true }
+    ).lean();
+    return updatedUser;
+  }
+
+  async updateUserEmail(
+    username: string,
+    email: string
+  ): Promise<IUserAccount | null> {
+    const updatedUser: IUserAccount | null = await MUser.findOneAndUpdate(
+      { 'credentials.username': username },
+      { email },
+      { new: true }
+    ).lean();
+    return updatedUser;
+  }
+
+  async updateUserPassword(
+    username: string,
+    hashedPassword: string
+  ): Promise<IUserAccount | null> {
+    const updatedUser: IUserAccount | null = await MUser.findOneAndUpdate(
+      { 'credentials.username': username },
+      { 'credentials.password': hashedPassword },
+      { new: true }
+    ).lean();
+    return updatedUser;
+  }
+
+  async countAdministrators(): Promise<number> {
+    const count = await MUser.countDocuments({
+      privilegeLevel: 'Administrator',
+      status: 'Active'
+    });
+    return count;
   }
 }

@@ -7,12 +7,14 @@ import { DB_CONN_STR as dbURL } from './env';
 import HomeController from './controllers/home.controller';
 import AuthController from './controllers/auth.controller';
 import AppDirController from './controllers/appdir.controller';
+import AccountController from './controllers/account.controller';
 
 const app = new App(
   [
     new HomeController('/'),
     new AuthController('/auth'),
-    new AppDirController('/appdir')
+    new AppDirController('/appdir'),
+    new AccountController('/account')
   ],
   {
     clientDir: path.join(__dirname, '../.dist/client'),
