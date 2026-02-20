@@ -96,7 +96,7 @@ export class MongoDB implements IDatabase {
   }
 
   async findUserById(userId: string): Promise<IUser | null> {
-    const user: IUser |null = await MUser.findById(userId).lean();
+    const user: IUser | null = await MUser.findById(userId).lean();
     return user;
   }
 

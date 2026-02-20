@@ -8,24 +8,21 @@ This section covers the authentication endpoints, including user registration, l
 
 ### **1.1 Interface Definitions**
 
-**IUser**
+- **IUser**
+  - **credentials**: { username: string, password: string }
+  - **\_id?**: string
+  - **email**: string
+  - **agreed**: boolean
 
-- **credentials**: { username: string, password: string }
-- **\_id?**: string
-- **email**: string
-- **agreed**: boolean
+- **IAuthenticatedUser**
+  - **user**: IUser
+  - **token**: string
 
-**IAuthenticatedUser**
-
-- **user**: IUser
-- **token**: string
-
-**ISuccess\<T\>**
-
-- **name**: string
-- **message?**: string
-- **authorizedUser?**: string
-- **payload**: T | null
+- **ISuccess\<T\>**
+  - **name**: string
+  - **message?**: string
+  - **authorizedUser?**: string
+  - **payload**: T | null
 
 ---
 
@@ -57,7 +54,7 @@ This section covers the authentication endpoints, including user registration, l
 
 JSON
 
-```
+```ts
 {
   "credentials": ILogin {
     "username": "Username",
@@ -79,7 +76,7 @@ JSON
 
 JSON
 
-```
+```ts
 {
   "password": "Abc1$"
 }
@@ -100,7 +97,7 @@ JSON
 
 JSON
 
-```
+```ts
 {
   "password": "Abc1$"
 }

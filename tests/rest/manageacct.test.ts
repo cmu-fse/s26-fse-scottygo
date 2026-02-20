@@ -11,10 +11,7 @@ import AccountController from '../../server/controllers/account.controller';
 import AuthController from '../../server/controllers/auth.controller';
 import HomeController from '../../server/controllers/home.controller';
 import DAC from '../../server/db/dac';
-import {
-  IUserAccount,
-  IPrivilegeLevel
-} from '../../common/user.interface';
+import { IUserAccount, IPrivilegeLevel } from '../../common/user.interface';
 import * as responses from '../../common/server.responses';
 
 // Test configuration
@@ -511,8 +508,11 @@ describe('PATCH /account/users/:username/username', () => {
 
     // Note: member3Token is now stale with old username
     // Login again to get fresh token for reverting
-    const newToken = await loginUser('member3renamed', member3User.credentials.password);
-    
+    const newToken = await loginUser(
+      'member3renamed',
+      member3User.credentials.password
+    );
+
     // Change back
     await request(
       'PATCH',
@@ -840,10 +840,13 @@ describe('Socket.io Events', () => {
     adminSocket.emit('subscribeAccount', member2User.credentials.username);
 
     let received = false;
-    
+
     // Set up listener first
     const handler = (account: IUserAccount) => {
-      if (!received && account.credentials.username === member2User.credentials.username) {
+      if (
+        !received &&
+        account.credentials.username === member2User.credentials.username
+      ) {
         received = true;
         expect(account.credentials.username).toBe(
           member2User.credentials.username
@@ -853,7 +856,7 @@ describe('Socket.io Events', () => {
         done();
       }
     };
-    
+
     adminSocket.on('accountUpdated', handler);
 
     // Wait for subscription to be processed, then trigger status update
@@ -881,18 +884,20 @@ describe('Socket.io Events', () => {
     adminSocket.emit('subscribeAccount', member2User.credentials.username);
 
     let received = false;
-    
+
     const handler = (account: IUserAccount) => {
-      if (!received && 
-          account.credentials.username === member2User.credentials.username &&
-          account.privilegeLevel === 'Coordinator') {
+      if (
+        !received &&
+        account.credentials.username === member2User.credentials.username &&
+        account.privilegeLevel === 'Coordinator'
+      ) {
         received = true;
         expect(account.privilegeLevel).toBe('Coordinator');
         adminSocket.off('accountUpdated', handler);
         done();
       }
     };
-    
+
     adminSocket.on('accountUpdated', handler);
 
     // Wait for subscription, then trigger privilege update

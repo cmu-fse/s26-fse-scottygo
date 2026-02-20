@@ -146,8 +146,8 @@ export default class AuthController extends Controller {
 
       // Create token payload with userId (immutable) and username (for convenience)
       const tokenPayload: ITokenPayload = {
-        userId: user._id!,  // Use userId instead of credentials to avoid token invalidation on username change
-        username: user.credentials.username  // Include username for convenience
+        userId: user._id!, // Use userId instead of credentials to avoid token invalidation on username change
+        username: user.credentials.username // Include username for convenience
       };
       // In tokenExpiry ever changed in .env, handle BOTH cases of
       // token expiry: actual time period and 'never'
