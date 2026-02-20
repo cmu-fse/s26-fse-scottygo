@@ -132,6 +132,19 @@ export default class AuthController extends Controller {
     try {
       const user: IUser = await User.validateUser(credentials);
 
+      // R5: Inactive users cannot log in
+      const userAccount = await User.getUserAccount(credentials.username);
+      if (userAccount.status === 'Inactive') {
+        const error: responses.IAppError = {
+          type: 'ClientError',
+          name: 'UnauthorizedRequest',
+          message:
+            'Your account is inactive. Please contact an administrator to reactivate your account.'
+        };
+        res.status(403).json(error);
+        return;
+      }
+
       // Check whether user has agreed Terms of Service, and if not, reject login
       if (user.agreed === false) {
         const error: responses.IAppError = {
@@ -146,8 +159,8 @@ export default class AuthController extends Controller {
 
       // Create token payload with userId (immutable) and username (for convenience)
       const tokenPayload: ITokenPayload = {
-        userId: user._id!,  // Use userId instead of credentials to avoid token invalidation on username change
-        username: user.credentials.username  // Include username for convenience
+        userId: user._id!, // Use userId instead of credentials to avoid token invalidation on username change
+        username: user.credentials.username // Include username for convenience
       };
       // In tokenExpiry ever changed in .env, handle BOTH cases of
       // token expiry: actual time period and 'never'

@@ -82,7 +82,10 @@ class EmailService implements IEmailService {
       );
       return true;
     } catch (error) {
-      console.error(`[EmailService]: Failed to send inactivation email:`, error);
+      console.error(
+        `[EmailService]: Failed to send inactivation email:`,
+        error
+      );
       return false;
     }
   }
@@ -129,7 +132,10 @@ class EmailService implements IEmailService {
       );
       return true;
     } catch (error) {
-      console.error(`[EmailService]: Failed to send reactivation email:`, error);
+      console.error(
+        `[EmailService]: Failed to send reactivation email:`,
+        error
+      );
       return false;
     }
   }

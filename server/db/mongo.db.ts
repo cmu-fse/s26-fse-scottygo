@@ -226,7 +226,9 @@ export class MongoDB implements IDatabase {
 
     const newAdmin = new MUser(defaultAdmin);
     await newAdmin.save();
-    console.log('[MongoDB]: Default Administrator user created (username: Admin, password: admin)');
+    console.log(
+      '[MongoDB]: Default Administrator user created (username: Admin, password: admin)'
+    );
   }
 
   async getAllUsernames(): Promise<string[]> {
