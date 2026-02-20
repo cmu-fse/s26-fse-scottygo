@@ -2,9 +2,13 @@
 // Handles HTTP requests for account retrieval, updates, password changes,
 // status changes, and privilege changes per REST_ManageAcct.md
 
-import { IUserAccount, IAccountStatus, IPrivilegeLevel, ITokenPayload } from '../../common/user.interface';
+import {
+  IUserAccount,
+  IAccountStatus,
+  IPrivilegeLevel,
+  ITokenPayload
+} from '../../common/user.interface';
 import { User } from '../models/user.model';
-import DAC from '../db/dac';
 import Controller from './controller';
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
@@ -27,10 +31,7 @@ export default class AccountController extends Controller {
     // Account management routes
     this.router.get('/users', this.getAllUsers.bind(this)); // Must be before :username route
     this.router.get('/users/:username', this.getUserAccount.bind(this));
-    this.router.patch(
-      '/users/:username/status',
-      this.updateStatus.bind(this)
-    );
+    this.router.patch('/users/:username/status', this.updateStatus.bind(this));
     this.router.patch(
       '/users/:username/privilege',
       this.updatePrivilege.bind(this)
@@ -93,7 +94,7 @@ export default class AccountController extends Controller {
 
     try {
       // Use userId from token (immutable) instead of username to avoid issues after username change
-      return await DAC.db.findUserAccountById(tokenUser.userId);
+      return await User.getUserAccountById(tokenUser.userId);
     } catch {
       return null;
     }
@@ -116,8 +117,10 @@ export default class AccountController extends Controller {
    * Emit account updated event to subscribed clients
    */
   private emitAccountUpdated(account: IUserAccount): void {
-    const roomName = `account:${account.credentials.username}`;
-    Controller.io.to(roomName).emit('accountUpdated', this.obfuscatePassword(account));
+    const roomName = `account:${account.credentials.username.toLowerCase()}`;
+    Controller.io
+      .to(roomName)
+      .emit('accountUpdated', this.obfuscatePassword(account));
   }
 
   /**
@@ -323,7 +326,8 @@ export default class AccountController extends Controller {
 
     sockets.forEach((socket) => {
       // Get user from socket (stored during connection)
-      const socketUser = (socket as unknown as { user?: { username: string } }).user;
+      const socketUser = (socket as unknown as { user?: { username: string } })
+        .user;
       if (socketUser && socketUser.username.toLowerCase() === username) {
         socket.emit(
           'forceLogout',
@@ -468,18 +472,22 @@ export default class AccountController extends Controller {
       }
 
       const oldUsername = targetUsername.toLowerCase();
-      const updatedUser = await User.updateUsername(targetUsername, newUsername);
+      const updatedUser = await User.updateUsername(
+        targetUsername,
+        newUsername
+      );
 
       // Emit account updated to old room, then handle room rename
       const oldRoomName = `account:${oldUsername}`;
-      const newRoomName = `account:${updatedUser.credentials.username}`;
+      const newRoomName = `account:${updatedUser.credentials.username.toLowerCase()}`;
 
       Controller.io
         .to(oldRoomName)
         .emit('accountUpdated', this.obfuscatePassword(updatedUser));
 
       // Move sockets from old room to new room
-      const socketsInRoom = Controller.io.sockets.adapter.rooms.get(oldRoomName);
+      const socketsInRoom =
+        Controller.io.sockets.adapter.rooms.get(oldRoomName);
       if (socketsInRoom) {
         socketsInRoom.forEach((socketId) => {
           const socket = Controller.io.sockets.sockets.get(socketId);
@@ -628,7 +636,10 @@ export default class AccountController extends Controller {
         return;
       }
 
-      const updatedUser = await User.updatePassword(targetUsername, newPassword);
+      const updatedUser = await User.updatePassword(
+        targetUsername,
+        newPassword
+      );
 
       // Emit account updated event
       this.emitAccountUpdated(updatedUser);

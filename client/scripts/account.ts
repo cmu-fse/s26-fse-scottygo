@@ -385,14 +385,9 @@ const renderReadMode = (): void => {
   statusEditGroup.hidden = true;
   fieldStatus.hidden = true;
 
-  // Admin editing someone else: hide username/email groups (can't edit those)
-  if (isAdmin() && !isOwnAccount()) {
-    usernameGroup.hidden = true;
-    emailGroup.hidden = true;
-  } else {
-    usernameGroup.hidden = false;
-    emailGroup.hidden = false;
-  }
+  // Always show username/email in read mode (read-only for admin viewing others)
+  usernameGroup.hidden = false;
+  emailGroup.hidden = false;
 
   // Show Edit button, hide Save/Cancel
   editBtn.hidden = false;
@@ -507,9 +502,13 @@ const handleSave = async (): Promise<void> => {
         fieldUsername.classList.add('form-input--error');
         hasError = true;
       } else {
-        const { status, data } = await patchAccount(targetUsername, 'username', {
-          newUsername
-        });
+        const { status, data } = await patchAccount(
+          targetUsername,
+          'username',
+          {
+            newUsername
+          }
+        );
         if (status >= 200 && status < 300) {
           saveCount++;
           if (ownAcct) localStorage.setItem('username', newUsername);

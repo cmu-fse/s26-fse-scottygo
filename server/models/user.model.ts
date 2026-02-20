@@ -486,6 +486,22 @@ export class User implements IUser {
   }
 
   /**
+   * Get a user account by userId (immutable _id)
+   */
+  static async getUserAccountById(userId: string): Promise<IUserAccount> {
+    const userAccount = await DAC.db.findUserAccountById(userId);
+    if (!userAccount) {
+      const error: IAppError = {
+        type: 'ClientError',
+        name: 'UserNotFound',
+        message: 'User not found'
+      };
+      throw error;
+    }
+    return userAccount;
+  }
+
+  /**
    * Get a user account by username
    */
   static async getUserAccount(username: string): Promise<IUserAccount> {
@@ -554,8 +570,14 @@ export class User implements IUser {
     // R1 At-Least-One-Administrator Rule: Check before demoting an admin
     if (privilegeLevel !== 'Administrator') {
       // Get current user to check if they're an admin
-      const currentUser = await DAC.db.findUserAccountByUsername(username.toLowerCase());
-      if (currentUser && currentUser.privilegeLevel === 'Administrator' && currentUser.status === 'Active') {
+      const currentUser = await DAC.db.findUserAccountByUsername(
+        username.toLowerCase()
+      );
+      if (
+        currentUser &&
+        currentUser.privilegeLevel === 'Administrator' &&
+        currentUser.status === 'Active'
+      ) {
         // Count active administrators
         const adminCount = await DAC.db.countAdministrators();
         if (adminCount <= 1) {

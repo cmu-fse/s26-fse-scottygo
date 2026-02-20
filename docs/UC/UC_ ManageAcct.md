@@ -3,10 +3,10 @@
 Short Name: ManageAcct
 
 Participating Actors  
-The use case is initiated by an Administrator or a Member. Email Sender is a supporting actor that gets involved only upon certain user actions. 
+The use case is initiated by an Administrator or a Member. Email Sender is a supporting actor that gets involved only upon certain user actions.
 
 Brief Description  
-The use case allows the Administrator or Member to change the account information related to a user, as permitted. 
+The use case allows the Administrator or Member to change the account information related to a user, as permitted.
 
 Assumptions  
 The Administrator or Member is logged into the app. Refer to **R1 At-least-One-Administrator** and **R2** **Initial-Administrator** rules below.
@@ -64,10 +64,10 @@ Rules
 | Coordinator | Users at this level of privilege can perform all the use cases that the **Member & Coordinator** actors can initiate (refer to [Use Case Survey](https://docs.google.com/document/u/1/d/1Bwin1rn23aZQoTPRZ8Rxr1I3MnKJN5BnN2VXz6-Ux3g/edit)) |
 | Administrator | Users at this level of privilege can perform all the use cases that the **Member, Coordinator & Administrator** actors can initiate (refer to [Use Case Survey](https://docs.google.com/document/u/1/d/1Bwin1rn23aZQoTPRZ8Rxr1I3MnKJN5BnN2VXz6-Ux3g/edit)) |
 
-* **R5 Active/Inactive Rule**:   
-  * **Active** is the default status of an account  
-  * A logged in member whose account becomes **Inactive** is logged out of the app with an email sent to the registered email address. *\[Note: This is the only element of the Active / Inactive Rule to be modeled in OOA\]*  
-  * If there is only one Administrator in the system, that Administrator cannot inactivate its own account by **R1** above.   
-  * A logged out member whose account becomes **Inactive** cannot log into the app any longer, but receives an informing message upon trying. An Inactive account can only be reactivated by an Administrator. Provided there are multiple Administrators, only another Administrator can reactivate an **Inactive** Administrator.  
-  * Information and resources associated with an **Active** account are visible to other users, as applicable.  
-  * Information and resources associated with an **Inactive** account remain in the app, but are invisible to all users (except for User Account information, which is visible to the Administrator for administration purposes). 
+- **R5 Active/Inactive Rule**:
+  - **Active** is the default status of an account
+  - A logged in member whose account becomes **Inactive** is logged out of the app with an email sent to the registered email address. _\[Note: This is the only element of the Active / Inactive Rule to be modeled in OOA\]_
+  - If there is only one Administrator in the system, that Administrator cannot inactivate its own account by **R1** above.
+  - A logged out member whose account becomes **Inactive** cannot log into the app any longer, but receives an informing message upon trying. An Inactive account can only be reactivated by an Administrator. Provided there are multiple Administrators, only another Administrator can reactivate an **Inactive** Administrator.
+  - Information and resources associated with an **Active** account are visible to other users, as applicable.
+  - Information and resources associated with an **Inactive** account remain in the app, but are invisible to all users (except for User Account information, which is visible to the Administrator for administration purposes).

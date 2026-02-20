@@ -1,11 +1,11 @@
 /**
  * Email Service Demo Server
- * 
+ *
  * A simple Express server to test the EmailService component.
- * 
+ *
  * Usage:
  *   npx ts-node trials/email-demo-server.ts
- * 
+ *
  * Then open: http://localhost:3030
  */
 
@@ -56,9 +56,15 @@ app.post('/api/send-email', async (req: Request, res: Response) => {
     const displayUsername = username || 'TestUser';
 
     if (emailType === 'inactivated') {
-      success = await emailService.sendAccountInactivatedEmail(email, displayUsername);
+      success = await emailService.sendAccountInactivatedEmail(
+        email,
+        displayUsername
+      );
     } else if (emailType === 'reactivated') {
-      success = await emailService.sendAccountReactivatedEmail(email, displayUsername);
+      success = await emailService.sendAccountReactivatedEmail(
+        email,
+        displayUsername
+      );
     } else {
       res.status(400).json({
         success: false,
@@ -75,7 +81,8 @@ app.post('/api/send-email', async (req: Request, res: Response) => {
     } else {
       res.status(500).json({
         success: false,
-        message: 'Failed to send email. Check server logs and email configuration.'
+        message:
+          'Failed to send email. Check server logs and email configuration.'
       });
     }
   } catch (error) {

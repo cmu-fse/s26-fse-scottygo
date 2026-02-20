@@ -159,9 +159,7 @@ class App {
               `[Socket]: User ${socketUser.username} subscribed to ${roomName}`
             );
           } catch (error) {
-            console.error(
-              `[Socket]: Error in subscribeAccount: ${error}`
-            );
+            console.error(`[Socket]: Error in subscribeAccount: ${error}`);
           }
         });
 
