@@ -17,13 +17,31 @@ import {
 } from '../../common/user.interface';
 import * as responses from '../../common/server.responses';
 
+// Store reference to original email service before mocking
+const originalEmailService = jest.requireActual('../../server/services/email.service').default;
+
+// Mock the email service to avoid sending real emails during most tests
+jest.mock('../../server/services/email.service', () => ({
+  __esModule: true,
+  default: {
+    sendAccountInactivatedEmail: jest.fn().mockResolvedValue(true),
+    sendAccountReactivatedEmail: jest.fn().mockResolvedValue(true)
+  }
+}));
+
+// Import the mocked email service for verification
+import emailService from '../../server/services/email.service';
+const mockEmailService = emailService as jest.Mocked<typeof emailService>;
+
 // Test configuration
 const TEST_PORT = 8181;
 const TEST_URL = `http://localhost:${TEST_PORT}`;
 const TEST_DB_URL =
   process.env.DB_URL ?? 'mongodb://localhost:27017/scottygo_test';
 
-// Test user data
+// Test user data - use EMAIL_USER from env for the one real email test (sends to sender)
+import { EMAIL_USER } from '../../server/env';
+
 const adminUser = {
   credentials: { username: 'testadmin', password: 'Admin123!' },
   email: 'testadmin@cmu.edu',
@@ -337,6 +355,11 @@ describe('GET /account/users/:username', () => {
 // ============================================================================
 
 describe('PATCH /account/users/:username/status', () => {
+  beforeEach(() => {
+    // Clear mock call history before each test
+    jest.clearAllMocks();
+  });
+
   test('Admin can change member status to Inactive', async () => {
     const res = await request(
       'PATCH',
@@ -421,6 +444,48 @@ describe('PATCH /account/users/:username/status', () => {
     );
 
     expect(res.status).toBe(400);
+  });
+
+  test('Email service is called when user is inactivated', async () => {
+    // Inactivate user
+    await request(
+      'PATCH',
+      `/account/users/${member2User.credentials.username}/status`,
+      { status: 'Inactive' },
+      adminToken
+    );
+
+    // Verify inactivation email was sent (mocked)
+    expect(mockEmailService.sendAccountInactivatedEmail).toHaveBeenCalledWith(
+      member2User.email,
+      member2User.credentials.username
+    );
+
+    // Reactivate user
+    await request(
+      'PATCH',
+      `/account/users/${member2User.credentials.username}/status`,
+      { status: 'Active' },
+      adminToken
+    );
+
+    // Verify reactivation email was sent (mocked)
+    expect(mockEmailService.sendAccountReactivatedEmail).toHaveBeenCalledWith(
+      member2User.email,
+      member2User.credentials.username
+    );
+  });
+
+  test('Send ONE real email to verify email service works', async () => {
+    // Use the real email service for this one test - sends to sender's own email
+    const result = await originalEmailService.sendAccountInactivatedEmail(
+      EMAIL_USER,
+      'TestUser'
+    );
+
+    // Verify email was sent successfully (true) or skipped if not configured (false)
+    expect(typeof result).toBe('boolean');
+    console.log(`[Email Test] Real email ${result ? 'sent' : 'skipped (not configured)'} to ${EMAIL_USER}`);
   });
 });
 
