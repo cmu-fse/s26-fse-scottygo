@@ -28,8 +28,8 @@ export interface IUserAccount extends IUser {
 
 // JWT token payload - uses immutable userId to avoid token invalidation on username change
 export interface ITokenPayload {
-  userId: string; // User's _id (immutable)
-  username: string; // Included for convenience, but userId is the source of truth
-  iat?: number; // Issued at (set by jwt.sign)
-  exp?: number; // Expiration time (set by jwt.sign)
+  userId: string;  // User's _id (immutable)
+  username: string;  // Included for convenience, but userId is the source of truth
+  iat?: number;  // Issued at (set by jwt.sign)
+  exp?: number;  // Expiration time (set by jwt.sign)
 }

@@ -11,11 +11,7 @@ import {
 import { ExtendedError } from 'socket.io/dist/namespace';
 import jwt from 'jsonwebtoken';
 import { User } from './models/user.model';
-
-interface ISocketUser {
-  username: string;
-  password: string;
-}
+import { ITokenPayload } from '../common/user.interface';
 
 class App {
   public app: Express;
@@ -108,8 +104,8 @@ class App {
         return next(authErr);
       } else {
         // Store decoded user info on socket for later use
-        (socket as Socket & { user: ISocketUser }).user =
-          decoded as ISocketUser;
+        (socket as Socket & { user: ITokenPayload }).user =
+          decoded as ITokenPayload;
         return next();
       }
     });
@@ -125,7 +121,7 @@ class App {
         );
 
         // Get user from socket (attached during authentication)
-        const socketUser = (socket as Socket & { user?: ISocketUser }).user;
+        const socketUser = (socket as Socket & { user?: ITokenPayload }).user;
 
         // Handle subscribeAccount event
         socket.on('subscribeAccount', async (username: string) => {
@@ -159,7 +155,9 @@ class App {
               `[Socket]: User ${socketUser.username} subscribed to ${roomName}`
             );
           } catch (error) {
-            console.error(`[Socket]: Error in subscribeAccount: ${error}`);
+            console.error(
+              `[Socket]: Error in subscribeAccount: ${error}`
+            );
           }
         });
 

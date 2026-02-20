@@ -2,12 +2,7 @@
 // Handles HTTP requests for account retrieval, updates, password changes,
 // status changes, and privilege changes per REST_ManageAcct.md
 
-import {
-  IUserAccount,
-  IAccountStatus,
-  IPrivilegeLevel,
-  ITokenPayload
-} from '../../common/user.interface';
+import { IUserAccount, IAccountStatus, IPrivilegeLevel, ITokenPayload } from '../../common/user.interface';
 import { User } from '../models/user.model';
 import DAC from '../db/dac';
 import Controller from './controller';
@@ -28,7 +23,10 @@ export default class AccountController extends Controller {
 
     // Account management routes
     this.router.get('/users/:username', this.getUserAccount.bind(this));
-    this.router.patch('/users/:username/status', this.updateStatus.bind(this));
+    this.router.patch(
+      '/users/:username/status',
+      this.updateStatus.bind(this)
+    );
     this.router.patch(
       '/users/:username/privilege',
       this.updatePrivilege.bind(this)
@@ -115,9 +113,7 @@ export default class AccountController extends Controller {
    */
   private emitAccountUpdated(account: IUserAccount): void {
     const roomName = `account:${account.credentials.username}`;
-    Controller.io
-      .to(roomName)
-      .emit('accountUpdated', this.obfuscatePassword(account));
+    Controller.io.to(roomName).emit('accountUpdated', this.obfuscatePassword(account));
   }
 
   /**
@@ -283,8 +279,7 @@ export default class AccountController extends Controller {
 
     sockets.forEach((socket) => {
       // Get user from socket (stored during connection)
-      const socketUser = (socket as unknown as { user?: { username: string } })
-        .user;
+      const socketUser = (socket as unknown as { user?: { username: string } }).user;
       if (socketUser && socketUser.username.toLowerCase() === username) {
         socket.emit(
           'forceLogout',
@@ -351,6 +346,25 @@ export default class AccountController extends Controller {
         };
         res.status(403).json(error);
         return;
+      }
+
+      // R1: Cannot demote the last active administrator
+      const targetUser = await User.getUserAccount(targetUsername);
+      if (
+        targetUser.privilegeLevel === 'Administrator' &&
+        privilegeLevel !== 'Administrator'
+      ) {
+        const adminCount = await DAC.db.countAdministrators();
+        if (adminCount <= 1) {
+          const error: responses.IAppError = {
+            type: 'ClientError',
+            name: 'UnauthorizedRequest',
+            message:
+              'Cannot demote the last active administrator. Promote another user first.'
+          };
+          res.status(403).json(error);
+          return;
+        }
       }
 
       const updatedUser = await User.updatePrivilege(
@@ -428,10 +442,7 @@ export default class AccountController extends Controller {
       }
 
       const oldUsername = targetUsername.toLowerCase();
-      const updatedUser = await User.updateUsername(
-        targetUsername,
-        newUsername
-      );
+      const updatedUser = await User.updateUsername(targetUsername, newUsername);
 
       // Emit account updated to old room, then handle room rename
       const oldRoomName = `account:${oldUsername}`;
@@ -442,8 +453,7 @@ export default class AccountController extends Controller {
         .emit('accountUpdated', this.obfuscatePassword(updatedUser));
 
       // Move sockets from old room to new room
-      const socketsInRoom =
-        Controller.io.sockets.adapter.rooms.get(oldRoomName);
+      const socketsInRoom = Controller.io.sockets.adapter.rooms.get(oldRoomName);
       if (socketsInRoom) {
         socketsInRoom.forEach((socketId) => {
           const socket = Controller.io.sockets.sockets.get(socketId);
