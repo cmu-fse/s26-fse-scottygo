@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ScottyGo - Account</title>
+    <link rel="stylesheet" href="../styles/account.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <a href="app_directory.html" class="back-icon">
+        <svg
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M20 11H7.83L13.42 5.41L12 4L4 12L12 20L13.41 18.59L7.83 13H20V11Z"
+            fill="white"
+          />
+        </svg>
+      </a>
+      <div class="menu-icon">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </header>
+    <main class="content">
+      <h1 class="logo">ScottyGo</h1>
+
+      <!-- Target user selector (Admin only) -->
+      <div class="account-card" id="user-search-card" hidden>
+        <h2 class="card-title">Manage User</h2>
+        <div class="form-group">
+          <label for="target-username">Username to manage</label>
+          <div class="input-row">
+            <input
+              type="text"
+              id="target-username"
+              name="target-username"
+              class="form-input"
+              placeholder="Enter username"
+            />
+            <button type="button" class="action-btn" id="load-user-btn"
+              >Load</button
+            >
+          </div>
+        </div>
+        <p
+          id="search-status"
+          class="status"
+          role="status"
+          aria-live="polite"
+        ></p>
+      </div>
+
+      <!-- Account info display -->
+      <div class="account-card" id="account-info-card" hidden>
+        <h2 class="card-title">Account Information</h2>
+        <div class="info-row">
+          <span class="info-label">Username</span>
+          <span class="info-value" id="display-username">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Email</span>
+          <span class="info-value" id="display-email">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Status</span>
+          <span class="info-value" id="display-status">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Privilege</span>
+          <span class="info-value" id="display-privilege">—</span>
+        </div>
+      </div>
+
+      <!-- Update Username (Member only, own account) -->
+      <div class="account-card" id="username-card" hidden>
+        <h2 class="card-title">Change Username</h2>
+        <form id="username-form">
+          <div class="form-group">
+            <label for="new-username">New Username</label>
+            <input
+              type="text"
+              id="new-username"
+              name="new-username"
+              class="form-input"
+              placeholder="At least 4 characters"
+            />
+          </div>
+          <button type="submit" class="submit-btn">Update Username</button>
+        </form>
+        <p
+          id="username-status"
+          class="status"
+          role="status"
+          aria-live="polite"
+        ></p>
+      </div>
+
+      <!-- Update Email (Member only, own account) -->
+      <div class="account-card" id="email-card" hidden>
+        <h2 class="card-title">Change Email</h2>
+        <form id="email-form">
+          <div class="form-group">
+            <label for="new-email">New Email</label>
+            <input
+              type="email"
+              id="new-email"
+              name="new-email"
+              class="form-input"
+              placeholder="scotty@andrew.cmu.edu"
+            />
+          </div>
+          <button type="submit" class="submit-btn">Update Email</button>
+        </form>
+        <p
+          id="email-status"
+          class="status"
+          role="status"
+          aria-live="polite"
+        ></p>
+      </div>
+
+      <!-- Update Password (Admin: any user, Member: own account) -->
+      <div class="account-card" id="password-card" hidden>
+        <h2 class="card-title">Change Password</h2>
+        <form id="password-form">
+          <div class="form-group" id="current-password-group">
+            <label for="current-password">Current Password</label>
+            <input
+              type="password"
+              id="current-password"
+              name="current-password"
+              class="form-input"
+              placeholder="Enter current password"
+            />
+          </div>
+          <div class="form-group">
+            <label for="new-password">New Password</label>
+            <input
+              type="password"
+              id="new-password"
+              name="new-password"
+              class="form-input"
+              placeholder="At least 4 characters"
+            />
+          </div>
+          <button type="submit" class="submit-btn">Update Password</button>
+        </form>
+        <p
+          id="password-status"
+          class="status"
+          role="status"
+          aria-live="polite"
+        ></p>
+      </div>
+
+      <!-- Update Status (Admin: any, Member: own) -->
+      <div class="account-card" id="status-card" hidden>
+        <h2 class="card-title">Account Status</h2>
+        <form id="status-form">
+          <div class="form-group">
+            <label for="new-status">Status</label>
+            <select id="new-status" name="new-status" class="form-input">
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+          </div>
+          <button type="submit" class="submit-btn">Update Status</button>
+        </form>
+        <p
+          id="status-status"
+          class="status"
+          role="status"
+          aria-live="polite"
+        ></p>
+      </div>
+
+      <!-- Update Privilege (Admin only) -->
+      <div class="account-card" id="privilege-card" hidden>
+        <h2 class="card-title">Privilege Level</h2>
+        <form id="privilege-form">
+          <div class="form-group">
+            <label for="new-privilege">Privilege</label>
+            <select id="new-privilege" name="new-privilege" class="form-input">
+              <option value="Member">Member</option>
+              <option value="Coordinator">Coordinator</option>
+              <option value="Administrator">Administrator</option>
+            </select>
+          </div>
+          <button type="submit" class="submit-btn">Update Privilege</button>
+        </form>
+        <p
+          id="privilege-status"
+          class="status"
+          role="status"
+          aria-live="polite"
+        ></p>
+      </div>
+
+      <button type="button" class="logout-btn" id="logout-btn">Logout</button>
+    </main>
+
+    <!-- Confirm status change modal -->
+    <div id="confirm-modal" class="modal-backdrop" inert>
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-title"
+      >
+        <h2 id="confirm-title" class="modal-title">Confirm Change</h2>
+        <p id="confirm-message" class="modal-message"></p>
+        <div class="modal-actions">
+          <button
+            type="button"
+            class="modal-btn modal-btn--primary"
+            id="confirm-yes"
+            >Confirm</button
+          >
+          <button
+            type="button"
+            class="modal-btn modal-btn--secondary"
+            id="confirm-no"
+            >Cancel</button
+          >
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="../scripts/account.ts"></script>
+  </body>
+</html>
