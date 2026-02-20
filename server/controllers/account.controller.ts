@@ -348,6 +348,25 @@ export default class AccountController extends Controller {
         return;
       }
 
+      // R1: Cannot demote the last active administrator
+      const targetUser = await User.getUserAccount(targetUsername);
+      if (
+        targetUser.privilegeLevel === 'Administrator' &&
+        privilegeLevel !== 'Administrator'
+      ) {
+        const adminCount = await DAC.db.countAdministrators();
+        if (adminCount <= 1) {
+          const error: responses.IAppError = {
+            type: 'ClientError',
+            name: 'UnauthorizedRequest',
+            message:
+              'Cannot demote the last active administrator. Promote another user first.'
+          };
+          res.status(403).json(error);
+          return;
+        }
+      }
+
       const updatedUser = await User.updatePrivilege(
         targetUsername,
         privilegeLevel

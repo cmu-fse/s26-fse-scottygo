@@ -488,6 +488,21 @@ describe('PATCH /account/users/:username/privilege', () => {
 
     expect(res.status).toBe(400);
   });
+
+  test('Cannot demote last active administrator', async () => {
+    // Try to demote the only admin (testadmin) to Member
+    const res = await request(
+      'PATCH',
+      `/account/users/${adminUser.credentials.username}/privilege`,
+      { privilegeLevel: 'Member' },
+      adminToken
+    );
+
+    expect(res.status).toBe(403);
+    const error = res.data as responses.IAppError;
+    expect(error.name).toBe('UnauthorizedRequest');
+    expect(error.message).toContain('last active administrator');
+  });
 });
 
 // ============================================================================
