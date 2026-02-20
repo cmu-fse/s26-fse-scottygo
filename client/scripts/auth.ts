@@ -271,7 +271,7 @@ const handleAgreementAccept = async (): Promise<void> => {
     setStatus('Agreement accepted. Redirecting to directory...');
     if (pendingRedirectToHome) {
       window.setTimeout(() => {
-        window.location.href = 'app_directory.html';
+        window.location.href = 'map.html';
       }, 1200);
     }
   } catch (error) {
@@ -367,7 +367,7 @@ form?.addEventListener('submit', async (event: SubmitEvent) => {
 
           setStatus('Agreement accepted. Redirecting to directory...');
           window.setTimeout(() => {
-            window.location.href = 'app_directory.html';
+            window.location.href = 'map.html';
           }, 1200);
           return;
         }
@@ -410,7 +410,7 @@ form?.addEventListener('submit', async (event: SubmitEvent) => {
 
     setStatus('Login successful. Redirecting to directory...');
     window.setTimeout(() => {
-      window.location.href = 'app_directory.html';
+      window.location.href = 'map.html';
     }, 1200);
   } catch (error) {
     const message =
@@ -494,7 +494,7 @@ confirmYes?.addEventListener('click', async () => {
 
       setStatus('Registered and agreed. Redirecting to directory...');
       window.setTimeout(() => {
-        window.location.href = 'app_directory.html';
+        window.location.href = 'map.html';
       }, 1200);
       return;
     }

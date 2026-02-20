@@ -13,19 +13,18 @@ import {
 } from '../env';
 import * as responses from '../../common/server.responses';
 
-export default class AppDirController extends Controller {
+export default class MapController extends Controller {
   public constructor(path: string) {
     super(path);
   }
 
   public initializeRoutes(): void {
-    this.router.get('/', this.appDirPage);
-    this.router.get('/appdir', this.appDirPage);
-    this.router.get('/appdir/users/:username?', this.authorize, this.getUser);
+    this.router.get('/', this.mapPage);
+    this.router.get('/users/:username?', this.authorize, this.getUser);
   }
 
-  public appDirPage(req: Request, res: Response) {
-    return res.redirect('/app_directory.html');
+  public mapPage(req: Request, res: Response) {
+    return res.redirect('/map.html');
   }
 
   // Check if the user is logged in by validating token
