@@ -24,6 +24,11 @@ export const JWT_EXP: string =
 
 export const ENV = process.env.ENV ?? 'LOCAL'; // defaults to LOCAL
 
+// Email configuration for Gmail SMTP
+export const EMAIL_USER: string = process.env.EMAIL_USER ?? '';
+export const EMAIL_APP_PASSWORD: string = process.env.EMAIL_APP_PASSWORD ?? '';
+export const EMAIL_FROM_NAME: string = process.env.EMAIL_FROM_NAME ?? 'ScottyGO';
+
 // Set the HOST URL depending on the build environment and where the app is served from
 export const HOST: string =
   ENV === 'RENDER'

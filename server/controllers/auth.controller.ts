@@ -1,7 +1,7 @@
 // Controller serving the athentication page and handling user registration and login
 // Note that controllers don't access the DB direcly, only through the models
 
-import { ILogin, IUser } from '../../common/user.interface';
+import { ILogin, IUser, ITokenPayload } from '../../common/user.interface';
 import { User } from '../models/user.model';
 import Controller from './controller';
 import { Request, Response } from 'express';
@@ -144,7 +144,11 @@ export default class AuthController extends Controller {
         return; // Stop execution
       }
 
-      const tokenPayload: ILogin = user.credentials;
+      // Create token payload with userId (immutable) and username (for convenience)
+      const tokenPayload: ITokenPayload = {
+        userId: user._id!,  // Use userId instead of credentials to avoid token invalidation on username change
+        username: user.credentials.username  // Include username for convenience
+      };
       // In tokenExpiry ever changed in .env, handle BOTH cases of
       // token expiry: actual time period and 'never'
       let signedToken: string;

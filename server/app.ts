@@ -10,7 +10,8 @@ import {
 } from '../common/socket.interface';
 import { ExtendedError } from 'socket.io/dist/namespace';
 import jwt from 'jsonwebtoken';
-// other imports you need
+import { User } from './models/user.model';
+import { ITokenPayload } from '../common/user.interface';
 
 class App {
   public app: Express;
@@ -102,6 +103,9 @@ class App {
         const authErr = new Error('Authentication error: Invalid token');
         return next(authErr);
       } else {
+        // Store decoded user info on socket for later use
+        (socket as Socket & { user: ITokenPayload }).user =
+          decoded as ITokenPayload;
         return next();
       }
     });
@@ -115,6 +119,56 @@ class App {
           '⚡️[Server]: A client connected to the socket server with id' +
             socket.id
         );
+
+        // Get user from socket (attached during authentication)
+        const socketUser = (socket as Socket & { user?: ITokenPayload }).user;
+
+        // Handle subscribeAccount event
+        socket.on('subscribeAccount', async (username: string) => {
+          if (!socketUser) {
+            console.log(
+              `[Socket]: Unauthorized subscribeAccount attempt for ${username}`
+            );
+            return;
+          }
+
+          try {
+            // Authorization check: Members can only subscribe to their own account
+            const requestingUserAccount = await User.getUserAccount(
+              socketUser.username
+            );
+            const isAdmin =
+              requestingUserAccount.privilegeLevel === 'Administrator';
+            const isOwnAccount =
+              socketUser.username.toLowerCase() === username.toLowerCase();
+
+            if (!isAdmin && !isOwnAccount) {
+              console.log(
+                `[Socket]: User ${socketUser.username} unauthorized to subscribe to ${username}`
+              );
+              return;
+            }
+
+            const roomName = `account:${username.toLowerCase()}`;
+            socket.join(roomName);
+            console.log(
+              `[Socket]: User ${socketUser.username} subscribed to ${roomName}`
+            );
+          } catch (error) {
+            console.error(
+              `[Socket]: Error in subscribeAccount: ${error}`
+            );
+          }
+        });
+
+        // Handle unsubscribeAccount event
+        socket.on('unsubscribeAccount', (username: string) => {
+          const roomName = `account:${username.toLowerCase()}`;
+          socket.leave(roomName);
+          console.log(
+            `[Socket]: Client ${socket.id} unsubscribed from ${roomName}`
+          );
+        });
       });
 
       try {
