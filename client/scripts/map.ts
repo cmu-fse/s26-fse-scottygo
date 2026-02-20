@@ -108,10 +108,48 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
   console.log('App directory page loaded');
 });
 
+// Menu toggle process
+const menuIcon = document.getElementById('menu-icon');
+const dropdownMenu = document.getElementById('dropdown-menu');
+const backIcon = document.getElementById('back-icon');
+
+menuIcon?.addEventListener('click', () => {
+  menuIcon.classList.toggle('is-active');
+  dropdownMenu?.classList.toggle('is-active');
+  backIcon?.classList.toggle('is-hidden');
+});
+
+// Google Maps initialization
+interface GoogleMapsInstance {
+  new (
+    el: HTMLElement | null,
+    opts: { center: { lat: number; lng: number }; zoom: number }
+  ): unknown;
+}
+declare const google: { maps: { Map: GoogleMapsInstance } };
+
+declare global {
+  interface Window {
+    initMap: () => void;
+  }
+}
+
+window.initMap = function () {
+  new google.maps.Map(document.getElementById('map'), {
+    center: { lat: 40.4432, lng: -79.9428 }, // CMU campus
+    zoom: 15
+  });
+};
+
+const mapsScript = document.createElement('script');
+mapsScript.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.GOOGLE_MAPS_KEY}&callback=initMap&loading=async`;
+mapsScript.async = true;
+document.head.appendChild(mapsScript);
+
 // Logout process
-const logoutBtn = document.getElementById(
-  'logout-btn'
-) as HTMLButtonElement | null;
+const menuLogoutBtn = document.getElementById(
+  'menu-logout-btn'
+) as HTMLAnchorElement | null;
 
 const handleLogout = () => {
   localStorage.removeItem('token');
@@ -119,4 +157,4 @@ const handleLogout = () => {
   window.location.replace('/home');
 };
 
-logoutBtn?.addEventListener('click', handleLogout);
+menuLogoutBtn?.addEventListener('click', handleLogout);
