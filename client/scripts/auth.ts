@@ -125,7 +125,7 @@ const getResponseMessage = (
     MissingUsername: 'Missing Username',
     MissingPassword: 'Missing Password',
     InactiveAccount:
-      'Your account is inactive. Please contact an administrator to reactivate.'
+      'Your account is inactive. Please contact an administrator to reactivate your account.'
   };
   if (errorName in errorMessages) {
     return errorMessages[errorName];
