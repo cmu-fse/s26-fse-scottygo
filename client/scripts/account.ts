@@ -15,7 +15,7 @@ import type {
 export {};
 
 // ---------------------------------------------------------------------------
-// Auth helpers (consistent with app_directory.ts / auth.ts)
+// Auth helpers
 // ---------------------------------------------------------------------------
 
 const getToken = (): string | null => localStorage.getItem('token');
@@ -36,130 +36,118 @@ const authHeaders = (): Record<string, string> => {
 // DOM references
 // ---------------------------------------------------------------------------
 
-// User search (Admin only)
-const userSearchCard = document.getElementById(
-  'user-search-card'
-) as HTMLDivElement | null;
-const targetUsernameInput = document.getElementById(
-  'target-username'
-) as HTMLInputElement | null;
-const loadUserBtn = document.getElementById(
-  'load-user-btn'
-) as HTMLButtonElement | null;
+const pageTitle = document.getElementById('page-title') as HTMLHeadingElement;
+
+// Admin: username selector
+const userSelectorGroup = document.getElementById(
+  'user-selector-group'
+) as HTMLDivElement;
+const userSelector = document.getElementById(
+  'user-selector'
+) as HTMLSelectElement;
 const searchStatusEl = document.getElementById(
   'search-status'
-) as HTMLParagraphElement | null;
+) as HTMLParagraphElement;
 
-// Account info display
-const accountInfoCard = document.getElementById(
-  'account-info-card'
-) as HTMLDivElement | null;
-const displayUsername = document.getElementById(
-  'display-username'
-) as HTMLSpanElement | null;
-const displayEmail = document.getElementById(
-  'display-email'
-) as HTMLSpanElement | null;
+// Single account card
+const accountCard = document.getElementById('account-card') as HTMLDivElement;
+const accountForm = document.getElementById('account-form') as HTMLFormElement;
+
+// Display (read-only) spans
 const displayStatus = document.getElementById(
   'display-status'
-) as HTMLSpanElement | null;
+) as HTMLSpanElement;
+const displayUsername = document.getElementById(
+  'display-username'
+) as HTMLSpanElement;
+const displayEmail = document.getElementById(
+  'display-email'
+) as HTMLSpanElement;
+const displayPassword = document.getElementById(
+  'display-password'
+) as HTMLSpanElement;
 const displayPrivilege = document.getElementById(
   'display-privilege'
-) as HTMLSpanElement | null;
+) as HTMLSpanElement;
 
-// Username form (Member only)
-const usernameCard = document.getElementById(
-  'username-card'
-) as HTMLDivElement | null;
-const usernameForm = document.getElementById(
-  'username-form'
-) as HTMLFormElement | null;
-const newUsernameInput = document.getElementById(
-  'new-username'
-) as HTMLInputElement | null;
-const usernameStatusEl = document.getElementById(
-  'username-status'
-) as HTMLParagraphElement | null;
+// Form groups
+const statusDisplayGroup = document.getElementById(
+  'status-display-group'
+) as HTMLDivElement;
+const usernameGroup = document.getElementById(
+  'username-group'
+) as HTMLDivElement;
+const emailGroup = document.getElementById('email-group') as HTMLDivElement;
+const passwordGroup = document.getElementById(
+  'password-group'
+) as HTMLDivElement;
+const privilegeGroup = document.getElementById(
+  'privilege-group'
+) as HTMLDivElement;
+const statusEditGroup = document.getElementById(
+  'status-edit-group'
+) as HTMLDivElement;
 
-// Email form (Member only)
-const emailCard = document.getElementById(
-  'email-card'
-) as HTMLDivElement | null;
-const emailForm = document.getElementById(
-  'email-form'
-) as HTMLFormElement | null;
-const newEmailInput = document.getElementById(
-  'new-email'
-) as HTMLInputElement | null;
-const emailStatusEl = document.getElementById(
-  'email-status'
-) as HTMLParagraphElement | null;
+// Editable inputs
+const fieldUsername = document.getElementById(
+  'field-username'
+) as HTMLInputElement;
+const fieldEmail = document.getElementById('field-email') as HTMLInputElement;
+const fieldPassword = document.getElementById(
+  'field-password'
+) as HTMLInputElement;
+const fieldPrivilege = document.getElementById(
+  'field-privilege'
+) as HTMLSelectElement;
+const fieldStatus = document.getElementById(
+  'field-status'
+) as HTMLSelectElement;
 
-// Password form
-const passwordCard = document.getElementById(
-  'password-card'
-) as HTMLDivElement | null;
-const passwordForm = document.getElementById(
-  'password-form'
-) as HTMLFormElement | null;
-const currentPasswordGroup = document.getElementById(
-  'current-password-group'
-) as HTMLDivElement | null;
-const currentPasswordInput = document.getElementById(
-  'current-password'
-) as HTMLInputElement | null;
-const newPasswordInput = document.getElementById(
-  'new-password'
-) as HTMLInputElement | null;
-const passwordStatusEl = document.getElementById(
-  'password-status'
-) as HTMLParagraphElement | null;
+// Error elements
+const usernameError = document.getElementById(
+  'username-error'
+) as HTMLParagraphElement;
+const emailError = document.getElementById(
+  'email-error'
+) as HTMLParagraphElement;
+const passwordError = document.getElementById(
+  'password-error'
+) as HTMLParagraphElement;
+const privilegeError = document.getElementById(
+  'privilege-error'
+) as HTMLParagraphElement;
+const statusError = document.getElementById(
+  'status-error'
+) as HTMLParagraphElement;
 
-// Status form
-const statusCard = document.getElementById(
-  'status-card'
-) as HTMLDivElement | null;
-const statusForm = document.getElementById(
-  'status-form'
-) as HTMLFormElement | null;
-const newStatusSelect = document.getElementById(
-  'new-status'
-) as HTMLSelectElement | null;
-const statusStatusEl = document.getElementById(
-  'status-status'
-) as HTMLParagraphElement | null;
+// Member status toggle
+const statusToggleGroup = document.getElementById(
+  'status-toggle-group'
+) as HTMLDivElement;
+const statusToggle = document.getElementById(
+  'status-toggle'
+) as HTMLInputElement;
+const toggleStatusText = document.getElementById(
+  'toggle-status-text'
+) as HTMLSpanElement;
 
-// Privilege form (Admin only)
-const privilegeCard = document.getElementById(
-  'privilege-card'
-) as HTMLDivElement | null;
-const privilegeForm = document.getElementById(
-  'privilege-form'
-) as HTMLFormElement | null;
-const newPrivilegeSelect = document.getElementById(
-  'new-privilege'
-) as HTMLSelectElement | null;
-const privilegeStatusEl = document.getElementById(
-  'privilege-status'
-) as HTMLParagraphElement | null;
+// Buttons
+const editBtn = document.getElementById('edit-btn') as HTMLButtonElement;
+const saveBtn = document.getElementById('save-btn') as HTMLButtonElement;
+const cancelBtn = document.getElementById('cancel-btn') as HTMLButtonElement;
+
+// Form status
+const formStatusEl = document.getElementById(
+  'form-status'
+) as HTMLParagraphElement;
 
 // Confirm modal
-const confirmModal = document.getElementById(
-  'confirm-modal'
-) as HTMLDivElement | null;
+const confirmModal = document.getElementById('confirm-modal') as HTMLDivElement;
 const confirmMessage = document.getElementById(
   'confirm-message'
-) as HTMLParagraphElement | null;
-const confirmYes = document.getElementById(
-  'confirm-yes'
-) as HTMLButtonElement | null;
-const confirmNo = document.getElementById(
-  'confirm-no'
-) as HTMLButtonElement | null;
-
-const logoutBtn = document.getElementById(
-  'logout-btn'
-) as HTMLButtonElement | null;
+) as HTMLParagraphElement;
+const confirmYes = document.getElementById('confirm-yes') as HTMLButtonElement;
+const confirmNo = document.getElementById('confirm-no') as HTMLButtonElement;
 
 // ---------------------------------------------------------------------------
 // State
@@ -167,32 +155,46 @@ const logoutBtn = document.getElementById(
 
 let currentUserAccount: IUserAccount | null = null; // the logged-in user
 let viewingAccount: IUserAccount | null = null; // the account being viewed/edited
+let allUsernames: string[] = []; // for Admin dropdown
 let socket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null;
 let pendingConfirmAction: (() => Promise<void>) | null = null;
+let editing = false;
 
 // ---------------------------------------------------------------------------
 // Utility helpers
 // ---------------------------------------------------------------------------
 
-const setStatus = (
-  el: HTMLParagraphElement | null,
-  message: string,
-  isError = false
-): void => {
-  if (!el) return;
+const isAdmin = (): boolean =>
+  currentUserAccount?.privilegeLevel === 'Administrator';
+
+const isOwnAccount = (): boolean =>
+  viewingAccount !== null &&
+  currentUserAccount !== null &&
+  viewingAccount.credentials.username.toLowerCase() ===
+    currentUserAccount.credentials.username.toLowerCase();
+
+const setFieldError = (el: HTMLParagraphElement, message: string): void => {
   el.textContent = message;
-  el.classList.toggle('status--error', isError);
 };
 
-const clearAllStatuses = (): void => {
+const clearFieldErrors = (): void => {
   [
-    searchStatusEl,
-    usernameStatusEl,
-    emailStatusEl,
-    passwordStatusEl,
-    statusStatusEl,
-    privilegeStatusEl
-  ].forEach((el) => setStatus(el, ''));
+    usernameError,
+    emailError,
+    passwordError,
+    privilegeError,
+    statusError
+  ].forEach((el) => {
+    el.textContent = '';
+  });
+  [fieldUsername, fieldEmail, fieldPassword].forEach((el) => {
+    el.classList.remove('form-input--error');
+  });
+};
+
+const setFormStatus = (message: string, isError = false): void => {
+  formStatusEl.textContent = message;
+  formStatusEl.classList.toggle('form-status--error', isError);
 };
 
 const getResponseMessage = (
@@ -203,13 +205,16 @@ const getResponseMessage = (
   const errorName = 'name' in data ? data.name : '';
   const errorMessages: Record<string, string> = {
     UnauthorizedRequest: 'You do not have permission for this action',
-    LastAdministrator: 'Cannot inactivate the sole Administrator',
+    LastAdministrator: 'Invalid: at least 1 Administrator always needed',
     UserNotFound: 'User does not exist',
     InvalidPassword: 'Password should be at least 4 characters',
     UsernameExists: 'Username already taken',
     InvalidUsername: 'Username less than 4 characters or invalid',
     InvalidEmail: 'You are ineligible, ScottyGo is CMU ONLY',
-    IncorrectPassword: 'Current password is incorrect'
+    IncorrectPassword: 'Current password is incorrect',
+    MissingPassword: 'Missing Password',
+    MissingUsername: 'Missing Username',
+    MissingEmail: 'Missing Email'
   };
   if (typeof errorName === 'string' && errorName in errorMessages) {
     return errorMessages[errorName];
@@ -227,33 +232,22 @@ const getResponseMessage = (
   return fallback;
 };
 
-const isAdmin = (): boolean =>
-  currentUserAccount?.privilegeLevel === 'Administrator';
-
-const isOwnAccount = (): boolean =>
-  viewingAccount !== null &&
-  currentUserAccount !== null &&
-  viewingAccount.credentials.username.toLowerCase() ===
-    currentUserAccount.credentials.username.toLowerCase();
-
 // ---------------------------------------------------------------------------
-// Modal helpers (consistent with auth.ts)
+// Modal helpers
 // ---------------------------------------------------------------------------
 
-const openModal = (modal: HTMLDivElement | null): void => {
-  if (!modal) return;
+const openModal = (modal: HTMLDivElement): void => {
   modal.classList.add('is-open');
   modal.removeAttribute('inert');
 };
 
-const closeModal = (modal: HTMLDivElement | null): void => {
-  if (!modal) return;
+const closeModal = (modal: HTMLDivElement): void => {
   modal.classList.remove('is-open');
   modal.setAttribute('inert', '');
 };
 
 const showConfirm = (message: string, onConfirm: () => Promise<void>): void => {
-  if (confirmMessage) confirmMessage.textContent = message;
+  confirmMessage.textContent = message;
   pendingConfirmAction = onConfirm;
   openModal(confirmModal);
 };
@@ -308,7 +302,6 @@ const connectSocket = (): void => {
   socket = io({ query: { token } });
 
   socket.on('accountUpdated', (account: IUserAccount) => {
-    // Update the displayed account if it matches
     if (
       viewingAccount &&
       (account.credentials.username.toLowerCase() ===
@@ -316,16 +309,14 @@ const connectSocket = (): void => {
         account._id === viewingAccount._id)
     ) {
       viewingAccount = account;
-      renderAccountInfo();
+      if (!editing) renderReadMode();
     }
-    // Also update cached current user if it matches
     if (currentUserAccount && account._id === currentUserAccount._id) {
       currentUserAccount = account;
     }
   });
 
   socket.on('forceLogout', (_reason: string) => {
-    // Clear auth state and redirect per R5
     localStorage.removeItem('token');
     localStorage.removeItem('username');
     window.location.replace('/auth');
@@ -341,86 +332,311 @@ const unsubscribeFromAccount = (username: string): void => {
 };
 
 // ---------------------------------------------------------------------------
-// UI rendering
+// UI rendering — Read (view) mode
 // ---------------------------------------------------------------------------
 
-const renderAccountInfo = (): void => {
-  if (!viewingAccount || !accountInfoCard) return;
+const renderReadMode = (): void => {
+  if (!viewingAccount) return;
+  editing = false;
+  accountCard.hidden = false;
 
-  accountInfoCard.hidden = false;
+  // Show read-only values, hide inputs
+  displayUsername.textContent = viewingAccount.credentials.username;
+  displayUsername.hidden = false;
+  fieldUsername.hidden = true;
 
-  if (displayUsername) {
-    displayUsername.textContent = viewingAccount.credentials.username;
-  }
-  if (displayEmail) {
-    displayEmail.textContent = viewingAccount.email || '—';
-  }
-  if (displayStatus) {
+  displayEmail.textContent = viewingAccount.email || '—';
+  displayEmail.hidden = false;
+  fieldEmail.hidden = true;
+
+  displayPassword.textContent = '••••••••';
+  displayPassword.hidden = false;
+  fieldPassword.hidden = true;
+
+  // Status display
+  if (!isAdmin() && isOwnAccount()) {
+    // Member viewing own account → show toggle above card
+    statusToggleGroup.hidden = false;
+    statusToggle.checked = viewingAccount.status === 'Active';
+    toggleStatusText.textContent = viewingAccount.status;
+    statusDisplayGroup.hidden = true;
+  } else {
+    // Admin view → show status as read-only text inside card
+    statusToggleGroup.hidden = true;
     displayStatus.textContent = viewingAccount.status;
-    displayStatus.className = 'info-value';
+    displayStatus.className = 'field-value';
     displayStatus.classList.add(
       viewingAccount.status === 'Active' ? 'status-active' : 'status-inactive'
     );
-  }
-  if (displayPrivilege) {
-    displayPrivilege.textContent = viewingAccount.privilegeLevel;
-    displayPrivilege.className = 'info-value';
-    const privClass =
-      viewingAccount.privilegeLevel === 'Administrator'
-        ? 'privilege-admin'
-        : viewingAccount.privilegeLevel === 'Coordinator'
-          ? 'privilege-coordinator'
-          : 'privilege-member';
-    displayPrivilege.classList.add(privClass);
+    statusDisplayGroup.hidden = false;
   }
 
-  // Pre-fill dropdowns with current values
-  if (newStatusSelect) newStatusSelect.value = viewingAccount.status;
-  if (newPrivilegeSelect) {
-    newPrivilegeSelect.value = viewingAccount.privilegeLevel;
+  // Privilege (visible for Admin view)
+  if (isAdmin()) {
+    displayPrivilege.textContent = viewingAccount.privilegeLevel;
+    displayPrivilege.hidden = false;
+    fieldPrivilege.hidden = true;
+    privilegeGroup.hidden = false;
+  } else {
+    privilegeGroup.hidden = true;
   }
+
+  // Status edit group hidden in read mode
+  statusEditGroup.hidden = true;
+  fieldStatus.hidden = true;
+
+  // Admin editing someone else: hide username/email groups (can't edit those)
+  if (isAdmin() && !isOwnAccount()) {
+    usernameGroup.hidden = true;
+    emailGroup.hidden = true;
+  } else {
+    usernameGroup.hidden = false;
+    emailGroup.hidden = false;
+  }
+
+  // Show Edit button, hide Save/Cancel
+  editBtn.hidden = false;
+  saveBtn.hidden = true;
+  cancelBtn.hidden = true;
+
+  clearFieldErrors();
+  setFormStatus('');
 };
 
-const showPermittedCards = (): void => {
-  // Hide all editable cards first
-  [usernameCard, emailCard, passwordCard, statusCard, privilegeCard].forEach(
-    (card) => {
-      if (card) card.hidden = true;
-    }
-  );
+// ---------------------------------------------------------------------------
+// UI rendering — Edit mode
+// ---------------------------------------------------------------------------
 
-  if (!viewingAccount || !currentUserAccount) return;
+const enterEditMode = (): void => {
+  if (!viewingAccount) return;
+  editing = true;
+
+  clearFieldErrors();
+  setFormStatus('');
 
   const adminUser = isAdmin();
-  const ownAccount = isOwnAccount();
+  const ownAcct = isOwnAccount();
 
-  // Username: Member only, own account only
-  if (!adminUser && ownAccount && usernameCard) {
-    usernameCard.hidden = false;
+  // Username
+  if (adminUser && !ownAcct) {
+    usernameGroup.hidden = true;
+  } else {
+    usernameGroup.hidden = false;
+    displayUsername.hidden = true;
+    fieldUsername.hidden = false;
+    fieldUsername.value = viewingAccount.credentials.username;
   }
 
-  // Email: Member only, own account only
-  if (!adminUser && ownAccount && emailCard) {
-    emailCard.hidden = false;
+  // Email
+  if (adminUser && !ownAcct) {
+    emailGroup.hidden = true;
+  } else {
+    emailGroup.hidden = false;
+    displayEmail.hidden = true;
+    fieldEmail.hidden = false;
+    fieldEmail.value = viewingAccount.email || '';
   }
 
-  // Password: Admin can change any user's; Member can change own only
-  if ((adminUser || ownAccount) && passwordCard) {
-    passwordCard.hidden = false;
-    // Admin doesn't need current password; Member does
-    if (currentPasswordGroup) {
-      currentPasswordGroup.hidden = adminUser && !ownAccount;
+  // Password — always editable
+  passwordGroup.hidden = false;
+  displayPassword.hidden = true;
+  fieldPassword.hidden = false;
+  fieldPassword.value = '';
+
+  // Privilege — Admin only
+  if (adminUser) {
+    privilegeGroup.hidden = false;
+    displayPrivilege.hidden = true;
+    fieldPrivilege.hidden = false;
+    fieldPrivilege.value = viewingAccount.privilegeLevel;
+  } else {
+    privilegeGroup.hidden = true;
+  }
+
+  // Account Status — editable (Admin uses dropdown; Member uses toggle outside card)
+  if (adminUser) {
+    statusEditGroup.hidden = false;
+    fieldStatus.hidden = false;
+    fieldStatus.value = viewingAccount.status;
+    statusDisplayGroup.hidden = true;
+    statusToggleGroup.hidden = true;
+  }
+  // Member toggle stays visible and interactive (no change needed here)
+
+  // Show Save/Cancel, hide Edit
+  editBtn.hidden = true;
+  saveBtn.hidden = false;
+  cancelBtn.hidden = false;
+};
+
+// ---------------------------------------------------------------------------
+// Save changes — sends only changed fields individually
+// ---------------------------------------------------------------------------
+
+const handleSave = async (): Promise<void> => {
+  if (!viewingAccount) return;
+
+  clearFieldErrors();
+  setFormStatus('');
+
+  const adminUser = isAdmin();
+  const ownAcct = isOwnAccount();
+  const targetUsername = viewingAccount.credentials.username;
+
+  let hasError = false;
+  let saveCount = 0;
+  let lastError = '';
+
+  // --- Username ---
+  if (!(adminUser && !ownAcct)) {
+    const newUsername = fieldUsername.value.trim();
+    if (!newUsername) {
+      setFieldError(usernameError, 'Missing Username');
+      fieldUsername.classList.add('form-input--error');
+      hasError = true;
+    } else if (newUsername.length < 4) {
+      setFieldError(
+        usernameError,
+        'Username less than 4 characters or invalid'
+      );
+      fieldUsername.classList.add('form-input--error');
+      hasError = true;
+    } else if (
+      newUsername.toLowerCase() !==
+      viewingAccount.credentials.username.toLowerCase()
+    ) {
+      const { status, data } = await patchAccount(targetUsername, 'username', {
+        newUsername
+      });
+      if (status >= 200 && status < 300) {
+        saveCount++;
+        if (ownAcct) localStorage.setItem('username', newUsername);
+        if (data && isSuccess(data) && data.payload) {
+          viewingAccount = data.payload as IUserAccount;
+        }
+      } else {
+        const msg = getResponseMessage(data, 'Username update failed.');
+        setFieldError(usernameError, msg);
+        fieldUsername.classList.add('form-input--error');
+        hasError = true;
+        lastError = msg;
+      }
     }
   }
 
-  // Status: Admin can change any; Member can change own
-  if ((adminUser || ownAccount) && statusCard) {
-    statusCard.hidden = false;
+  // --- Email ---
+  if (!(adminUser && !ownAcct)) {
+    const newEmail = fieldEmail.value.trim();
+    if (!newEmail) {
+      setFieldError(emailError, 'Missing Email');
+      fieldEmail.classList.add('form-input--error');
+      hasError = true;
+    } else if (newEmail !== viewingAccount.email) {
+      const { status, data } = await patchAccount(
+        viewingAccount.credentials.username,
+        'email',
+        { email: newEmail }
+      );
+      if (status >= 200 && status < 300) {
+        saveCount++;
+        if (data && isSuccess(data) && data.payload) {
+          viewingAccount = data.payload as IUserAccount;
+        }
+      } else {
+        const msg = getResponseMessage(data, 'Email update failed.');
+        setFieldError(emailError, msg);
+        fieldEmail.classList.add('form-input--error');
+        hasError = true;
+        lastError = msg;
+      }
+    }
   }
 
-  // Privilege: Admin only
-  if (adminUser && privilegeCard) {
-    privilegeCard.hidden = false;
+  // --- Password ---
+  const newPassword = fieldPassword.value;
+  if (newPassword) {
+    if (newPassword.length < 4) {
+      setFieldError(passwordError, 'Password should be at least 4 characters');
+      fieldPassword.classList.add('form-input--error');
+      hasError = true;
+    } else {
+      const body: Record<string, string> = { newPassword };
+      const { status, data } = await patchAccount(
+        viewingAccount.credentials.username,
+        'password',
+        body
+      );
+      if (status >= 200 && status < 300) {
+        saveCount++;
+        if (data && isSuccess(data) && data.payload) {
+          viewingAccount = data.payload as IUserAccount;
+        }
+      } else {
+        const msg = getResponseMessage(data, 'Password update failed.');
+        setFieldError(passwordError, msg);
+        fieldPassword.classList.add('form-input--error');
+        hasError = true;
+        lastError = msg;
+      }
+    }
+  }
+
+  // --- Privilege ---
+  if (adminUser) {
+    const newPrivilege = fieldPrivilege.value as IPrivilegeLevel;
+    if (newPrivilege !== viewingAccount.privilegeLevel) {
+      const { status, data } = await patchAccount(
+        viewingAccount.credentials.username,
+        'privilege',
+        { privilegeLevel: newPrivilege }
+      );
+      if (status >= 200 && status < 300) {
+        saveCount++;
+        if (data && isSuccess(data) && data.payload) {
+          viewingAccount = data.payload as IUserAccount;
+        }
+      } else {
+        const msg = getResponseMessage(data, 'Privilege update failed.');
+        setFieldError(privilegeError, msg);
+        hasError = true;
+        lastError = msg;
+      }
+    }
+  }
+
+  // --- Status (Admin dropdown only; Member uses toggle which saves immediately) ---
+  if (adminUser) {
+    const newStatus = fieldStatus.value as IAccountStatus;
+    if (newStatus !== viewingAccount.status) {
+      const { status, data } = await patchAccount(
+        viewingAccount.credentials.username,
+        'status',
+        { status: newStatus }
+      );
+      if (status >= 200 && status < 300) {
+        saveCount++;
+        if (data && isSuccess(data) && data.payload) {
+          viewingAccount = data.payload as IUserAccount;
+        }
+      } else {
+        const msg = getResponseMessage(data, 'Status update failed.');
+        setFieldError(statusError, msg);
+        hasError = true;
+        lastError = msg;
+      }
+    }
+  }
+
+  // Show result
+  if (!hasError) {
+    renderReadMode();
+    if (saveCount > 0) {
+      setFormStatus('Changes saved!');
+    }
+  } else if (saveCount > 0) {
+    setFormStatus('Some changes saved, but errors remain.', true);
+  } else {
+    setFormStatus(lastError || 'Please fix the errors above.', true);
   }
 };
 
@@ -429,276 +645,151 @@ const showPermittedCards = (): void => {
 // ---------------------------------------------------------------------------
 
 const loadAccount = async (username: string): Promise<boolean> => {
-  clearAllStatuses();
+  clearFieldErrors();
+  setFormStatus('');
 
   const { status, data } = await fetchAccount(username);
 
   if (status < 200 || status >= 300) {
     const message = getResponseMessage(data, 'Failed to load account.');
-    setStatus(searchStatusEl ?? usernameStatusEl, message, true);
+    searchStatusEl.textContent = message;
     return false;
   }
 
   if (data && isSuccess(data) && data.payload) {
-    // Unsubscribe from previous account if any
     if (viewingAccount) {
       unsubscribeFromAccount(viewingAccount.credentials.username);
     }
-
     viewingAccount = data.payload as IUserAccount;
-    renderAccountInfo();
-    showPermittedCards();
+    renderReadMode();
     subscribeToAccount(viewingAccount.credentials.username);
     return true;
   }
 
-  setStatus(searchStatusEl, 'Unexpected response from server.', true);
+  searchStatusEl.textContent = 'Unexpected response from server.';
   return false;
 };
 
 // ---------------------------------------------------------------------------
-// Form handlers
+// Admin: populate username dropdown
 // ---------------------------------------------------------------------------
 
-// Update Username
-usernameForm?.addEventListener('submit', async (e: SubmitEvent) => {
-  e.preventDefault();
-  if (!newUsernameInput || !viewingAccount) return;
-
-  const newUsername = newUsernameInput.value.trim();
-  if (newUsername.length < 4) {
-    newUsernameInput.classList.add('form-input--error');
-    setStatus(usernameStatusEl, 'Username must be at least 4 characters', true);
-    return;
-  }
-
-  newUsernameInput.classList.remove('form-input--error');
-
-  showConfirm(`Change username to "${newUsername}"?`, async () => {
-    const oldUsername = viewingAccount!.credentials.username;
-    const { status, data } = await patchAccount(oldUsername, 'username', {
-      newUsername
+const populateUserSelector = async (): Promise<void> => {
+  try {
+    const res: AxiosResponse<IResponse> = await axios.request({
+      method: 'get',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      url: '/account/users',
+      validateStatus: () => true
     });
 
-    if (status < 200 || status >= 300) {
-      const message = getResponseMessage(data, 'Username update failed.');
-      const errorName = data && 'name' in data ? data.name : '';
-      if (errorName === 'UsernameExists' || errorName === 'InvalidUsername') {
-        newUsernameInput.classList.add('form-input--error');
-      }
-      setStatus(usernameStatusEl, message, true);
-      return;
+    if (res.status >= 200 && res.status < 300 && isSuccess(res.data)) {
+      const users = res.data.payload as string[];
+      allUsernames = users;
     }
-
-    // Update localStorage if own username changed
-    if (isOwnAccount()) {
-      localStorage.setItem('username', newUsername);
+  } catch {
+    if (currentUserAccount) {
+      allUsernames = [currentUserAccount.credentials.username];
     }
+  }
 
-    if (data && isSuccess(data) && data.payload) {
-      viewingAccount = data.payload as IUserAccount;
-      renderAccountInfo();
-    }
-
-    newUsernameInput.value = '';
-    setStatus(usernameStatusEl, 'Username updated successfully.');
+  userSelector.innerHTML = '<option value="">Select Username</option>';
+  allUsernames.forEach((u: string) => {
+    const opt = document.createElement('option');
+    opt.value = u;
+    opt.textContent = u;
+    userSelector.appendChild(opt);
   });
+};
+
+// ---------------------------------------------------------------------------
+// Event listeners
+// ---------------------------------------------------------------------------
+
+// Edit button
+editBtn.addEventListener('click', () => {
+  enterEditMode();
 });
 
-// Update Email
-emailForm?.addEventListener('submit', async (e: SubmitEvent) => {
-  e.preventDefault();
-  if (!newEmailInput || !viewingAccount) return;
+// Cancel button
+cancelBtn.addEventListener('click', () => {
+  renderReadMode();
+});
 
-  const email = newEmailInput.value.trim();
-  if (!email) {
-    newEmailInput.classList.add('form-input--error');
-    setStatus(emailStatusEl, 'Email is required.', true);
+// Save button / form submit
+accountForm.addEventListener('submit', async (e: SubmitEvent) => {
+  e.preventDefault();
+  saveBtn.disabled = true;
+  await handleSave();
+  saveBtn.disabled = false;
+});
+
+// Admin: username selector change
+userSelector.addEventListener('change', async () => {
+  const selected = userSelector.value;
+  if (!selected) {
+    accountCard.hidden = true;
     return;
   }
-
-  newEmailInput.classList.remove('form-input--error');
-
-  showConfirm(`Change email to "${email}"?`, async () => {
-    const { status, data } = await patchAccount(
-      viewingAccount!.credentials.username,
-      'email',
-      { email }
-    );
-
-    if (status < 200 || status >= 300) {
-      const message = getResponseMessage(data, 'Email update failed.');
-      const errorName = data && 'name' in data ? data.name : '';
-      if (errorName === 'InvalidEmail') {
-        newEmailInput.classList.add('form-input--error');
-      }
-      setStatus(emailStatusEl, message, true);
-      return;
-    }
-
-    if (data && isSuccess(data) && data.payload) {
-      viewingAccount = data.payload as IUserAccount;
-      renderAccountInfo();
-    }
-
-    newEmailInput.value = '';
-    setStatus(emailStatusEl, 'Email updated successfully.');
-  });
+  searchStatusEl.textContent = '';
+  await loadAccount(selected);
 });
 
-// Update Password
-passwordForm?.addEventListener('submit', async (e: SubmitEvent) => {
-  e.preventDefault();
-  if (!newPasswordInput || !viewingAccount) return;
+// Member status toggle
+statusToggle.addEventListener('change', () => {
+  if (!viewingAccount) return;
 
-  const newPassword = newPasswordInput.value;
-  if (newPassword.length < 4) {
-    newPasswordInput.classList.add('form-input--error');
-    setStatus(
-      passwordStatusEl,
-      'Password must be at least 4 characters.',
-      true
-    );
-    return;
-  }
+  const newStatus: IAccountStatus = statusToggle.checked
+    ? 'Active'
+    : 'Inactive';
 
-  newPasswordInput.classList.remove('form-input--error');
-  if (currentPasswordInput)
-    currentPasswordInput.classList.remove('form-input--error');
+  if (newStatus === viewingAccount.status) return;
 
-  const body: Record<string, string> = { newPassword };
+  // Self-inactivation — show confirmation modal
+  if (isOwnAccount() && newStatus === 'Inactive') {
+    // Revert the toggle visually until confirmed
+    statusToggle.checked = true;
 
-  // Member must supply current password; Admin changing another user's password does not
-  const adminChangingOther = isAdmin() && !isOwnAccount();
-  if (!adminChangingOther) {
-    const currentPassword = currentPasswordInput?.value ?? '';
-    if (!currentPassword) {
-      currentPasswordInput?.classList.add('form-input--error');
-      setStatus(passwordStatusEl, 'Current password is required.', true);
-      return;
-    }
-    body.currentPassword = currentPassword;
-  }
-
-  showConfirm('Change password?', async () => {
-    const { status, data } = await patchAccount(
-      viewingAccount!.credentials.username,
-      'password',
-      body
-    );
-
-    if (status < 200 || status >= 300) {
-      const message = getResponseMessage(data, 'Password update failed.');
-      const errorName = data && 'name' in data ? data.name : '';
-      if (errorName === 'InvalidPassword') {
-        newPasswordInput.classList.add('form-input--error');
+    showConfirm(
+      "Do you really want to inactivate your account?\n\nIf you confirm, you'll be logged out and unable to log back in. Only an Administrator can reactivate accounts.",
+      async () => {
+        const { status, data } = await patchAccount(
+          viewingAccount!.credentials.username,
+          'status',
+          { status: 'Inactive' as IAccountStatus }
+        );
+        if (status >= 200 && status < 300) {
+          handleLogout();
+        } else {
+          const msg = getResponseMessage(data, 'Status update failed.');
+          setFormStatus(msg, true);
+        }
       }
-      if (errorName === 'IncorrectPassword') {
-        currentPasswordInput?.classList.add('form-input--error');
-      }
-      setStatus(passwordStatusEl, message, true);
-      return;
-    }
-
-    if (data && isSuccess(data) && data.payload) {
-      viewingAccount = data.payload as IUserAccount;
-      renderAccountInfo();
-    }
-
-    if (currentPasswordInput) currentPasswordInput.value = '';
-    newPasswordInput.value = '';
-    setStatus(passwordStatusEl, 'Password updated successfully.');
-  });
-});
-
-// Update Status
-statusForm?.addEventListener('submit', async (e: SubmitEvent) => {
-  e.preventDefault();
-  if (!newStatusSelect || !viewingAccount) return;
-
-  const newStatus = newStatusSelect.value as IAccountStatus;
-
-  if (newStatus === viewingAccount.status) {
-    setStatus(statusStatusEl, 'Status is already ' + newStatus + '.', true);
-    return;
-  }
-
-  const selfInactivate = isOwnAccount() && newStatus === 'Inactive';
-  const confirmMsg = selfInactivate
-    ? 'Setting your account to Inactive will log you out. Continue?'
-    : `Set ${viewingAccount.credentials.username}'s status to ${newStatus}?`;
-
-  showConfirm(confirmMsg, async () => {
-    const { status, data } = await patchAccount(
-      viewingAccount!.credentials.username,
-      'status',
-      { status: newStatus }
-    );
-
-    if (status < 200 || status >= 300) {
-      const message = getResponseMessage(data, 'Status update failed.');
-      setStatus(statusStatusEl, message, true);
-      return;
-    }
-
-    if (data && isSuccess(data) && data.payload) {
-      viewingAccount = data.payload as IUserAccount;
-      renderAccountInfo();
-    }
-
-    setStatus(statusStatusEl, 'Status updated successfully.');
-
-    // If member inactivated own account, they will be force-logged-out via socket
-  });
-});
-
-// Update Privilege (Admin only)
-privilegeForm?.addEventListener('submit', async (e: SubmitEvent) => {
-  e.preventDefault();
-  if (!newPrivilegeSelect || !viewingAccount) return;
-
-  const newPrivilege = newPrivilegeSelect.value as IPrivilegeLevel;
-
-  if (newPrivilege === viewingAccount.privilegeLevel) {
-    setStatus(
-      privilegeStatusEl,
-      'Privilege is already ' + newPrivilege + '.',
-      true
     );
     return;
   }
 
-  showConfirm(
-    `Change ${viewingAccount.credentials.username}'s privilege to ${newPrivilege}? (Takes effect on next login)`,
-    async () => {
-      const { status, data } = await patchAccount(
-        viewingAccount!.credentials.username,
-        'privilege',
-        { privilegeLevel: newPrivilege }
-      );
-
-      if (status < 200 || status >= 300) {
-        const message = getResponseMessage(data, 'Privilege update failed.');
-        setStatus(privilegeStatusEl, message, true);
-        return;
-      }
-
+  // Reactivation (shouldn't normally happen for Member, but handle it)
+  patchAccount(viewingAccount.credentials.username, 'status', {
+    status: newStatus
+  }).then(({ status, data }) => {
+    if (status >= 200 && status < 300) {
       if (data && isSuccess(data) && data.payload) {
         viewingAccount = data.payload as IUserAccount;
-        renderAccountInfo();
-        showPermittedCards();
       }
-
-      setStatus(privilegeStatusEl, 'Privilege updated successfully.');
+      toggleStatusText.textContent = newStatus;
+      setFormStatus('Status updated!');
+    } else {
+      // Revert toggle on failure
+      statusToggle.checked = viewingAccount!.status === 'Active';
+      const msg = getResponseMessage(data, 'Status update failed.');
+      setFormStatus(msg, true);
     }
-  );
+  });
 });
 
-// ---------------------------------------------------------------------------
 // Confirm modal handlers
-// ---------------------------------------------------------------------------
-
-confirmYes?.addEventListener('click', async () => {
+confirmYes.addEventListener('click', async () => {
   closeModal(confirmModal);
   if (pendingConfirmAction) {
     const action = pendingConfirmAction;
@@ -707,44 +798,10 @@ confirmYes?.addEventListener('click', async () => {
   }
 });
 
-confirmNo?.addEventListener('click', () => {
+confirmNo.addEventListener('click', () => {
   pendingConfirmAction = null;
   closeModal(confirmModal);
 });
-
-// ---------------------------------------------------------------------------
-// Load user button (Admin: search for other users)
-// ---------------------------------------------------------------------------
-
-loadUserBtn?.addEventListener('click', async () => {
-  if (!targetUsernameInput) return;
-
-  const username = targetUsernameInput.value.trim();
-  if (!username) {
-    setStatus(searchStatusEl, 'Please enter a username.', true);
-    return;
-  }
-
-  setStatus(searchStatusEl, 'Loading...');
-  const success = await loadAccount(username);
-  if (success) {
-    setStatus(searchStatusEl, '');
-  }
-});
-
-// Allow pressing Enter in the search input
-targetUsernameInput?.addEventListener('keydown', (e: KeyboardEvent) => {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    loadUserBtn?.click();
-  }
-});
-
-// ---------------------------------------------------------------------------
-// Logout
-// ---------------------------------------------------------------------------
-
-logoutBtn?.addEventListener('click', handleLogout);
 
 // ---------------------------------------------------------------------------
 // Page initialization
@@ -759,14 +816,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
-  // Connect socket for real-time updates
   connectSocket();
 
-  // Load the logged-in user's own account first
   const { status, data } = await fetchAccount(username);
 
   if (status === 401) {
-    // Token invalid — redirect to auth
     localStorage.removeItem('token');
     localStorage.removeItem('username');
     window.location.replace('/auth');
@@ -783,18 +837,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     currentUserAccount = data.payload as IUserAccount;
     viewingAccount = currentUserAccount;
 
-    renderAccountInfo();
-    showPermittedCards();
-    subscribeToAccount(currentUserAccount.credentials.username);
-
-    // Show admin user-search card if Administrator
-    if (isAdmin() && userSearchCard) {
-      userSearchCard.hidden = false;
+    // Set page title per wireframe
+    if (isAdmin()) {
+      pageTitle.textContent = 'Manage\nAccounts';
+      pageTitle.style.whiteSpace = 'pre-line';
+      userSelectorGroup.hidden = false;
+      await populateUserSelector();
+      userSelector.value = currentUserAccount.credentials.username;
+    } else {
+      pageTitle.textContent = 'Account';
     }
+
+    renderReadMode();
+    subscribeToAccount(currentUserAccount.credentials.username);
   } else {
-    // Could not load own account
     const message = getResponseMessage(data, 'Failed to load your account.');
-    setStatus(searchStatusEl, message, true);
-    if (accountInfoCard) accountInfoCard.hidden = true;
+    setFormStatus(message, true);
   }
 });

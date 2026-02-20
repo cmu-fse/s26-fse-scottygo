@@ -59,16 +59,16 @@ body {
   overflow-y: auto;
 }
 
-.logo {
+/* Page title — matches wireframe "Account" / "Manage Accounts" heading */
+.page-title {
   color: #c41230;
-  font-size: 48px;
+  font-size: 32px;
   font-weight: bold;
   margin-bottom: 24px;
-  text-shadow: 0px 2px 4px rgba(0, 0, 0, 0.2);
-  letter-spacing: -0.5px;
+  text-align: center;
 }
 
-/* Account Card Styles (consistent with auth-card) */
+/* Single account card (consistent with auth-card) */
 .account-card {
   width: 100%;
   max-width: 360px;
@@ -79,71 +79,39 @@ body {
   margin-bottom: 16px;
 }
 
-.card-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #c41230;
-  margin-bottom: 16px;
-  text-align: center;
-}
-
-/* Info display rows */
-.info-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 0;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.info-row:last-child {
-  border-bottom: none;
-}
-
-.info-label {
-  font-size: 14px;
-  font-weight: 500;
-  color: #555;
-}
-
-.info-value {
-  font-size: 14px;
-  color: #333;
-  font-weight: 600;
-}
-
-/* Status badge styling */
-.info-value.status-active {
-  color: #2e7d32;
-}
-
-.info-value.status-inactive {
-  color: #c62828;
-}
-
-.info-value.privilege-admin {
-  color: #c41230;
-}
-
-.info-value.privilege-coordinator {
-  color: #1565c0;
-}
-
-.info-value.privilege-member {
-  color: #555;
-}
-
 /* Form Styles (consistent with auth.css) */
 .form-group {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   display: flex;
   flex-direction: column;
+  width: 100%;
+  max-width: 360px;
 }
 
 .form-group label {
   font-size: 16px;
+  font-weight: 600;
   color: #000;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
+}
+
+/* Read-only field value display */
+.field-value {
+  font-size: 16px;
+  color: #333;
+  padding: 10px 0;
+  border-bottom: 1px solid #e0e0e0;
+  min-height: 24px;
+}
+
+.field-value.status-active {
+  color: #2e7d32;
+  font-weight: 600;
+}
+
+.field-value.status-inactive {
+  color: #c62828;
+  font-weight: 600;
 }
 
 .form-input {
@@ -179,41 +147,27 @@ select.form-input {
   padding-right: 36px;
 }
 
-/* Input row with inline button */
-.input-row {
+/* Inline field error text (below each field, per wireframe) */
+.field-error {
+  font-size: 13px;
+  color: #c62828;
+  min-height: 0;
+  margin-top: 4px;
+}
+
+.field-error:empty {
+  display: none;
+}
+
+/* Form action buttons */
+.form-actions {
   display: flex;
-  gap: 8px;
-  align-items: stretch;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
 }
 
-.input-row .form-input {
-  flex: 1;
-}
-
-.action-btn {
-  background-color: #c41230;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  padding: 0 20px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  transition: background-color 0.2s;
-  white-space: nowrap;
-}
-
-.action-btn:hover {
-  background-color: #a00f28;
-}
-
-.action-btn:active {
-  box-shadow: none;
-  transform: translateY(1px);
-}
-
-/* Submit button (consistent with auth.css) */
+/* Submit / Edit button (consistent with auth.css) */
 .submit-btn {
   width: 100%;
   background-color: #c41230;
@@ -243,23 +197,9 @@ select.form-input {
   box-shadow: none;
 }
 
-/* Status message (consistent with auth.css) */
-.status {
-  margin-top: 12px;
-  font-size: 14px;
-  color: #2e7d32;
-  min-height: 18px;
-  text-align: center;
-}
-
-.status--error {
-  color: #c62828;
-}
-
-/* Logout button (consistent with app_directory.css) */
-.logout-btn {
+/* Cancel button */
+.cancel-btn {
   width: 100%;
-  max-width: 360px;
   background-color: #6d6d6d;
   color: white;
   border: none;
@@ -270,16 +210,28 @@ select.form-input {
   cursor: pointer;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   transition: background-color 0.2s;
-  margin-top: 8px;
 }
 
-.logout-btn:hover {
+.cancel-btn:hover {
   background-color: #555;
 }
 
-.logout-btn:active {
+.cancel-btn:active {
   box-shadow: none;
   transform: translateY(1px);
+}
+
+/* Global form status message (success / error) */
+.form-status {
+  margin-top: 12px;
+  font-size: 14px;
+  color: #2e7d32;
+  min-height: 18px;
+  text-align: center;
+}
+
+.form-status--error {
+  color: #c62828;
 }
 
 /* Modal Styles (consistent with auth.css) */
@@ -307,11 +259,6 @@ select.form-input {
   padding: 16px;
   text-align: center;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
-}
-
-.modal-title {
-  font-size: 16px;
-  margin-bottom: 12px;
 }
 
 .modal-message {
@@ -346,6 +293,83 @@ select.form-input {
 .modal-btn--secondary {
   background-color: #6d6d6d;
   color: #fff;
+}
+
+/* ------------------------------------------------------------------ */
+/* Toggle switch (Member Account Status, per wireframe)               */
+/* ------------------------------------------------------------------ */
+
+.status-toggle-group {
+  max-width: 360px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+
+.toggle-label {
+  font-size: 16px;
+  font-weight: 600;
+  color: #000;
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background-color: #ccc;
+  border-radius: 28px;
+  cursor: pointer;
+  transition: background-color 0.25s;
+}
+
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  height: 22px;
+  width: 22px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #fff;
+  border-radius: 50%;
+  transition: transform 0.25s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background-color: #4caf50;
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(22px);
+}
+
+.toggle-status-text {
+  display: block;
+  font-size: 14px;
+  color: #888;
+  margin-top: 4px;
+  align-self: flex-start;
 }
 
 /* Hidden utility */

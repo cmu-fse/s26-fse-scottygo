@@ -29,184 +29,136 @@
       </div>
     </header>
     <main class="content">
-      <h1 class="logo">ScottyGo</h1>
+      <!-- Page title: "Account" for Member, "Manage Accounts" for Admin -->
+      <h1 class="page-title" id="page-title">Account</h1>
 
-      <!-- Target user selector (Admin only) -->
-      <div class="account-card" id="user-search-card" hidden>
-        <h2 class="card-title">Manage User</h2>
-        <div class="form-group">
-          <label for="target-username">Username to manage</label>
-          <div class="input-row">
-            <input
-              type="text"
-              id="target-username"
-              name="target-username"
-              class="form-input"
-              placeholder="Enter username"
-            />
-            <button type="button" class="action-btn" id="load-user-btn"
-              >Load</button
-            >
-          </div>
-        </div>
+      <!-- Username selector (Admin only) -->
+      <div class="form-group" id="user-selector-group" hidden>
+        <label for="user-selector">Select Username</label>
+        <select id="user-selector" class="form-input">
+          <option value="">Select Username</option>
+        </select>
         <p
           id="search-status"
-          class="status"
+          class="field-error"
           role="status"
           aria-live="polite"
         ></p>
       </div>
 
-      <!-- Account info display -->
-      <div class="account-card" id="account-info-card" hidden>
-        <h2 class="card-title">Account Information</h2>
-        <div class="info-row">
-          <span class="info-label">Username</span>
-          <span class="info-value" id="display-username">—</span>
+      <!-- Account Status toggle (Member only, outside card per wireframe) -->
+      <div class="status-toggle-group" id="status-toggle-group" hidden>
+        <div class="toggle-row">
+          <span class="toggle-label">Account Status</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="status-toggle" />
+            <span class="toggle-slider"></span>
+          </label>
         </div>
-        <div class="info-row">
-          <span class="info-label">Email</span>
-          <span class="info-value" id="display-email">—</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Status</span>
-          <span class="info-value" id="display-status">—</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Privilege</span>
-          <span class="info-value" id="display-privilege">—</span>
-        </div>
+        <span class="toggle-status-text" id="toggle-status-text">Active</span>
       </div>
 
-      <!-- Update Username (Member only, own account) -->
-      <div class="account-card" id="username-card" hidden>
-        <h2 class="card-title">Change Username</h2>
-        <form id="username-form">
-          <div class="form-group">
-            <label for="new-username">New Username</label>
+      <!-- Single unified account card -->
+      <div class="account-card" id="account-card" hidden>
+        <form id="account-form" novalidate>
+          <!-- Account Status (read-only display) -->
+          <div class="form-group" id="status-display-group">
+            <label>Account Status</label>
+            <span class="field-value" id="display-status">—</span>
+          </div>
+
+          <!-- Username -->
+          <div class="form-group" id="username-group">
+            <label for="field-username">Username</label>
+            <span class="field-value" id="display-username">—</span>
             <input
               type="text"
-              id="new-username"
-              name="new-username"
+              id="field-username"
+              name="username"
               class="form-input"
-              placeholder="At least 4 characters"
+              hidden
             />
+            <p class="field-error" id="username-error"></p>
           </div>
-          <button type="submit" class="submit-btn">Update Username</button>
-        </form>
-        <p
-          id="username-status"
-          class="status"
-          role="status"
-          aria-live="polite"
-        ></p>
-      </div>
 
-      <!-- Update Email (Member only, own account) -->
-      <div class="account-card" id="email-card" hidden>
-        <h2 class="card-title">Change Email</h2>
-        <form id="email-form">
-          <div class="form-group">
-            <label for="new-email">New Email</label>
+          <!-- Email -->
+          <div class="form-group" id="email-group">
+            <label for="field-email">Email</label>
+            <span class="field-value" id="display-email">—</span>
             <input
               type="email"
-              id="new-email"
-              name="new-email"
+              id="field-email"
+              name="email"
               class="form-input"
-              placeholder="scotty@andrew.cmu.edu"
+              hidden
             />
+            <p class="field-error" id="email-error"></p>
           </div>
-          <button type="submit" class="submit-btn">Update Email</button>
-        </form>
-        <p
-          id="email-status"
-          class="status"
-          role="status"
-          aria-live="polite"
-        ></p>
-      </div>
 
-      <!-- Update Password (Admin: any user, Member: own account) -->
-      <div class="account-card" id="password-card" hidden>
-        <h2 class="card-title">Change Password</h2>
-        <form id="password-form">
-          <div class="form-group" id="current-password-group">
-            <label for="current-password">Current Password</label>
+          <!-- Password -->
+          <div class="form-group" id="password-group">
+            <label for="field-password">Password</label>
+            <span class="field-value" id="display-password">••••••••</span>
             <input
               type="password"
-              id="current-password"
-              name="current-password"
+              id="field-password"
+              name="password"
               class="form-input"
-              placeholder="Enter current password"
+              hidden
             />
+            <p class="field-error" id="password-error"></p>
           </div>
-          <div class="form-group">
-            <label for="new-password">New Password</label>
-            <input
-              type="password"
-              id="new-password"
-              name="new-password"
+
+          <!-- Privilege Level (Admin only) -->
+          <div class="form-group" id="privilege-group" hidden>
+            <label for="field-privilege">Privilege Level</label>
+            <span class="field-value" id="display-privilege">—</span>
+            <select
+              id="field-privilege"
+              name="privilege"
               class="form-input"
-              placeholder="At least 4 characters"
-            />
-          </div>
-          <button type="submit" class="submit-btn">Update Password</button>
-        </form>
-        <p
-          id="password-status"
-          class="status"
-          role="status"
-          aria-live="polite"
-        ></p>
-      </div>
-
-      <!-- Update Status (Admin: any, Member: own) -->
-      <div class="account-card" id="status-card" hidden>
-        <h2 class="card-title">Account Status</h2>
-        <form id="status-form">
-          <div class="form-group">
-            <label for="new-status">Status</label>
-            <select id="new-status" name="new-status" class="form-input">
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-            </select>
-          </div>
-          <button type="submit" class="submit-btn">Update Status</button>
-        </form>
-        <p
-          id="status-status"
-          class="status"
-          role="status"
-          aria-live="polite"
-        ></p>
-      </div>
-
-      <!-- Update Privilege (Admin only) -->
-      <div class="account-card" id="privilege-card" hidden>
-        <h2 class="card-title">Privilege Level</h2>
-        <form id="privilege-form">
-          <div class="form-group">
-            <label for="new-privilege">Privilege</label>
-            <select id="new-privilege" name="new-privilege" class="form-input">
+              hidden
+            >
               <option value="Member">Member</option>
               <option value="Coordinator">Coordinator</option>
               <option value="Administrator">Administrator</option>
             </select>
+            <p class="field-error" id="privilege-error"></p>
           </div>
-          <button type="submit" class="submit-btn">Update Privilege</button>
-        </form>
-        <p
-          id="privilege-status"
-          class="status"
-          role="status"
-          aria-live="polite"
-        ></p>
-      </div>
 
-      <button type="button" class="logout-btn" id="logout-btn">Logout</button>
+          <!-- Account Status (editable, Admin only for others; self-inactivation for Member) -->
+          <div class="form-group" id="status-edit-group" hidden>
+            <label for="field-status">Account Status</label>
+            <select id="field-status" name="status" class="form-input" hidden>
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+            <p class="field-error" id="status-error"></p>
+          </div>
+
+          <!-- Action buttons -->
+          <div class="form-actions">
+            <button type="button" class="submit-btn" id="edit-btn">Edit</button>
+            <button type="submit" class="submit-btn" id="save-btn" hidden
+              >Save Changes</button
+            >
+            <button type="button" class="cancel-btn" id="cancel-btn" hidden
+              >Cancel</button
+            >
+          </div>
+
+          <!-- Success / global status message -->
+          <p
+            id="form-status"
+            class="form-status"
+            role="status"
+            aria-live="polite"
+          ></p>
+        </form>
+      </div>
     </main>
 
-    <!-- Confirm status change modal -->
+    <!-- Confirm inactivation modal -->
     <div id="confirm-modal" class="modal-backdrop" inert>
       <div
         class="modal"
@@ -214,7 +166,6 @@
         aria-modal="true"
         aria-labelledby="confirm-title"
       >
-        <h2 id="confirm-title" class="modal-title">Confirm Change</h2>
         <p id="confirm-message" class="modal-message"></p>
         <div class="modal-actions">
           <button
