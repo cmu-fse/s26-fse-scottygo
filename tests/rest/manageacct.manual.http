@@ -81,7 +81,7 @@ Content-Type: application/json
 // Admin retrieves any user's account
 // Expected: 200 OK, AccountRetrieved with IUserAccount payload
 // Replace <ADMIN_TOKEN> with actual token from login
-GET http://localhost:8080/account/users/testmember
+GET http://localhost:8080/account/users/testadmin
 Authorization: Bearer <ADMIN_TOKEN>
 ###
 

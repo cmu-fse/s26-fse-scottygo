@@ -2,6 +2,7 @@
 // Uses nodemailer with Gmail app password authentication
 
 import nodemailer from 'nodemailer';
+import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import { EMAIL_USER, EMAIL_APP_PASSWORD, EMAIL_FROM_NAME } from '../env';
 
 export interface IEmailService {
@@ -23,13 +24,23 @@ class EmailService implements IEmailService {
 
   constructor() {
     // Create reusable transporter using Gmail SMTP
-    this.transporter = nodemailer.createTransport({
-      service: 'gmail',
+    // Use explicit host/port with family:4 to force IPv4,
+    // avoiding ENETUNREACH on hosts without IPv6 routing (e.g., Render)
+    const options: SMTPTransport.Options = {
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
       auth: {
         user: EMAIL_USER,
         pass: EMAIL_APP_PASSWORD
-      }
-    });
+      },
+      // Force IPv4 DNS resolution to avoid ENETUNREACH on hosts
+      // without IPv6 routing (e.g., Render).
+      // The 'family' option is passed through to net.connect() at runtime
+      // but is missing from @types/nodemailer.
+      ...({ family: 4 } as Record<string, unknown>)
+    };
+    this.transporter = nodemailer.createTransport(options);
   }
 
   /**
