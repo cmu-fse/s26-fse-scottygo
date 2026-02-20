@@ -33,6 +33,7 @@ export type ClientErrorName =
   | 'MissingPassword'
   | 'MissingToken'
   | 'UnauthorizedRequest'
+  | 'InactiveAccount'
   | 'UserNotFound'
   | 'UserExists'
   | 'UnregisteredUser'

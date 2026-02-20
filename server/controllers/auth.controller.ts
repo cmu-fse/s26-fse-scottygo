@@ -137,7 +137,7 @@ export default class AuthController extends Controller {
       if (userAccount.status === 'Inactive') {
         const error: responses.IAppError = {
           type: 'ClientError',
-          name: 'UnauthorizedRequest',
+          name: 'InactiveAccount',
           message:
             'Your account is inactive. Please contact an administrator to reactivate your account.'
         };

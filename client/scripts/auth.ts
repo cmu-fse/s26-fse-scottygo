@@ -123,7 +123,9 @@ const getResponseMessage = (
     InvalidPassword: 'Password should be at least 4 characters',
     InvalidEmail: 'You are ineligible, ScottyGo is CMU ONLY',
     MissingUsername: 'Missing Username',
-    MissingPassword: 'Missing Password'
+    MissingPassword: 'Missing Password',
+    InactiveAccount:
+      'Your account is inactive. Please contact an administrator to reactivate.'
   };
   if (errorName in errorMessages) {
     return errorMessages[errorName];
@@ -328,6 +330,14 @@ form?.addEventListener('submit', async (event: SubmitEvent) => {
 
     if (status < 200 || status >= 300) {
       const errorName = data && 'name' in data ? data.name : '';
+
+      // R5: Inactive accounts cannot log in - show error, don't show ToS modal
+      if (errorName === 'InactiveAccount') {
+        const message = getResponseMessage(data, 'Your account is inactive.');
+        setStatus(message, true);
+        return;
+      }
+
       if (errorName === 'UnauthorizedRequest') {
         // If user already checked the ToS checkbox, process agreement directly
         if (shouldAgree) {
