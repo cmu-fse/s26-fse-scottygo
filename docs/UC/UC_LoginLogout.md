@@ -55,7 +55,7 @@ Implementation Notes
 ### Not Implemented
 
 - **Online/offline status** (Steps 5, 8): No `isOnline` field in user model
-- **App directory listing** (Step 6): No `GET /appdir/users` endpoint, no UI to list members
+- **App directory listing** (Step 6): No `GET /map/users` endpoint, no UI to list members
 - **Real-time status updates**: No Socket.io integration
 - **Browser close detection**: No `beforeunload` handler
 - **A1 NonexistingMember**: Shows error instead of redirecting to registration flow

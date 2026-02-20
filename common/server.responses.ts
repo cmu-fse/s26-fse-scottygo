@@ -17,6 +17,7 @@ export type SuccessName =
   | 'UserRegistered'
   | 'UserFound'
   | 'UsersFound'
+  | 'UsersRetrieved'
   | 'UserAgreed'
   | 'LoginSuccess'
   | 'AccountRetrieved'

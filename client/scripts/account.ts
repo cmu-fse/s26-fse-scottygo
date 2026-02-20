@@ -490,36 +490,39 @@ const handleSave = async (): Promise<void> => {
   // --- Username ---
   if (!(adminUser && !ownAcct)) {
     const newUsername = fieldUsername.value.trim();
-    if (!newUsername) {
-      setFieldError(usernameError, 'Missing Username');
-      fieldUsername.classList.add('form-input--error');
-      hasError = true;
-    } else if (newUsername.length < 4) {
-      setFieldError(
-        usernameError,
-        'Username less than 4 characters or invalid'
-      );
-      fieldUsername.classList.add('form-input--error');
-      hasError = true;
-    } else if (
+    const usernameChanged =
       newUsername.toLowerCase() !==
-      viewingAccount.credentials.username.toLowerCase()
-    ) {
-      const { status, data } = await patchAccount(targetUsername, 'username', {
-        newUsername
-      });
-      if (status >= 200 && status < 300) {
-        saveCount++;
-        if (ownAcct) localStorage.setItem('username', newUsername);
-        if (data && isSuccess(data) && data.payload) {
-          viewingAccount = data.payload as IUserAccount;
-        }
-      } else {
-        const msg = getResponseMessage(data, 'Username update failed.');
-        setFieldError(usernameError, msg);
+      viewingAccount.credentials.username.toLowerCase();
+
+    if (usernameChanged) {
+      if (!newUsername) {
+        setFieldError(usernameError, 'Missing Username');
         fieldUsername.classList.add('form-input--error');
         hasError = true;
-        lastError = msg;
+      } else if (newUsername.length < 4) {
+        setFieldError(
+          usernameError,
+          'Username less than 4 characters or invalid'
+        );
+        fieldUsername.classList.add('form-input--error');
+        hasError = true;
+      } else {
+        const { status, data } = await patchAccount(targetUsername, 'username', {
+          newUsername
+        });
+        if (status >= 200 && status < 300) {
+          saveCount++;
+          if (ownAcct) localStorage.setItem('username', newUsername);
+          if (data && isSuccess(data) && data.payload) {
+            viewingAccount = data.payload as IUserAccount;
+          }
+        } else {
+          const msg = getResponseMessage(data, 'Username update failed.');
+          setFieldError(usernameError, msg);
+          fieldUsername.classList.add('form-input--error');
+          hasError = true;
+          lastError = msg;
+        }
       }
     }
   }
@@ -527,27 +530,35 @@ const handleSave = async (): Promise<void> => {
   // --- Email ---
   if (!(adminUser && !ownAcct)) {
     const newEmail = fieldEmail.value.trim();
-    if (!newEmail) {
-      setFieldError(emailError, 'Missing Email');
-      fieldEmail.classList.add('form-input--error');
-      hasError = true;
-    } else if (newEmail !== viewingAccount.email) {
-      const { status, data } = await patchAccount(
-        viewingAccount.credentials.username,
-        'email',
-        { email: newEmail }
-      );
-      if (status >= 200 && status < 300) {
-        saveCount++;
-        if (data && isSuccess(data) && data.payload) {
-          viewingAccount = data.payload as IUserAccount;
+    const emailChanged = newEmail !== (viewingAccount.email || '');
+
+    if (emailChanged) {
+      if (!newEmail) {
+        // Only error if previously had email and now clearing it
+        if (viewingAccount.email) {
+          setFieldError(emailError, 'Missing Email');
+          fieldEmail.classList.add('form-input--error');
+          hasError = true;
         }
+        // If was empty and stays empty, no error
       } else {
-        const msg = getResponseMessage(data, 'Email update failed.');
-        setFieldError(emailError, msg);
-        fieldEmail.classList.add('form-input--error');
-        hasError = true;
-        lastError = msg;
+        const { status, data } = await patchAccount(
+          viewingAccount.credentials.username,
+          'email',
+          { email: newEmail }
+        );
+        if (status >= 200 && status < 300) {
+          saveCount++;
+          if (data && isSuccess(data) && data.payload) {
+            viewingAccount = data.payload as IUserAccount;
+          }
+        } else {
+          const msg = getResponseMessage(data, 'Email update failed.');
+          setFieldError(emailError, msg);
+          fieldEmail.classList.add('form-input--error');
+          hasError = true;
+          lastError = msg;
+        }
       }
     }
   }
@@ -560,11 +571,10 @@ const handleSave = async (): Promise<void> => {
       fieldPassword.classList.add('form-input--error');
       hasError = true;
     } else {
-      const body: Record<string, string> = { newPassword };
       const { status, data } = await patchAccount(
         viewingAccount.credentials.username,
         'password',
-        body
+        { newPassword }
       );
       if (status >= 200 && status < 300) {
         saveCount++;
@@ -855,3 +865,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     setFormStatus(message, true);
   }
 });
+
+// Menu toggle
+const menuIcon = document.getElementById('menu-icon');
+const dropdownMenu = document.getElementById('dropdown-menu');
+const backIcon = document.getElementById('back-icon');
+
+menuIcon?.addEventListener('click', () => {
+  menuIcon.classList.toggle('is-active');
+  dropdownMenu?.classList.toggle('is-active');
+  backIcon?.classList.toggle('is-hidden');
+});
+
+// Logout from menu
+const menuLogoutBtn = document.getElementById('menu-logout-btn');
+menuLogoutBtn?.addEventListener('click', handleLogout);

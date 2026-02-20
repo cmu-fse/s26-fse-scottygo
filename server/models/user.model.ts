@@ -176,7 +176,6 @@ export class User implements IUser {
     'add',
     'address',
     'adm',
-    'admin',
     'administration',
     'adult',
     'advertising',
@@ -480,6 +479,13 @@ export class User implements IUser {
   ];
 
   /**
+   * Get all usernames (for admin dropdown)
+   */
+  static async getAllUsernames(): Promise<string[]> {
+    return DAC.db.getAllUsernames();
+  }
+
+  /**
    * Get a user account by username
    */
   static async getUserAccount(username: string): Promise<IUserAccount> {
@@ -539,11 +545,30 @@ export class User implements IUser {
 
   /**
    * Update user privilege level
+   * Enforces R1 At-Least-One-Administrator Rule
    */
   static async updatePrivilege(
     username: string,
     privilegeLevel: IPrivilegeLevel
   ): Promise<IUserAccount> {
+    // R1 At-Least-One-Administrator Rule: Check before demoting an admin
+    if (privilegeLevel !== 'Administrator') {
+      // Get current user to check if they're an admin
+      const currentUser = await DAC.db.findUserAccountByUsername(username.toLowerCase());
+      if (currentUser && currentUser.privilegeLevel === 'Administrator' && currentUser.status === 'Active') {
+        // Count active administrators
+        const adminCount = await DAC.db.countAdministrators();
+        if (adminCount <= 1) {
+          const error: IAppError = {
+            type: 'ClientError',
+            name: 'LastAdministrator',
+            message: 'Cannot demote the last active Administrator'
+          };
+          throw error;
+        }
+      }
+    }
+
     const updatedUser = await DAC.db.updateUserPrivilege(
       username.toLowerCase(),
       privilegeLevel
@@ -626,50 +651,11 @@ export class User implements IUser {
    * Update user password with validation
    * @param username - The username of the user
    * @param newPassword - The new password (plain text, will be hashed)
-   * @param currentPassword - The current password (required for members)
-   * @param isAdmin - Whether the requester is an admin (admins don't need current password)
    */
   static async updatePassword(
     username: string,
-    newPassword: string,
-    currentPassword?: string,
-    isAdmin: boolean = false
+    newPassword: string
   ): Promise<IUserAccount> {
-    // Get current user to verify current password if not admin
-    if (!isAdmin) {
-      if (!currentPassword) {
-        const error: IAppError = {
-          type: 'ClientError',
-          name: 'MissingPassword',
-          message: 'Current password is required'
-        };
-        throw error;
-      }
-
-      const user = await DAC.db.findUserByUsername(username.toLowerCase());
-      if (!user) {
-        const error: IAppError = {
-          type: 'ClientError',
-          name: 'UserNotFound',
-          message: 'User not found'
-        };
-        throw error;
-      }
-
-      const isValid = await bcrypt.compare(
-        currentPassword,
-        user.credentials.password
-      );
-      if (!isValid) {
-        const error: IAppError = {
-          type: 'ClientError',
-          name: 'IncorrectPassword',
-          message: 'Current password is incorrect'
-        };
-        throw error;
-      }
-    }
-
     // Validate new password strength
     User.validatePasswordStrength(newPassword);
 
