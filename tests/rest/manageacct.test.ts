@@ -922,7 +922,17 @@ describe('Socket.io Events', () => {
       member2Socket.on('forceLogout', (reason: string) => {
         expect(reason).toContain('deactivated');
         member2Socket.disconnect();
-        done();
+
+        // Reactivate member2 BEFORE marking test as done
+        void (async () => {
+          await request(
+            'PATCH',
+            `/account/users/${member2User.credentials.username}/status`,
+            { status: 'Active' },
+            adminToken
+          );
+          done();
+        })();
       });
 
       // Inactivate member2
@@ -934,18 +944,6 @@ describe('Socket.io Events', () => {
             { status: 'Inactive' },
             adminToken
           );
-
-          // Reactivate after test
-          trackTimeout(() => {
-            void (async () => {
-              await request(
-                'PATCH',
-                `/account/users/${member2User.credentials.username}/status`,
-                { status: 'Active' },
-                adminToken
-              );
-            })();
-          }, 1000);
         })();
       }, 500);
     });
