@@ -48,6 +48,9 @@ const userSelector = document.getElementById(
 const searchStatusEl = document.getElementById(
   'search-status'
 ) as HTMLParagraphElement;
+const userSearchInput = document.getElementById(
+  'user-search-input'
+) as HTMLInputElement;
 
 // Single account card
 const accountCard = document.getElementById('account-card') as HTMLDivElement;
@@ -302,6 +305,26 @@ const connectSocket = (): void => {
   socket = io({ query: { token } });
 
   socket.on('accountUpdated', (account: IUserAccount) => {
+    // Update admin dropdown if a username changed
+    if (isAdmin() && account._id) {
+      const oldIdx = allUsernames.findIndex((u) => {
+        // Match by checking if this account's _id corresponds to this username
+        // We detect a rename when the old username is in the list but doesn't match the new one
+        return (
+          viewingAccount &&
+          viewingAccount._id === account._id &&
+          u.toLowerCase() ===
+            viewingAccount.credentials.username.toLowerCase() &&
+          u.toLowerCase() !== account.credentials.username.toLowerCase()
+        );
+      });
+      if (oldIdx !== -1) {
+        allUsernames[oldIdx] = account.credentials.username;
+        refreshUserSelectorOptions();
+        userSelector.value = account.credentials.username;
+      }
+    }
+
     if (
       viewingAccount &&
       (account.credentials.username.toLowerCase() ===
@@ -617,6 +640,37 @@ const handleSave = async (): Promise<void> => {
   if (adminUser) {
     const newStatus = fieldStatus.value as IAccountStatus;
     if (newStatus !== viewingAccount.status) {
+      // Admin self-inactivation: show confirmation modal instead of saving immediately
+      if (ownAcct && newStatus === 'Inactive') {
+        const capturedUsername = viewingAccount.credentials.username;
+        const currentSaveCount = saveCount;
+        const currentHasError = hasError;
+        showConfirm(
+          "Do you really want to inactivate your account?\n\nIf you confirm, you'll be logged out and unable to log back in. Only another Administrator can reactivate your account.",
+          async () => {
+            const { status: s, data: d } = await patchAccount(
+              capturedUsername,
+              'status',
+              { status: 'Inactive' as IAccountStatus }
+            );
+            if (s >= 200 && s < 300) {
+              handleLogout();
+            } else {
+              const msg = getResponseMessage(d, 'Status update failed.');
+              setFormStatus(msg, true);
+            }
+          }
+        );
+        // Show partial results so far
+        if (!currentHasError && currentSaveCount > 0) {
+          setFormStatus(
+            'Some changes saved. Confirm inactivation in the dialog.'
+          );
+        }
+        saveBtn.disabled = false;
+        return;
+      }
+
       const { status, data } = await patchAccount(
         viewingAccount.credentials.username,
         'status',
@@ -683,6 +737,25 @@ const loadAccount = async (username: string): Promise<boolean> => {
 // Admin: populate username dropdown
 // ---------------------------------------------------------------------------
 
+/**
+ * Refresh the <select> options from the allUsernames array,
+ * optionally filtering by a search string.
+ */
+const refreshUserSelectorOptions = (filter = ''): void => {
+  const lowerFilter = filter.toLowerCase();
+  const filtered = lowerFilter
+    ? allUsernames.filter((u) => u.toLowerCase().includes(lowerFilter))
+    : allUsernames;
+
+  userSelector.innerHTML = '<option value="">Select Username</option>';
+  filtered.forEach((u: string) => {
+    const opt = document.createElement('option');
+    opt.value = u;
+    opt.textContent = u;
+    userSelector.appendChild(opt);
+  });
+};
+
 const populateUserSelector = async (): Promise<void> => {
   try {
     const res: AxiosResponse<IResponse> = await axios.request({
@@ -702,13 +775,7 @@ const populateUserSelector = async (): Promise<void> => {
     }
   }
 
-  userSelector.innerHTML = '<option value="">Select Username</option>';
-  allUsernames.forEach((u: string) => {
-    const opt = document.createElement('option');
-    opt.value = u;
-    opt.textContent = u;
-    userSelector.appendChild(opt);
-  });
+  refreshUserSelectorOptions(userSearchInput.value.trim());
 };
 
 // ---------------------------------------------------------------------------
@@ -733,6 +800,11 @@ accountForm.addEventListener('submit', async (e: SubmitEvent) => {
   saveBtn.disabled = false;
 });
 
+// Admin: type-to-filter search input
+userSearchInput.addEventListener('input', () => {
+  refreshUserSelectorOptions(userSearchInput.value.trim());
+});
+
 // Admin: username selector change
 userSelector.addEventListener('change', async () => {
   const selected = userSelector.value;
@@ -741,6 +813,10 @@ userSelector.addEventListener('change', async () => {
     return;
   }
   searchStatusEl.textContent = '';
+  // Sync the search input with the selected username
+  userSearchInput.value = '';
+  refreshUserSelectorOptions();
+  userSelector.value = selected;
   await loadAccount(selected);
 });
 

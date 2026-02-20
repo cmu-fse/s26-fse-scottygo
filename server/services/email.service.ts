@@ -1,8 +1,7 @@
-// Email Service for sending account notifications via Resend API
-// Uses HTTP-based Resend API to avoid SMTP blocking on cloud platforms
+// Email Service for sending account notifications via Brevo (Sendinblue) API
+// Uses HTTP-based Brevo API to avoid SMTP port blocking on cloud platforms (e.g., Render free tier)
 
-import { Resend } from 'resend';
-import { RESEND_API_KEY, EMAIL_FROM_NAME } from '../env';
+import { BREVO_API_KEY, EMAIL_USER, EMAIL_FROM_NAME } from '../env';
 
 export interface IEmailService {
   sendAccountInactivatedEmail(
@@ -16,22 +15,48 @@ export interface IEmailService {
 }
 
 /**
- * Email Service implementation using Resend API
+ * Email Service implementation using Brevo HTTP API
+ * No SDK required — uses native fetch() to POST to Brevo's transactional email endpoint
  */
 class EmailService implements IEmailService {
-  private resend: Resend | null = null;
-
-  constructor() {
-    if (this.isConfigured()) {
-      this.resend = new Resend(RESEND_API_KEY);
-    }
-  }
+  private readonly apiUrl = 'https://api.brevo.com/v3/smtp/email';
 
   /**
    * Check if email service is configured
    */
   private isConfigured(): boolean {
-    return RESEND_API_KEY !== '';
+    return BREVO_API_KEY !== '' && EMAIL_USER !== '';
+  }
+
+  /**
+   * Send an email via Brevo's transactional email API
+   */
+  private async sendEmail(
+    to: string,
+    subject: string,
+    html: string
+  ): Promise<boolean> {
+    const response = await fetch(this.apiUrl, {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+        'api-key': BREVO_API_KEY
+      },
+      body: JSON.stringify({
+        sender: { name: EMAIL_FROM_NAME, email: EMAIL_USER },
+        to: [{ email: to }],
+        subject,
+        htmlContent: html
+      })
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(`Brevo API error ${response.status}: ${errorBody}`);
+    }
+
+    return true;
   }
 
   /**
@@ -44,7 +69,7 @@ class EmailService implements IEmailService {
     email: string,
     username: string
   ): Promise<boolean> {
-    if (!this.isConfigured() || !this.resend) {
+    if (!this.isConfigured()) {
       console.log(
         `[EmailService]: Email not configured. Skipping inactivation email for ${username}`
       );
@@ -52,11 +77,10 @@ class EmailService implements IEmailService {
     }
 
     try {
-      await this.resend.emails.send({
-        from: `${EMAIL_FROM_NAME} <onboarding@resend.dev>`,
-        to: email,
-        subject: `${EMAIL_FROM_NAME} - Your Account Has Been Deactivated`,
-        html: `
+      await this.sendEmail(
+        email,
+        `${EMAIL_FROM_NAME} - Your Account Has Been Deactivated`,
+        `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2 style="color: #c41230;">Account Deactivated</h2>
             <p>Hello <strong>${username}</strong>,</p>
@@ -69,7 +93,7 @@ class EmailService implements IEmailService {
             </p>
           </div>
         `
-      });
+      );
       console.log(
         `[EmailService]: Account inactivation email sent to ${email} for user ${username}`
       );
@@ -93,7 +117,7 @@ class EmailService implements IEmailService {
     email: string,
     username: string
   ): Promise<boolean> {
-    if (!this.isConfigured() || !this.resend) {
+    if (!this.isConfigured()) {
       console.log(
         `[EmailService]: Email not configured. Skipping reactivation email for ${username}`
       );
@@ -101,11 +125,10 @@ class EmailService implements IEmailService {
     }
 
     try {
-      await this.resend.emails.send({
-        from: `${EMAIL_FROM_NAME} <onboarding@resend.dev>`,
-        to: email,
-        subject: `${EMAIL_FROM_NAME} - Your Account Has Been Reactivated`,
-        html: `
+      await this.sendEmail(
+        email,
+        `${EMAIL_FROM_NAME} - Your Account Has Been Reactivated`,
+        `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2 style="color: #2e7d32;">Account Reactivated</h2>
             <p>Hello <strong>${username}</strong>,</p>
@@ -117,7 +140,7 @@ class EmailService implements IEmailService {
             </p>
           </div>
         `
-      });
+      );
       console.log(
         `[EmailService]: Account reactivation email sent to ${email} for user ${username}`
       );

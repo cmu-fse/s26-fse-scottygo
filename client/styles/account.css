@@ -482,6 +482,11 @@ select.form-input {
   align-self: flex-start;
 }
 
+/* Username search input spacing (Admin selector) */
+#user-search-input {
+  margin-bottom: 8px;
+}
+
 /* Hidden utility */
 [hidden] {
   display: none !important;

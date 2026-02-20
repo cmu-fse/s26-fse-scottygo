@@ -24,8 +24,9 @@ export const JWT_EXP: string =
 
 export const ENV = process.env.ENV ?? 'LOCAL'; // defaults to LOCAL
 
-// Email configuration for Resend API
-export const RESEND_API_KEY: string = process.env.RESEND_API_KEY ?? '';
+// Email configuration for Brevo (formerly Sendinblue) API
+export const BREVO_API_KEY: string = process.env.BREVO_API_KEY ?? '';
+export const EMAIL_USER: string = process.env.EMAIL_USER ?? '';
 export const EMAIL_FROM_NAME: string =
   process.env.EMAIL_FROM_NAME ?? 'ScottyGO';
 
