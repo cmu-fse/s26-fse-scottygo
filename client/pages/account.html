@@ -115,7 +115,14 @@
 
       <!-- Username selector (Admin only) -->
       <div class="form-group" id="user-selector-group" hidden>
-        <label for="user-selector">Select Username</label>
+        <label for="user-search-input">Search / Select Username</label>
+        <input
+          type="text"
+          id="user-search-input"
+          class="form-input"
+          placeholder="Type to filter usernames…"
+          autocomplete="off"
+        />
         <select id="user-selector" class="form-input">
           <option value="">Select Username</option>
         </select>
