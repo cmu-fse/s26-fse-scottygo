@@ -11,6 +11,8 @@ import {
   IPrivilegeLevel
 } from '../../common/user.interface';
 import { IAppError } from '../../common/server.responses';
+import bcrypt from 'bcrypt';
+import { v4 as uuidV4 } from 'uuid';
 
 // Extended schema for user accounts with status and privilege
 const UserSchema = new Schema<IUserAccount>({
@@ -18,7 +20,7 @@ const UserSchema = new Schema<IUserAccount>({
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true }
   },
-  email: { type: String, required: true },
+  email: { type: String, required: false }, // Optional to support default admin with undefined email
   agreed: { type: Boolean, required: true },
   _id: { type: String, required: true },
   status: { type: String, default: 'Active', enum: ['Active', 'Inactive'] },
@@ -96,7 +98,7 @@ export class MongoDB implements IDatabase {
   }
 
   async findUserById(userId: string): Promise<IUser | null> {
-    const user: IUser |null = await MUser.findById(userId).lean();
+    const user: IUser | null = await MUser.findById(userId).lean();
     return user;
   }
 
@@ -195,5 +197,40 @@ export class MongoDB implements IDatabase {
       status: 'Active'
     });
     return count;
+  }
+
+  async seedDefaultAdmin(): Promise<void> {
+    // Check if default admin already exists
+    const existingAdmin = await MUser.findOne({
+      'credentials.username': 'admin'
+    });
+
+    if (existingAdmin) {
+      console.log('[MongoDB]: Default Administrator already exists');
+      return;
+    }
+
+    // Create default admin user as specified in UC_ManageAcct R2 Initial-Administrator Rule
+    const hashedPassword = await bcrypt.hash('admin', 10);
+    const defaultAdmin: IUserAccount = {
+      credentials: {
+        username: 'admin',
+        password: hashedPassword
+      },
+      email: '', // undefined represented as empty string
+      agreed: true, // Default admin is pre-agreed to terms
+      _id: uuidV4(),
+      status: 'Active',
+      privilegeLevel: 'Administrator'
+    };
+
+    const newAdmin = new MUser(defaultAdmin);
+    await newAdmin.save();
+    console.log('[MongoDB]: Default Administrator user created (username: Admin, password: admin)');
+  }
+
+  async getAllUsernames(): Promise<string[]> {
+    const users = await MUser.find({}, { 'credentials.username': 1 }).lean();
+    return users.map((u) => u.credentials.username);
   }
 }

@@ -76,7 +76,8 @@
       "source": [
         "client/pages/home.html",
         "client/pages/auth.html",
-        "client/pages/map.html"
+        "client/pages/map.html",
+        "client/pages/account.html"
       ],
       "distDir": ".dist/client",
       "context": "browser"

@@ -106,34 +106,34 @@ This section covers the account management endpoints, allowing Administrators an
 
 Changes take effect upon the **next login**.
 
-| Privilege Level | Permissions |
-| :---- | :---- |
-| **Member** | Standard Member use cases. |
-| **Coordinator** | Member \+ Coordinator use cases. |
+| Privilege Level   | Permissions                               |
+| :---------------- | :---------------------------------------- |
+| **Member**        | Standard Member use cases.                |
+| **Coordinator**   | Member \+ Coordinator use cases.          |
 | **Administrator** | Member \+ Coordinator \+ Admin use cases. |
 
 ---
 
 ## **7\. Initial Administrator (R2)**
 
-| Field | Value |
-| :---- | :---- |
-| Username | Admin |
-| Password | admin |
+| Field           | Value         |
+| :-------------- | :------------ |
+| Username        | Admin         |
+| Password        | admin         |
 | Privilege Level | Administrator |
-| Status | Active |
+| Status          | Active        |
 
 ---
 
 ## **8\. Error Names**
 
-| Error Name | Description |
-| :---- | :---- |
-| **UnauthorizedRequest** | User lacks permission for the action. |
-| **LastAdministrator** | Cannot inactivate the sole Administrator. |
-| **UserNotFound** | Target user does not exist. |
-| **InvalidPassword** | Does not meet complexity rules. |
-| **UsernameExists** | New username is already taken. |
+| Error Name              | Description                               |
+| :---------------------- | :---------------------------------------- |
+| **UnauthorizedRequest** | User lacks permission for the action.     |
+| **LastAdministrator**   | Cannot inactivate the sole Administrator. |
+| **UserNotFound**        | Target user does not exist.               |
+| **InvalidPassword**     | Does not meet complexity rules.           |
+| **UsernameExists**      | New username is already taken.            |
 
 ---
 

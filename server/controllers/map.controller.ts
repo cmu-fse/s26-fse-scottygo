@@ -1,4 +1,4 @@
-// Controller serving the app_directory page where the user lands after login
+// Controller serving the map page where the user lands after login
 // Note that controllers don't access the DB direcly, only through the models
 
 import { ILogin, IUser } from '../../common/user.interface';
@@ -19,12 +19,12 @@ export default class MapController extends Controller {
   }
 
   public initializeRoutes(): void {
-    this.router.get('/', this.mapPage);
+    this.router.get('/', this.mapPage.bind(this));
     this.router.get('/users/:username?', this.authorize, this.getUser);
   }
 
-  public mapPage(req: Request, res: Response) {
-    return res.redirect('/map.html');
+  public mapPage(req: Request, res: Response): void {
+    this.sendPage(res, 'map.html');
   }
 
   // Check if the user is logged in by validating token

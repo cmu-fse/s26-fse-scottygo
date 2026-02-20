@@ -25,8 +25,8 @@ export default class AuthController extends Controller {
     this.router.patch('/users/:username', this.agreed.bind(this));
   }
 
-  public async authPage(req: Request, res: Response): Promise<void> {
-    return res.redirect('/auth.html');
+  public authPage(req: Request, res: Response): void {
+    this.sendPage(res, 'auth.html');
   }
 
   public async register(req: Request, res: Response) {

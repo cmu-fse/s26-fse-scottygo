@@ -423,6 +423,14 @@ describe('PATCH /account/users/:username/status', () => {
   });
 
   test('Last admin cannot be inactivated (R1)', async () => {
+    // First, inactivate the default admin so testadmin is the only admin
+    await request(
+      'PATCH',
+      '/account/users/admin/status',
+      { status: 'Inactive' },
+      adminToken
+    );
+
     const res = await request(
       'PATCH',
       `/account/users/${adminUser.credentials.username}/status`,
@@ -433,6 +441,14 @@ describe('PATCH /account/users/:username/status', () => {
     expect(res.status).toBe(400);
     const error = res.data as responses.IAppError;
     expect(error.name).toBe('LastAdministrator');
+
+    // Reactivate default admin for other tests
+    await request(
+      'PATCH',
+      '/account/users/admin/status',
+      { status: 'Active' },
+      adminToken
+    );
   });
 
   test('Invalid status value returns error', async () => {
@@ -555,6 +571,14 @@ describe('PATCH /account/users/:username/privilege', () => {
   });
 
   test('Cannot demote last active administrator', async () => {
+    // First, inactivate the default admin so testadmin is the only admin
+    await request(
+      'PATCH',
+      '/account/users/admin/status',
+      { status: 'Inactive' },
+      adminToken
+    );
+
     // Try to demote the only admin (testadmin) to Member
     const res = await request(
       'PATCH',
@@ -563,10 +587,17 @@ describe('PATCH /account/users/:username/privilege', () => {
       adminToken
     );
 
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(400);
     const error = res.data as responses.IAppError;
-    expect(error.name).toBe('UnauthorizedRequest');
-    expect(error.message).toContain('last active administrator');
+    expect(error.name).toBe('LastAdministrator');
+
+    // Reactivate default admin for other tests
+    await request(
+      'PATCH',
+      '/account/users/admin/status',
+      { status: 'Active' },
+      adminToken
+    );
   });
 });
 
@@ -641,7 +672,7 @@ describe('PATCH /account/users/:username/username', () => {
     const res = await request(
       'PATCH',
       `/account/users/${member3User.credentials.username}/username`,
-      { newUsername: 'admin' },
+      { newUsername: 'root' },
       member3Token
     );
 

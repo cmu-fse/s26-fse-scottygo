@@ -56,6 +56,10 @@ export interface IDatabase {
   ): Promise<IUserAccount | null>;
 
   countAdministrators(): Promise<number>;
+
+  getAllUsernames(): Promise<string[]>;
+
+  seedDefaultAdmin(): Promise<void>;
 }
 
 /* Data Access Class */

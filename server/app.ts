@@ -59,11 +59,14 @@ class App {
 
   private configureApp(initOnStart: boolean) {
     DAC.db = this.db;
-    DAC.db.connect().then(() => {
+    DAC.db.connect().then(async () => {
       if (initOnStart) {
-        this.db.init(); //
+        await this.db.init();
         // I set initOnStart to false if STAGE is 'PROD' in serve.ts so no risk of deleting PROD DB
       }
+      // Seed default admin user if it doesn't exist
+      // This runs in both PROD and non-PROD to ensure default admin exists
+      await this.db.seedDefaultAdmin();
     });
     // TODO: Add more app initialization code here if required
   }
@@ -79,6 +82,7 @@ class App {
 
   private configureControllers(controllers: Controller[]) {
     Controller.io = this.io;
+    Controller.clientDir = this.clientDir;
     controllers.forEach((controller) => {
       this.app.use(controller.path, controller.router);
     });

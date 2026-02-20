@@ -18,10 +18,14 @@ export default class AccountController extends Controller {
   }
 
   public initializeRoutes(): void {
-    // Apply auth middleware to all routes
+    // Page route (no auth required - client handles auth)
+    this.router.get('/', this.accountPage.bind(this));
+
+    // Apply auth middleware to API routes only
     this.router.use(this.authenticateToken.bind(this));
 
     // Account management routes
+    this.router.get('/users', this.getAllUsers.bind(this)); // Must be before :username route
     this.router.get('/users/:username', this.getUserAccount.bind(this));
     this.router.patch(
       '/users/:username/status',
@@ -114,6 +118,46 @@ export default class AccountController extends Controller {
   private emitAccountUpdated(account: IUserAccount): void {
     const roomName = `account:${account.credentials.username}`;
     Controller.io.to(roomName).emit('accountUpdated', this.obfuscatePassword(account));
+  }
+
+  /**
+   * GET /account/users
+   * Get all usernames (Admin only)
+   */
+  public async getAllUsers(req: Request, res: Response): Promise<void> {
+    try {
+      const requestingUser = await this.getRequestingUserAccount(req);
+      if (!requestingUser) {
+        const error: responses.IAppError = {
+          type: 'ClientError',
+          name: 'UnauthorizedRequest',
+          message: 'Unable to verify requesting user'
+        };
+        res.status(401).json(error);
+        return;
+      }
+
+      // Only administrators can get all users
+      if (requestingUser.privilegeLevel !== 'Administrator') {
+        const error: responses.IAppError = {
+          type: 'ClientError',
+          name: 'UnauthorizedRequest',
+          message: 'Only administrators can view all users'
+        };
+        res.status(403).json(error);
+        return;
+      }
+
+      const usernames = await User.getAllUsernames();
+      const successRes: responses.ISuccess = {
+        name: 'UsersRetrieved',
+        authorizedUser: requestingUser.credentials.username,
+        payload: usernames
+      };
+      res.status(200).json(successRes);
+    } catch (error: unknown) {
+      this.handleError(res, error);
+    }
   }
 
   /**
@@ -348,25 +392,7 @@ export default class AccountController extends Controller {
         return;
       }
 
-      // R1: Cannot demote the last active administrator
-      const targetUser = await User.getUserAccount(targetUsername);
-      if (
-        targetUser.privilegeLevel === 'Administrator' &&
-        privilegeLevel !== 'Administrator'
-      ) {
-        const adminCount = await DAC.db.countAdministrators();
-        if (adminCount <= 1) {
-          const error: responses.IAppError = {
-            type: 'ClientError',
-            name: 'UnauthorizedRequest',
-            message:
-              'Cannot demote the last active administrator. Promote another user first.'
-          };
-          res.status(403).json(error);
-          return;
-        }
-      }
-
+      // R1 check is now in User.updatePrivilege (model layer)
       const updatedUser = await User.updatePrivilege(
         targetUsername,
         privilegeLevel
@@ -552,10 +578,7 @@ export default class AccountController extends Controller {
    */
   public async updatePassword(req: Request, res: Response): Promise<void> {
     const targetUsername = req.params.username;
-    const { currentPassword, newPassword } = req.body as {
-      currentPassword?: string;
-      newPassword: string;
-    };
+    const { newPassword } = req.body as { newPassword: string };
 
     if (!targetUsername) {
       const error: responses.IAppError = {
@@ -605,13 +628,7 @@ export default class AccountController extends Controller {
         return;
       }
 
-      // Members must provide current password; Admins don't need it
-      const updatedUser = await User.updatePassword(
-        targetUsername,
-        newPassword,
-        currentPassword,
-        isAdmin && !isOwnAccount // Admin changing another user's password
-      );
+      const updatedUser = await User.updatePassword(targetUsername, newPassword);
 
       // Emit account updated event
       this.emitAccountUpdated(updatedUser);
@@ -625,6 +642,14 @@ export default class AccountController extends Controller {
     } catch (error: unknown) {
       this.handleError(res, error);
     }
+  }
+
+  /**
+   * GET /account
+   * Serve the account page
+   */
+  public accountPage(req: Request, res: Response): void {
+    this.sendPage(res, 'account.html');
   }
 
   /**
