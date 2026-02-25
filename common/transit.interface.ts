@@ -23,8 +23,8 @@ export interface IVehicle {
 }
 
 export interface IStop {
-  stopid: string;
-  stopname: string; // Stop Name
+  stopId: string;
+  stopName: string; // Stop Name
   lat: number;
   lon: number;
   routes?: string[];
