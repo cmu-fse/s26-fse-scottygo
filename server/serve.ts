@@ -8,13 +8,15 @@ import HomeController from './controllers/home.controller';
 import AuthController from './controllers/auth.controller';
 import AccountController from './controllers/account.controller';
 import MapController from './controllers/map.controller';
+import BusController from './controllers/transit.controller';
 
 const app = new App(
   [
     new HomeController('/'),
     new AuthController('/auth'),
     new AccountController('/account'),
-    new MapController('/map')
+    new MapController('/map'),
+    new BusController('/transit')
   ],
   {
     clientDir: path.join(__dirname, '../.dist/client'),

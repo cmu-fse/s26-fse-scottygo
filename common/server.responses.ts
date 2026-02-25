@@ -62,7 +62,10 @@ export type ClientErrorName =
   | 'UsernameExists'
   | 'OutOfBounds'
   | 'PermissionDenied'
-  | 'ServiceUnavailable';
+  | 'ServiceUnavailable'
+  | 'RouteNotFound'
+  | 'StopNotFound'
+  | 'MissingParameter';
 
 export type ServerErrorName =
   | 'FailedAuthentication'

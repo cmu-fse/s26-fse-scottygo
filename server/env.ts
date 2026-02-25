@@ -30,6 +30,12 @@ export const EMAIL_USER: string = process.env.EMAIL_USER ?? '';
 export const EMAIL_FROM_NAME: string =
   process.env.EMAIL_FROM_NAME ?? 'ScottyGO';
 
+// TrueTime API (Pittsburgh Regional Transit)
+export const TRUETIME_KEY: string = process.env.TRUETIME_KEY ?? '';
+export const TRUETIME_BASE_URL: string =
+  process.env.TRUETIME_BASE_URL ??
+  'https://truetime.portauthority.org/bustime/api/v3';
+
 // Set the HOST URL depending on the build environment and where the app is served from
 export const HOST: string =
   ENV === 'RENDER'
