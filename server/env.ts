@@ -45,3 +45,5 @@ export const HOST: string =
       : ENV === 'LOCAL'
         ? (process.env.LOCAL_HOST ?? 'unknown')
         : 'unknown';
+
+export const GOOGLE_MAPS_KEY: string = process.env.GOOGLE_MAPS_KEY ?? '';

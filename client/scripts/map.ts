@@ -1,10 +1,8 @@
 import axios, { AxiosResponse } from 'axios';
-import type { ILogin, IUser } from '../../common/user.interface';
-import type {
-  IAuthenticatedUser,
-  IResponse
-} from '../../common/server.responses';
-import { isSuccess } from '../../common/server.responses';
+import type { IUser } from '../../common/user.interface';
+import type { IResponse } from '../../common/server.responses';
+import type { IMapProvider, IConfig } from '../../common/map.interface';
+import { GoogleMapProvider } from './maps/google-map.provider';
 
 // Export empty object to treat as module
 export {};
@@ -98,14 +96,48 @@ async function getUser(username: string): Promise<IUser | null> {
   }
 }
 
+// Map provider instance — depends on IMapProvider, not Google Maps directly
+const mapProvider: IMapProvider = new GoogleMapProvider();
+
+// Fetch map config (API key, default center, zoom) from server
+async function getMapConfig(): Promise<IConfig | null> {
+  try {
+    const token = localStorage.getItem('token');
+    const res: AxiosResponse = await axios.get('/map/config', {
+      headers: { Authorization: `Bearer ${token}` },
+      validateStatus: () => true
+    });
+    const response: IResponse = res.data;
+    if (res.status === 200 && response.name === 'ConfigFound') {
+      return response.payload as IConfig;
+    }
+    console.error('Failed to fetch map config:', response);
+    return null;
+  } catch (error) {
+    console.error('Error fetching map config:', error);
+    return null;
+  }
+}
+
 // Document-ready event handler
 document.addEventListener('DOMContentLoaded', async function (e: Event) {
   e.preventDefault();
   const loggedIn: boolean = await isLoggedIn(); // Check if user logged in
   if (!loggedIn) {
     window.location.replace('/home'); // Redirect to home page
+    return;
   }
-  console.log('App directory page loaded');
+
+  // Initialize map via provider abstraction
+  const config = await getMapConfig();
+  if (config) {
+    const container = document.getElementById('map') as HTMLElement;
+    await mapProvider.initialize(container, config);
+  } else {
+    console.error('Map could not be initialized: config unavailable');
+  }
+
+  console.log('Map page loaded');
 });
 
 // Menu toggle process
@@ -118,33 +150,6 @@ menuIcon?.addEventListener('click', () => {
   dropdownMenu?.classList.toggle('is-active');
   backIcon?.classList.toggle('is-hidden');
 });
-
-// Google Maps initialization
-interface GoogleMapsInstance {
-  new (
-    el: HTMLElement | null,
-    opts: { center: { lat: number; lng: number }; zoom: number }
-  ): unknown;
-}
-declare const google: { maps: { Map: GoogleMapsInstance } };
-
-declare global {
-  interface Window {
-    initMap: () => void;
-  }
-}
-
-window.initMap = function () {
-  new google.maps.Map(document.getElementById('map'), {
-    center: { lat: 40.4432, lng: -79.9428 }, // CMU campus
-    zoom: 15
-  });
-};
-
-const mapsScript = document.createElement('script');
-mapsScript.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.GOOGLE_MAPS_KEY}&callback=initMap&loading=async`;
-mapsScript.async = true;
-document.head.appendChild(mapsScript);
 
 // Logout process
 const menuLogoutBtn = document.getElementById(

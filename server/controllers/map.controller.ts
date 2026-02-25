@@ -9,7 +9,8 @@ import jwt from 'jsonwebtoken';
 import {
   JWT_KEY as secretKey,
   JWT_EXP as tokenExpiry,
-  STAGE as appStage
+  STAGE as appStage,
+  GOOGLE_MAPS_KEY
 } from '../env';
 import * as responses from '../../common/server.responses';
 
@@ -21,6 +22,7 @@ export default class MapController extends Controller {
   public initializeRoutes(): void {
     this.router.get('/', this.mapPage.bind(this));
     this.router.get('/users/:username?', this.authorize, this.getUser);
+    this.router.get('/config', this.authorize, this.getMapConfig.bind(this));
   }
 
   public mapPage(req: Request, res: Response): void {
@@ -102,5 +104,20 @@ export default class MapController extends Controller {
       };
       return res.status(500).json(unexpectedError);
     }
+  }
+
+  // Return Google Maps config to the client (API key, default center, zoom)
+  public getMapConfig(req: Request, res: Response): void {
+    const successRes: responses.ISuccess = {
+      name: 'ConfigFound',
+      message: 'Google Maps configuration',
+      payload: {
+        apiKey: GOOGLE_MAPS_KEY,
+        lat: 40.4433, // CMU campus default
+        lon: -79.9436,
+        defaultZoom: 14
+      }
+    };
+    res.status(200).json(successRes);
   }
 }
