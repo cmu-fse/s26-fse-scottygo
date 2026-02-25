@@ -53,7 +53,8 @@ export class GoogleMapProvider implements IMapProvider {
       position: options.position,
       map: this.map,
       title: options.title,
-      draggable: options.draggable
+      draggable: options.draggable,
+      icon: options.icon
     });
     this.markers.set(id, marker);
 
