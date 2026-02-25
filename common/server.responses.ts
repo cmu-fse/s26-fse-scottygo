@@ -1,4 +1,12 @@
 import { IUser, ILogin, IUserAccount } from './user.interface';
+import {
+  IRoute,
+  IVehicle,
+  IStop,
+  IPrediction,
+  IDetour
+} from './transit.interface';
+import { IConfig } from './map.interface';
 
 // in a response, the password property of an ILogin object should always be obfuscated, e.g., replaced by '*******';
 
@@ -25,7 +33,14 @@ export type SuccessName =
   | 'PrivilegeUpdated'
   | 'UsernameUpdated'
   | 'EmailUpdated'
-  | 'PasswordUpdated';
+  | 'PasswordUpdated'
+  | 'RoutesRetrieved'
+  | 'PathGenerated'
+  | 'VehiclesLocated'
+  | 'StopsRetrieved'
+  | 'PredictionsRetrieved'
+  | 'DetoursRetrieved'
+  | 'ConfigFound';
 
 export type ClientErrorName =
   | 'MissingEmail'
@@ -44,7 +59,13 @@ export type ClientErrorName =
   | 'WeakPassword'
   | 'InvalidUsername'
   | 'LastAdministrator'
-  | 'UsernameExists';
+  | 'UsernameExists'
+  | 'OutOfBounds'
+  | 'PermissionDenied'
+  | 'ServiceUnavailable'
+  | 'RouteNotFound'
+  | 'StopNotFound'
+  | 'MissingParameter';
 
 export type ServerErrorName =
   | 'FailedAuthentication'
@@ -52,7 +73,8 @@ export type ServerErrorName =
   | 'PostRequestFailure'
   | 'GetRequestFailure'
   | 'PatchRequestFailure'
-  | 'MongoDBError';
+  | 'MongoDBError'
+  | 'UpstreamError';
 
 export type IPayload =
   | IUser
@@ -62,6 +84,12 @@ export type IPayload =
   | IUserAccount[]
   | string[]
   | IAuthenticatedUser
+  | IRoute[]
+  | IVehicle[]
+  | IStop[]
+  | IPrediction[]
+  | IDetour[]
+  | IConfig
   | null;
 
 export interface ISuccess {
