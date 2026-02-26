@@ -18,6 +18,8 @@ import type { ITogglePanelConfig, ITogglePanelElement } from './components/toggl
 import type { ITimePickerElement, ITimeSelection } from './components/time-picker';
 import type { ICalendarPickerElement, IDateSelection } from './components/calendar-picker';
 import type { IRouteSelectorElement, IRouteSelection } from './components/route-selector';
+import { RouteDataService, ROUTE_COLORS } from './services/route-data.service';
+import type { IStop } from './services/route-data.service';
 
 // Export empty object to treat as module
 export {};
@@ -113,6 +115,7 @@ async function getUser(username: string): Promise<IUser | null> {
 
 // Map provider instance — depends on IMapProvider, not Google Maps directly
 const mapProvider: IMapProvider = new GoogleMapProvider();
+const routeService = RouteDataService.getInstance();
 
 // Fetch map config (API key, default center, zoom) from server
 async function getMapConfig(): Promise<IConfig | null> {
@@ -149,6 +152,7 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
     const container = document.getElementById('map') as HTMLElement;
     await mapProvider.initialize(container, config);
     await initializeTogglePanels();
+    await loadAndRenderRoutes(); // Load and display CMU Shuttle routes
     setupMapEventListeners();
   } else {
     console.error('Map could not be initialized: config unavailable');
@@ -193,6 +197,64 @@ async function initializeTogglePanels(): Promise<void> {
   }
 
   console.log('Toggle panels initialized');
+}
+
+// Generate SVG marker icon as data URL
+function createDotMarker(color: string, size: number = 12): string {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+      <circle cx="${size / 2}" cy="${size / 2}" r="${size / 2 - 1}" fill="${color}" stroke="white" stroke-width="1.5"/>
+    </svg>
+  `;
+  return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg.trim());
+}
+
+// Load and render CMU Shuttle routes
+async function loadAndRenderRoutes(): Promise<void> {
+  try {
+    console.log('Loading CMU Shuttle route data...');
+    const routeData = await routeService.loadRouteData();
+    
+    // Get route path and stops
+    const shapePath = routeService.getShapeAsLatLng();
+    const stops = routeData.stops;
+    const routeColor = ROUTE_COLORS['CMU_Shuttle']; // CMU red color
+    
+    // Draw route polyline
+    if (shapePath.length > 0) {
+      mapProvider.addPolyline({
+        path: shapePath,
+        color: routeColor,
+        weight: 4,
+        opacity: 1.0
+      });
+      console.log(`Drew route polyline with ${shapePath.length} points`);
+    }
+    
+    // Create custom dot marker icon
+    const dotIcon = createDotMarker(routeColor, 12);
+    
+    // Add stop markers with custom icon
+    stops.forEach((stop: IStop, index: number) => {
+      mapProvider.addMarker({
+        position: { lat: stop.lat, lng: stop.lng },
+        title: `${stop.name} (Stop #${index + 1})`,
+        icon: dotIcon
+      });
+    });
+    console.log(`Added ${stops.length} stop markers`);
+    
+    // Fit map to show all routes
+    const bounds = routeService.getRouteBounds();
+    if (bounds) {
+      mapProvider.fitBounds(bounds);
+      console.log('Fitted map to route bounds');
+    }
+    
+    console.log('CMU Shuttle routes rendered successfully');
+  } catch (error) {
+    console.error('Failed to load and render routes:', error);
+  }
 }
 
 // Helper function to get panel references
