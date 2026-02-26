@@ -63,4 +63,5 @@ export interface IMapProvider {
   clearPolylines(): void;
   clearAll(): void;
   onMapClick(callback: (position: ILatLng) => void): void;
+  fitBounds(bounds: { north: number; south: number; east: number; west: number }): void;
 }

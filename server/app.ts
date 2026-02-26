@@ -75,6 +75,7 @@ class App {
     // This prevents poorly configured clients from leaking data over unencrypted connections
     this.app.use(this.enforceHttps);
     this.app.use(express.static(this.clientDir)); // serve the static assets from the client folder
+    this.app.use('/assets', express.static('assets')); // serve CSV and other assets
     this.app.use(express.json()); // for parsing request's json body
     this.app.use(express.urlencoded({ extended: true })); // for decoding the encoded url
     this.app.use(this.serverLogger); // add a logging middleware
