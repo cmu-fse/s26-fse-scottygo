@@ -4,6 +4,21 @@ import type { IResponse } from '../../common/server.responses';
 import type { IMapProvider, IConfig } from '../../common/map.interface';
 import { GoogleMapProvider } from './maps/google-map.provider';
 
+// Import web components
+import './components/transit-search';
+import './components/map-controls';
+import './components/zoom-controls';
+import './components/location-indicator';
+import './components/dark-toggle';
+import './components/toggle-panel';
+import './components/time-picker';
+import './components/calendar-picker';
+import './components/route-selector';
+import type { ITogglePanelConfig, ITogglePanelElement } from './components/toggle-panel';
+import type { ITimePickerElement, ITimeSelection } from './components/time-picker';
+import type { ICalendarPickerElement, IDateSelection } from './components/calendar-picker';
+import type { IRouteSelectorElement, IRouteSelection } from './components/route-selector';
+
 // Export empty object to treat as module
 export {};
 
@@ -133,12 +148,377 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
   if (config) {
     const container = document.getElementById('map') as HTMLElement;
     await mapProvider.initialize(container, config);
+    await initializeTogglePanels();
+    setupMapEventListeners();
   } else {
     console.error('Map could not be initialized: config unavailable');
   }
 
   console.log('Map page loaded');
 });
+
+// Initialize toggle panels with their configurations
+async function initializeTogglePanels(): Promise<void> {
+  // Wait for the custom element to be defined
+  await customElements.whenDefined('toggle-panel');
+  
+  // Direction Filter Panel Configuration
+  const directionPanel = document.getElementById('direction-panel');
+  console.log('Direction panel element:', directionPanel);
+  
+  if (directionPanel && 'configure' in directionPanel) {
+    const directionConfig: ITogglePanelConfig = {
+      options: [
+        { id: 'inbound', label: 'Show Inbound', defaultChecked: true },
+        { id: 'outbound', label: 'Show Outbound', defaultChecked: true }
+      ],
+      eventName: 'directionFilterApplied'
+    };
+    (directionPanel as ITogglePanelElement).configure(directionConfig);
+  }
+
+  // System Filter Panel Configuration (Rule R2: PRT ON, CMU OFF by default)
+  const systemPanel = document.getElementById('system-panel');
+  console.log('System panel element:', systemPanel);
+  
+  if (systemPanel && 'configure' in systemPanel) {
+    const systemConfig: ITogglePanelConfig = {
+      options: [
+        { id: 'prt', label: 'Pittsburgh Regional Transit Routes', defaultChecked: true },
+        { id: 'cmu', label: 'CMU Shuttle Routes', defaultChecked: false }
+      ],
+      eventName: 'systemFilterApplied'
+    };
+    (systemPanel as ITogglePanelElement).configure(systemConfig);
+  }
+
+  console.log('Toggle panels initialized');
+}
+
+// Helper function to get panel references
+function getPanels(): { 
+  direction: HTMLElement | null; 
+  system: HTMLElement | null;
+  time: HTMLElement | null;
+  calendar: HTMLElement | null;
+  route: HTMLElement | null;
+} {
+  return {
+    direction: document.getElementById('direction-panel'),
+    system: document.getElementById('system-panel'),
+    time: document.querySelector('time-picker-panel'),
+    calendar: document.querySelector('calendar-picker-panel'),
+    route: document.querySelector('route-selector-panel')
+  };
+}
+
+// Helper function to close all panels
+function closeAllPanels(): void {
+  const panels = getPanels();
+  if (panels.direction && 'isOpen' in panels.direction && (panels.direction as ITogglePanelElement).isOpen()) {
+    (panels.direction as ITogglePanelElement).hide();
+  }
+  if (panels.system && 'isOpen' in panels.system && (panels.system as ITogglePanelElement).isOpen()) {
+    (panels.system as ITogglePanelElement).hide();
+  }
+  if (panels.time && 'isOpen' in panels.time && (panels.time as ITimePickerElement).isOpen()) {
+    (panels.time as ITimePickerElement).hide();
+  }
+  if (panels.calendar && 'isOpen' in panels.calendar && (panels.calendar as ICalendarPickerElement).isOpen()) {
+    (panels.calendar as ICalendarPickerElement).hide();
+  }
+  if (panels.route && 'isOpen' in panels.route && (panels.route as IRouteSelectorElement).isOpen()) {
+    (panels.route as IRouteSelectorElement).hide();
+  }
+}
+
+// Setup event listeners for web components
+function setupMapEventListeners(): void {
+  // Transit Search Events
+  document.addEventListener('search', (e: Event) => {
+    const customEvent = e as CustomEvent;
+    const query = customEvent.detail.query;
+    console.log('Search query:', query);
+    // TODO: Implement search functionality
+  });
+
+  document.addEventListener('toggleLayers', () => {
+    console.log('Toggle layers clicked');
+    // TODO: Implement layer toggle functionality
+  });
+
+  // Map Control Events (Filters)
+  document.addEventListener('filterRoute', () => {
+    console.log('Route filter clicked');
+    const panels = getPanels();
+    console.log('Route selector panel found:', panels.route);
+    
+    // Close other panels if open
+    if (panels.direction && 'isOpen' in panels.direction && (panels.direction as ITogglePanelElement).isOpen()) {
+      (panels.direction as ITogglePanelElement).hide();
+    }
+    if (panels.system && 'isOpen' in panels.system && (panels.system as ITogglePanelElement).isOpen()) {
+      (panels.system as ITogglePanelElement).hide();
+    }
+    if (panels.time && 'isOpen' in panels.time && (panels.time as ITimePickerElement).isOpen()) {
+      (panels.time as ITimePickerElement).hide();
+    }
+    if (panels.calendar && 'isOpen' in panels.calendar && (panels.calendar as ICalendarPickerElement).isOpen()) {
+      (panels.calendar as ICalendarPickerElement).hide();
+    }
+    
+    // Toggle route selector panel
+    if (panels.route && 'toggle' in panels.route) {
+      (panels.route as IRouteSelectorElement).toggle();
+    }
+  });
+
+  document.addEventListener('filterCalendar', () => {
+    console.log('Calendar filter clicked');
+    const panels = getPanels();
+    console.log('Calendar picker panel found:', panels.calendar);
+    
+    // Close other panels if open
+    if (panels.direction && 'isOpen' in panels.direction && (panels.direction as ITogglePanelElement).isOpen()) {
+      (panels.direction as ITogglePanelElement).hide();
+    }
+    if (panels.system && 'isOpen' in panels.system && (panels.system as ITogglePanelElement).isOpen()) {
+      (panels.system as ITogglePanelElement).hide();
+    }
+    if (panels.time && 'isOpen' in panels.time && (panels.time as ITimePickerElement).isOpen()) {
+      (panels.time as ITimePickerElement).hide();
+    }
+    if (panels.route && 'isOpen' in panels.route && (panels.route as IRouteSelectorElement).isOpen()) {
+      (panels.route as IRouteSelectorElement).hide();
+    }
+    
+    // Toggle calendar picker panel
+    if (panels.calendar && 'toggle' in panels.calendar) {
+      (panels.calendar as ICalendarPickerElement).toggle();
+    }
+  });
+
+  document.addEventListener('filterTime', () => {
+    console.log('Time filter clicked');
+    const panels = getPanels();
+    console.log('Time picker panel found:', panels.time);
+    
+    // Close other panels if open
+    if (panels.direction && 'isOpen' in panels.direction && (panels.direction as ITogglePanelElement).isOpen()) {
+      (panels.direction as ITogglePanelElement).hide();
+    }
+    if (panels.system && 'isOpen' in panels.system && (panels.system as ITogglePanelElement).isOpen()) {
+      (panels.system as ITogglePanelElement).hide();
+    }
+    if (panels.calendar && 'isOpen' in panels.calendar && (panels.calendar as ICalendarPickerElement).isOpen()) {
+      (panels.calendar as ICalendarPickerElement).hide();
+    }
+    if (panels.route && 'isOpen' in panels.route && (panels.route as IRouteSelectorElement).isOpen()) {
+      (panels.route as IRouteSelectorElement).hide();
+    }
+    
+    // Toggle time picker panel
+    if (panels.time && 'toggle' in panels.time) {
+      (panels.time as ITimePickerElement).toggle();
+    }
+  });
+
+  document.addEventListener('filterSystem', () => {
+    console.log('System filter clicked');
+    const panels = getPanels();
+    console.log('System panel found:', panels.system);
+    
+    // Close other panels if open
+    if (panels.direction && 'isOpen' in panels.direction && (panels.direction as ITogglePanelElement).isOpen()) {
+      (panels.direction as ITogglePanelElement).hide();
+    }
+    if (panels.time && 'isOpen' in panels.time && (panels.time as ITimePickerElement).isOpen()) {
+      (panels.time as ITimePickerElement).hide();
+    }
+    if (panels.calendar && 'isOpen' in panels.calendar && (panels.calendar as ICalendarPickerElement).isOpen()) {
+      (panels.calendar as ICalendarPickerElement).hide();
+    }
+    if (panels.route && 'isOpen' in panels.route && (panels.route as IRouteSelectorElement).isOpen()) {
+      (panels.route as IRouteSelectorElement).hide();
+    }
+    
+    // Toggle system panel
+    if (panels.system && 'toggle' in panels.system) {
+      (panels.system as ITogglePanelElement).toggle();
+    }
+  });
+
+  document.addEventListener('filterDirection', () => {
+    console.log('Direction filter clicked');
+    const panels = getPanels();
+    console.log('Direction panel found:', panels.direction);
+    
+    // Close other panels if open
+    if (panels.system && 'isOpen' in panels.system && (panels.system as ITogglePanelElement).isOpen()) {
+      (panels.system as ITogglePanelElement).hide();
+    }
+    if (panels.time && 'isOpen' in panels.time && (panels.time as ITimePickerElement).isOpen()) {
+      (panels.time as ITimePickerElement).hide();
+    }
+    if (panels.calendar && 'isOpen' in panels.calendar && (panels.calendar as ICalendarPickerElement).isOpen()) {
+      (panels.calendar as ICalendarPickerElement).hide();
+    }
+    if (panels.route && 'isOpen' in panels.route && (panels.route as IRouteSelectorElement).isOpen()) {
+      (panels.route as IRouteSelectorElement).hide();
+    }
+    
+    // Toggle direction panel
+    if (panels.direction && 'toggle' in panels.direction) {
+      (panels.direction as ITogglePanelElement).toggle();
+    }
+  });
+
+  // Zoom Control Events
+  document.addEventListener('zoomIn', () => {
+    console.log('Zoom in clicked');
+    // TODO: Implement zoom in via map provider
+  });
+
+  document.addEventListener('zoomOut', () => {
+    console.log('Zoom out clicked');
+    // TODO: Implement zoom out via map provider
+  });
+
+  // Location Indicator Events
+  document.addEventListener('locationShown', (e: Event) => {
+    const customEvent = e as CustomEvent;
+    console.log('Location shown:', customEvent.detail);
+  });
+
+  // Dark Mode Events
+  document.addEventListener('themeChanged', (e: Event) => {
+    const customEvent = e as CustomEvent;
+    const isDark = customEvent.detail.isDark;
+    console.log('Theme changed to:', isDark ? 'dark' : 'light');
+    // TODO: Update map theme if needed
+  });
+
+  // System Toggle Events
+  document.addEventListener('systemFilterApplied', (e: Event) => {
+    const customEvent = e as CustomEvent;
+    const { prt, cmu } = customEvent.detail;
+    console.log('System filters applied - PRT:', prt, 'CMU:', cmu);
+    // TODO: Filter routes by system (Rule R2)
+  });
+
+  // Direction Filter Events
+  document.addEventListener('directionFilterApplied', (e: Event) => {
+    const customEvent = e as CustomEvent;
+    const { inbound, outbound } = customEvent.detail;
+    console.log('Direction filters applied - Inbound:', inbound, 'Outbound:', outbound);
+    // TODO: Filter routes by direction
+  });
+
+  // Time Picker Events
+  document.addEventListener('timeSelected', (e: Event) => {
+    const customEvent = e as CustomEvent<ITimeSelection>;
+    const { hour, minute, period } = customEvent.detail;
+    console.log(`Time selected: ${hour}:${minute.toString().padStart(2, '0')} ${period}`);
+    // TODO: Filter routes and buses by selected time (VisRoute Basic Flow step 18)
+  });
+
+  // Calendar Picker Events
+  document.addEventListener('dateSelected', (e: Event) => {
+    const customEvent = e as CustomEvent<IDateSelection>;
+    const date = customEvent.detail.date;
+    console.log('Date selected:', date.toLocaleDateString());
+    // TODO: Filter routes by selected date (VisRoute Basic Flow steps 11-14)
+  });
+
+  // Route Selector Events
+  document.addEventListener('routeSelected', (e: Event) => {
+    const customEvent = e as CustomEvent<IRouteSelection>;
+    const route = customEvent.detail.route;
+    console.log('Route selected:', route);
+    // TODO: Filter and display selected route on map (VisRoute Basic Flow steps 7-10, Rule R1)
+  });
+
+  // Request user location for centering map (VisRoute flow)
+  requestUserLocation();
+
+  // Close panels when clicking outside them
+  const mapContainer = document.querySelector('.map-container');
+  mapContainer?.addEventListener('click', (e: Event) => {
+    const target = e.target as HTMLElement;
+    
+    // Don't close if clicking inside any panel or control
+    if (
+      target.closest('.panel') ||
+      target.closest('.control-panel') ||
+      target.closest('time-picker-panel') ||
+      target.closest('calendar-picker-panel') ||
+      target.closest('route-selector-panel') ||
+      target.closest('toggle-panel') ||
+      target.closest('map-controls')
+    ) {
+      return;
+    }
+    
+    // Close panels if clicking on map or map container
+    if (
+      target.id === 'map' ||
+      target.classList.contains('map-container')
+    ) {
+      closeAllPanels();
+    }
+  });
+}
+
+// Request user's geographic location (VisRoute Basic Flow step 2-3)
+function requestUserLocation(): void {
+  if ('geolocation' in navigator) {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        console.log('User location:', lat, lng);
+        
+        // Check if location is in Pittsburgh area (Rule R5)
+        if (isInPittsburghArea(lat, lng)) {
+          // Center map on user location
+          // TODO: Implement map centering via provider
+          
+          // Show location indicator
+          const locationIndicator = document.querySelector(
+            'location-indicator'
+          ) as HTMLElement & { show: (lat?: number, lng?: number) => void };
+          if (locationIndicator && locationIndicator.show) {
+            locationIndicator.show(lat, lng);
+          }
+        } else {
+          // A3: Location Out of Bounds
+          alert('This transit app only supports the Pittsburgh bus system.');
+          // TODO: Center on Downtown Pittsburgh (Point State Park)
+          console.log('Centering on default Pittsburgh location');
+        }
+      },
+      (error) => {
+        // A6: Location Access Denied
+        console.warn('Location access denied:', error.message);
+        alert('Location access denied. Centering on Downtown Pittsburgh by default.');
+        // TODO: Center on default Pittsburgh coordinates
+      }
+    );
+  } else {
+    console.warn('Geolocation not supported');
+    alert('Geolocation not supported. Centering on Downtown Pittsburgh.');
+  }
+}
+
+// Check if coordinates are within Pittsburgh area (Rule R5)
+function isInPittsburghArea(lat: number, lng: number): boolean {
+  const MIN_LAT = 40.1;
+  const MAX_LAT = 40.7;
+  const MIN_LNG = -80.4;
+  const MAX_LNG = -79.6;
+  
+  return lat >= MIN_LAT && lat <= MAX_LAT && lng >= MIN_LNG && lng <= MAX_LNG;
+}
 
 // Menu toggle process
 const menuIcon = document.getElementById('menu-icon');
