@@ -115,17 +115,30 @@
 
       <!-- Username selector (Admin only) -->
       <div class="form-group" id="user-selector-group" hidden>
-        <label for="user-search-input">Search / Select Username</label>
-        <input
-          type="text"
-          id="user-search-input"
-          class="form-input"
-          placeholder="Type to filter usernames…"
-          autocomplete="off"
-        />
-        <select id="user-selector" class="form-input">
-          <option value="">Select Username</option>
-        </select>
+        <div class="combobox-wrapper" id="combobox-wrapper">
+          <input
+            type="text"
+            id="user-selector"
+            class="form-input"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded="false"
+            aria-controls="user-listbox"
+            placeholder="Select username (type to filter)"
+            autocomplete="off"
+          />
+          <svg class="combobox-chevron" viewBox="0 0 10 6" aria-hidden="true">
+            <polyline
+              points="1,1 5,5 9,1"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          <ul id="user-listbox" class="combobox-listbox" role="listbox"></ul>
+        </div>
         <p
           id="search-status"
           class="field-error"

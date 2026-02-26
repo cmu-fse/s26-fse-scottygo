@@ -482,9 +482,53 @@ select.form-input {
   align-self: flex-start;
 }
 
-/* Username search input spacing (Admin selector) */
-#user-search-input {
-  margin-bottom: 8px;
+/* Combobox wrapper (Admin username selector) */
+.combobox-wrapper {
+  position: relative;
+}
+
+.combobox-chevron {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+  color: #888;
+}
+
+.combobox-listbox {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  z-index: 100;
+}
+
+.combobox-option {
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.combobox-option:hover {
+  background: #f0f0f0;
+}
+
+.combobox-option.combobox-empty {
+  color: #999;
+  font-style: italic;
+  cursor: default;
 }
 
 /* Hidden utility */

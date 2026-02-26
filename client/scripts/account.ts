@@ -44,13 +44,14 @@ const userSelectorGroup = document.getElementById(
 ) as HTMLDivElement;
 const userSelector = document.getElementById(
   'user-selector'
-) as HTMLSelectElement;
+) as HTMLInputElement;
+const userListbox = document.getElementById('user-listbox') as HTMLUListElement;
+const comboboxWrapper = document.getElementById(
+  'combobox-wrapper'
+) as HTMLDivElement;
 const searchStatusEl = document.getElementById(
   'search-status'
 ) as HTMLParagraphElement;
-const userSearchInput = document.getElementById(
-  'user-search-input'
-) as HTMLInputElement;
 
 // Single account card
 const accountCard = document.getElementById('account-card') as HTMLDivElement;
@@ -159,6 +160,7 @@ const confirmNo = document.getElementById('confirm-no') as HTMLButtonElement;
 let currentUserAccount: IUserAccount | null = null; // the logged-in user
 let viewingAccount: IUserAccount | null = null; // the account being viewed/edited
 let allUsernames: string[] = []; // for Admin dropdown
+let selectedComboValue = ''; // currently-selected combobox value
 let socket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null;
 let pendingConfirmAction: (() => Promise<void>) | null = null;
 let editing = false;
@@ -320,8 +322,9 @@ const connectSocket = (): void => {
       });
       if (oldIdx !== -1) {
         allUsernames[oldIdx] = account.credentials.username;
+        selectedComboValue = account.credentials.username;
+        userSelector.value = '';
         refreshUserSelectorOptions();
-        userSelector.value = account.credentials.username;
       }
     }
 
@@ -343,6 +346,25 @@ const connectSocket = (): void => {
     localStorage.removeItem('token');
     localStorage.removeItem('username');
     window.location.replace('/auth');
+  });
+
+  // Live update admin dropdown when any user renames themselves
+  socket.on('usernameChanged', (oldUsername: string, newUsername: string) => {
+    if (!isAdmin()) return;
+    const idx = allUsernames.findIndex(
+      (u) => u.toLowerCase() === oldUsername.toLowerCase()
+    );
+    if (idx !== -1) {
+      allUsernames[idx] = newUsername;
+    }
+    // If we're currently viewing the renamed user, update the tracked selection
+    if (selectedComboValue.toLowerCase() === oldUsername.toLowerCase()) {
+      selectedComboValue = newUsername;
+    }
+    // Re-render the listbox if it's currently visible
+    if (userListbox.hidden === false) {
+      refreshUserSelectorOptions();
+    }
   });
 };
 
@@ -738,22 +760,44 @@ const loadAccount = async (username: string): Promise<boolean> => {
 // ---------------------------------------------------------------------------
 
 /**
- * Refresh the <select> options from the allUsernames array,
- * optionally filtering by a search string.
+ * Refresh the listbox <li> items from allUsernames,
+ * filtering by whatever is currently typed in the combobox.
  */
-const refreshUserSelectorOptions = (filter = ''): void => {
-  const lowerFilter = filter.toLowerCase();
+const refreshUserSelectorOptions = (): void => {
+  const lowerFilter = userSelector.value.trim().toLowerCase();
   const filtered = lowerFilter
     ? allUsernames.filter((u) => u.toLowerCase().includes(lowerFilter))
     : allUsernames;
 
-  userSelector.innerHTML = '<option value="">Select Username</option>';
+  userListbox.innerHTML = '';
+
+  if (filtered.length === 0) {
+    const empty = document.createElement('li');
+    empty.className = 'combobox-option combobox-empty';
+    empty.textContent = 'No matching users';
+    empty.setAttribute('aria-disabled', 'true');
+    userListbox.appendChild(empty);
+    return;
+  }
+
   filtered.forEach((u: string) => {
-    const opt = document.createElement('option');
-    opt.value = u;
-    opt.textContent = u;
-    userSelector.appendChild(opt);
+    const li = document.createElement('li');
+    li.className = 'combobox-option';
+    li.setAttribute('role', 'option');
+    li.dataset.value = u;
+    li.textContent = u;
+    userListbox.appendChild(li);
   });
+};
+
+const openCombobox = (): void => {
+  userListbox.hidden = false;
+  userSelector.setAttribute('aria-expanded', 'true');
+};
+
+const closeCombobox = (): void => {
+  userListbox.hidden = true;
+  userSelector.setAttribute('aria-expanded', 'false');
 };
 
 const populateUserSelector = async (): Promise<void> => {
@@ -775,7 +819,7 @@ const populateUserSelector = async (): Promise<void> => {
     }
   }
 
-  refreshUserSelectorOptions(userSearchInput.value.trim());
+  refreshUserSelectorOptions();
 };
 
 // ---------------------------------------------------------------------------
@@ -800,24 +844,62 @@ accountForm.addEventListener('submit', async (e: SubmitEvent) => {
   saveBtn.disabled = false;
 });
 
-// Admin: type-to-filter search input
-userSearchInput.addEventListener('input', () => {
-  refreshUserSelectorOptions(userSearchInput.value.trim());
+// Admin combobox: clear input, refresh user list, and show all options on focus
+userSelector.addEventListener('focus', async () => {
+  userSelector.value = '';
+  await populateUserSelector();
+  openCombobox();
 });
 
-// Admin: username selector change
-userSelector.addEventListener('change', async () => {
-  const selected = userSelector.value;
-  if (!selected) {
-    accountCard.hidden = true;
-    return;
-  }
-  searchStatusEl.textContent = '';
-  // Sync the search input with the selected username
-  userSearchInput.value = '';
+// Admin combobox: filter as user types
+userSelector.addEventListener('input', () => {
   refreshUserSelectorOptions();
-  userSelector.value = selected;
-  await loadAccount(selected);
+  openCombobox();
+});
+
+// Admin combobox: close on blur (delayed so click registers)
+userSelector.addEventListener('blur', () => {
+  setTimeout(() => {
+    closeCombobox();
+    // Clear the input so the placeholder reappears
+    userSelector.value = '';
+  }, 150);
+});
+
+// Admin combobox: keyboard navigation
+userSelector.addEventListener('keydown', (e: KeyboardEvent) => {
+  if (e.key === 'Escape') {
+    closeCombobox();
+    userSelector.value = '';
+    userSelector.blur();
+  }
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const first = userListbox.querySelector(
+      '.combobox-option:not(.combobox-empty)'
+    ) as HTMLLIElement | null;
+    if (first?.dataset.value) {
+      selectedComboValue = first.dataset.value;
+      userSelector.value = '';
+      closeCombobox();
+      userSelector.blur();
+      loadAccount(selectedComboValue);
+    }
+  }
+});
+
+// Admin combobox: select item on click
+userListbox.addEventListener('mousedown', async (e: MouseEvent) => {
+  const li = (e.target as HTMLElement).closest(
+    '.combobox-option:not(.combobox-empty)'
+  ) as HTMLLIElement | null;
+  if (!li?.dataset.value) return;
+  e.preventDefault(); // keep focus in input
+  selectedComboValue = li.dataset.value;
+  userSelector.value = '';
+  closeCombobox();
+  searchStatusEl.textContent = '';
+  await loadAccount(selectedComboValue);
 });
 
 // Member status toggle
@@ -928,7 +1010,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       pageTitle.style.whiteSpace = 'pre-line';
       userSelectorGroup.hidden = false;
       await populateUserSelector();
-      userSelector.value = currentUserAccount.credentials.username;
+      closeCombobox();
+      selectedComboValue = currentUserAccount.credentials.username;
+      // Leave input empty so placeholder shows; selection tracked internally
     } else {
       pageTitle.textContent = 'Account';
     }
