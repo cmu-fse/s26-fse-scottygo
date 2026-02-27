@@ -8,24 +8,44 @@ export interface IRouteSelection {
   route: string;
 }
 
+export interface IRouteOption {
+  id: string;
+  name: string;
+}
+
 export interface IRouteSelectorElement extends HTMLElement {
   show(): void;
   hide(): void;
   toggle(): void;
   isOpen(): boolean;
-  setRoutes(routes: string[]): void;
+  setRoutes(routes: IRouteOption[]): void;
 }
 
 export class RouteSelectorPanel extends HTMLElement implements IRouteSelectorElement {
-  private routes: string[] = [];
-  private filteredRoutes: string[] = [];
+  private routes: IRouteOption[] = [];
+  private filteredRoutes: IRouteOption[] = [];
   private selectedRoute: string | null = null;
   private isVisible = false;
+  private searchValue = '';
 
   constructor() {
     super();
     // Default sample routes (PRT and CMU routes)
-    this.routes = ['61A', '61B', '61C', '61D', '67', '69', '71A', '71B', '71C', '71D', 'P1', 'P3', 'P10X'];
+    this.routes = [
+      { id: '61A', name: '61A' },
+      { id: '61B', name: '61B' },
+      { id: '61C', name: '61C' },
+      { id: '61D', name: '61D' },
+      { id: '67', name: '67' },
+      { id: '69', name: '69' },
+      { id: '71A', name: '71A' },
+      { id: '71B', name: '71B' },
+      { id: '71C', name: '71C' },
+      { id: '71D', name: '71D' },
+      { id: 'P1', name: 'P1' },
+      { id: 'P3', name: 'P3' },
+      { id: 'P10X', name: 'P10X' }
+    ];
     this.filteredRoutes = [...this.routes];
   }
 
@@ -92,9 +112,10 @@ export class RouteSelectorPanel extends HTMLElement implements IRouteSelectorEle
   /**
    * Allow setting routes dynamically
    */
-  setRoutes(routes: string[]): void {
+  setRoutes(routes: IRouteOption[]): void {
     this.routes = routes;
     this.filteredRoutes = [...routes];
+    this.searchValue = '';
     this.render();
   }
 
@@ -107,15 +128,15 @@ export class RouteSelectorPanel extends HTMLElement implements IRouteSelectorEle
       <div class="route-selector-panel panel" style="display: ${displayStyle}; pointer-events: ${pointerEvents};">
         <div class="route-search-wrapper">
           <span class="material-icons-outlined route-search-icon">search</span>
-          <input type="text" class="route-search-input" placeholder="Search route..." />
+          <input type="text" class="route-search-input" placeholder="Search route..." value="${this.searchValue}" />
         </div>
 
         <div class="route-list">
           ${this.filteredRoutes
             .map(
               route => `
-                <button class="route-btn ${this.selectedRoute === route ? 'selected' : ''}" data-route="${route}">
-                  ${route}
+                <button class="route-btn ${this.selectedRoute === route.id ? 'selected' : ''}" data-route="${route.id}">
+                  ${route.name}
                 </button>
               `
             )
@@ -144,7 +165,7 @@ export class RouteSelectorPanel extends HTMLElement implements IRouteSelectorEle
       requestAnimationFrame(() => {
         const selectedBtn = this.querySelector(`.route-btn[data-route="${this.selectedRoute}"]`) as HTMLElement;
         if (selectedBtn) {
-          selectedBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          selectedBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
       });
     }
@@ -156,8 +177,9 @@ export class RouteSelectorPanel extends HTMLElement implements IRouteSelectorEle
     input?.addEventListener('input', (e) => {
       e.stopPropagation();
       const value = (e.target as HTMLInputElement).value.toLowerCase();
+      this.searchValue = value;
       this.filteredRoutes = this.routes.filter(route =>
-        route.toLowerCase().includes(value)
+        route.id.toLowerCase().includes(value) || route.name.toLowerCase().includes(value)
       );
       this.render();
     });

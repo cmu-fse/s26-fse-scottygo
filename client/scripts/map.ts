@@ -9,7 +9,6 @@ import './components/transit-search';
 import './components/map-controls';
 import './components/zoom-controls';
 import './components/location-indicator';
-import './components/dark-toggle';
 import './components/toggle-panel';
 import './components/time-picker';
 import './components/calendar-picker';
@@ -18,11 +17,60 @@ import type { ITogglePanelConfig, ITogglePanelElement } from './components/toggl
 import type { ITimePickerElement, ITimeSelection } from './components/time-picker';
 import type { ICalendarPickerElement, IDateSelection } from './components/calendar-picker';
 import type { IRouteSelectorElement, IRouteSelection } from './components/route-selector';
-import { RouteDataService, ROUTE_COLORS } from './services/route-data.service';
-import type { IStop } from './services/route-data.service';
+
+// Import state management and controllers
+import { MapStateManager } from './state/map-state';
+import { URLSyncManager } from './state/url-sync';
+import { FilterController } from './controllers/filter-controller';
+import { RouteRenderer } from './renderers/route-renderer';
+import { VehicleTracker } from './trackers/vehicle-tracker';
 
 // Export empty object to treat as module
 export {};
+
+// Modal utility functions
+function showModal(title: string, message: string): void {
+  const modal = document.getElementById('message-modal');
+  const modalTitle = document.getElementById('modal-title');
+  const modalMessage = document.getElementById('modal-message');
+  const okButton = document.getElementById('modal-ok');
+
+  if (modal && modalTitle && modalMessage && okButton) {
+    modalTitle.textContent = title;
+    modalMessage.textContent = message;
+    modal.classList.add('is-open');
+    modal.removeAttribute('inert');
+
+    // Close modal on OK button click
+    const closeModal = () => {
+      modal.classList.remove('is-open');
+      modal.setAttribute('inert', '');
+      okButton.removeEventListener('click', closeModal);
+    };
+
+    okButton.addEventListener('click', closeModal);
+  } else {
+    console.error('Modal elements not found in DOM:', {
+      modal: !!modal,
+      modalTitle: !!modalTitle,
+      modalMessage: !!modalMessage,
+      okButton: !!okButton
+    });
+    // Fallback to alert if modal not available
+    alert(`${title}\n\n${message}`);
+  }
+}
+
+// Export modal function for use in other modules
+(window as any).showModal = showModal;
+console.log('showModal function registered globally');
+
+// Global instances
+const mapStateManager = MapStateManager.getInstance();
+const urlSyncManager = URLSyncManager.getInstance();
+const filterController = FilterController.getInstance();
+const routeRenderer = RouteRenderer.getInstance();
+const vehicleTracker = VehicleTracker.getInstance();
 
 // Check whether user is logged in
 async function isLoggedIn(): Promise<boolean> {
@@ -68,10 +116,10 @@ async function getUser(username: string): Promise<IUser | null> {
       // If User not found
       // ClientErrorName = 'UserNotFound'
       if (response.name === 'UserNotFound') {
-        alert('User does not exist: ' + response.message);
+        showModal('User Not Found', 'User does not exist: ' + response.message);
         return null;
       } else {
-        alert(response.message);
+        showModal('Error', response.message);
         return null;
       }
     } else if (
@@ -95,12 +143,12 @@ async function getUser(username: string): Promise<IUser | null> {
     ) {
       // If MongoDB error, pass error message to User
       if (response.name === 'MongoDBError') {
-        alert('Database error: ' + response.message);
+        showModal('Database Error', response.message);
         return null;
       }
       // Handle any other server errors
       else {
-        alert('Server error: ' + response.message);
+        showModal('Server Error', response.message);
         return null;
       }
     } else {
@@ -115,7 +163,9 @@ async function getUser(username: string): Promise<IUser | null> {
 
 // Map provider instance — depends on IMapProvider, not Google Maps directly
 const mapProvider: IMapProvider = new GoogleMapProvider();
-const routeService = RouteDataService.getInstance();
+
+// Store user/initial location for recenter functionality
+let userLocation: { lat: number; lng: number } | null = null;
 
 // Fetch map config (API key, default center, zoom) from server
 async function getMapConfig(): Promise<IConfig | null> {
@@ -151,9 +201,34 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
   if (config) {
     const container = document.getElementById('map') as HTMLElement;
     await mapProvider.initialize(container, config);
+    
+    // Initialize all components
+    routeRenderer.initialize(mapProvider);
+    vehicleTracker.initialize(mapProvider);
+    
+    // Initialize toggle panels
     await initializeTogglePanels();
-    await loadAndRenderRoutes(); // Load and display CMU Shuttle routes
+    
+    // Initialize URL sync and restore state from URL
+    urlSyncManager.initialize();
+    
+    // Set up route selector update callback before initializing filter controller
+    filterController.setRouteSelectorCallback((routes) => {
+      const routeSelector = document.querySelector('route-selector-panel') as IRouteSelectorElement;
+      if (routeSelector && 'setRoutes' in routeSelector) {
+        routeSelector.setRoutes(routes);
+        console.log(`Updated route selector with ${routes.length} routes`);
+      }
+    });
+    
+    // Initialize filter controller (fetches and renders routes)
+    await filterController.initialize();
+    
+    // Setup event listeners for filter panels
     setupMapEventListeners();
+    
+    // Request user location for centering map
+    requestUserLocation();
   } else {
     console.error('Map could not be initialized: config unavailable');
   }
@@ -197,64 +272,6 @@ async function initializeTogglePanels(): Promise<void> {
   }
 
   console.log('Toggle panels initialized');
-}
-
-// Generate SVG marker icon as data URL
-function createDotMarker(color: string, size: number = 12): string {
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-      <circle cx="${size / 2}" cy="${size / 2}" r="${size / 2 - 1}" fill="${color}" stroke="white" stroke-width="1.5"/>
-    </svg>
-  `;
-  return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg.trim());
-}
-
-// Load and render CMU Shuttle routes
-async function loadAndRenderRoutes(): Promise<void> {
-  try {
-    console.log('Loading CMU Shuttle route data...');
-    const routeData = await routeService.loadRouteData();
-    
-    // Get route path and stops
-    const shapePath = routeService.getShapeAsLatLng();
-    const stops = routeData.stops;
-    const routeColor = ROUTE_COLORS['CMU_Shuttle']; // CMU red color
-    
-    // Draw route polyline
-    if (shapePath.length > 0) {
-      mapProvider.addPolyline({
-        path: shapePath,
-        color: routeColor,
-        weight: 4,
-        opacity: 1.0
-      });
-      console.log(`Drew route polyline with ${shapePath.length} points`);
-    }
-    
-    // Create custom dot marker icon
-    const dotIcon = createDotMarker(routeColor, 12);
-    
-    // Add stop markers with custom icon
-    stops.forEach((stop: IStop, index: number) => {
-      mapProvider.addMarker({
-        position: { lat: stop.lat, lng: stop.lng },
-        title: `${stop.name} (Stop #${index + 1})`,
-        icon: dotIcon
-      });
-    });
-    console.log(`Added ${stops.length} stop markers`);
-    
-    // Fit map to show all routes
-    const bounds = routeService.getRouteBounds();
-    if (bounds) {
-      mapProvider.fitBounds(bounds);
-      console.log('Fitted map to route bounds');
-    }
-    
-    console.log('CMU Shuttle routes rendered successfully');
-  } catch (error) {
-    console.error('Failed to load and render routes:', error);
-  }
 }
 
 // Helper function to get panel references
@@ -437,12 +454,25 @@ function setupMapEventListeners(): void {
   // Zoom Control Events
   document.addEventListener('zoomIn', () => {
     console.log('Zoom in clicked');
-    // TODO: Implement zoom in via map provider
+    const currentZoom = mapProvider.getZoom();
+    mapProvider.setZoom(currentZoom + 1);
   });
 
   document.addEventListener('zoomOut', () => {
     console.log('Zoom out clicked');
-    // TODO: Implement zoom out via map provider
+    const currentZoom = mapProvider.getZoom();
+    mapProvider.setZoom(currentZoom - 1);
+  });
+
+  document.addEventListener('recenter', () => {
+    console.log('Recenter clicked');
+    if (userLocation) {
+      mapProvider.setCenter(userLocation);
+      mapProvider.setZoom(15);
+      console.log('Recentered map on user location');
+    } else {
+      console.warn('No user location stored, cannot recenter');
+    }
   });
 
   // Location Indicator Events
@@ -460,47 +490,49 @@ function setupMapEventListeners(): void {
   });
 
   // System Toggle Events
-  document.addEventListener('systemFilterApplied', (e: Event) => {
+  document.addEventListener('systemFilterApplied', async (e: Event) => {
     const customEvent = e as CustomEvent;
     const { prt, cmu } = customEvent.detail;
     console.log('System filters applied - PRT:', prt, 'CMU:', cmu);
-    // TODO: Filter routes by system (Rule R2)
+    mapStateManager.updateFilter('selectedSystems', { prt, cmu });
+    await filterController.applySystemFilter();
   });
 
   // Direction Filter Events
-  document.addEventListener('directionFilterApplied', (e: Event) => {
+  document.addEventListener('directionFilterApplied', async (e: Event) => {
     const customEvent = e as CustomEvent;
     const { inbound, outbound } = customEvent.detail;
     console.log('Direction filters applied - Inbound:', inbound, 'Outbound:', outbound);
-    // TODO: Filter routes by direction
+    mapStateManager.updateFilter('selectedDirections', { inbound, outbound });
+    await filterController.applyDirectionFilter();
   });
 
   // Time Picker Events
-  document.addEventListener('timeSelected', (e: Event) => {
+  document.addEventListener('timeSelected', async (e: Event) => {
     const customEvent = e as CustomEvent<ITimeSelection>;
     const { hour, minute, period } = customEvent.detail;
     console.log(`Time selected: ${hour}:${minute.toString().padStart(2, '0')} ${period}`);
-    // TODO: Filter routes and buses by selected time (VisRoute Basic Flow step 18)
+    mapStateManager.updateFilter('selectedTime', { hour, minute, period });
+    await filterController.applyDateTimeFilter();
   });
 
   // Calendar Picker Events
-  document.addEventListener('dateSelected', (e: Event) => {
+  document.addEventListener('dateSelected', async (e: Event) => {
     const customEvent = e as CustomEvent<IDateSelection>;
     const date = customEvent.detail.date;
     console.log('Date selected:', date.toLocaleDateString());
-    // TODO: Filter routes by selected date (VisRoute Basic Flow steps 11-14)
+    mapStateManager.updateFilter('selectedDate', date);
+    await filterController.applyDateTimeFilter();
   });
 
   // Route Selector Events
-  document.addEventListener('routeSelected', (e: Event) => {
+  document.addEventListener('routeSelected', async (e: Event) => {
     const customEvent = e as CustomEvent<IRouteSelection>;
     const route = customEvent.detail.route;
     console.log('Route selected:', route);
-    // TODO: Filter and display selected route on map (VisRoute Basic Flow steps 7-10, Rule R1)
+    mapStateManager.updateFilter('selectedRouteId', route);
+    await filterController.applyRouteFilter(route);
   });
-
-  // Request user location for centering map (VisRoute flow)
-  requestUserLocation();
 }
 
 // Request user's geographic location (VisRoute Basic Flow step 2-3)
@@ -514,34 +546,35 @@ function requestUserLocation(): void {
         
         // Check if location is in Pittsburgh area (Rule R5)
         if (isInPittsburghArea(lat, lng)) {
-          // Center map on user location
-          // TODO: Implement map centering via provider
-          
-          // TODO: Show location indicator when proper map-based positioning is implemented
-          // The location indicator currently just shows a centered dot without using lat/lng
-          // const locationIndicator = document.querySelector(
-          //   'location-indicator'
-          // ) as HTMLElement & { show: (lat?: number, lng?: number) => void };
-          // if (locationIndicator && locationIndicator.show) {
-          //   locationIndicator.show(lat, lng);
-          // }
+          // Store and center map on user location
+          userLocation = { lat, lng };
+          mapProvider.setCenter({ lat, lng });
+          mapProvider.setZoom(15);
+          console.log('Centered map on user location');
         } else {
           // A3: Location Out of Bounds
-          alert('This transit app only supports the Pittsburgh bus system.');
-          // TODO: Center on Downtown Pittsburgh (Point State Park)
+          showModal('Location Out of Bounds', 'This transit app only supports the Pittsburgh bus system.');
+          // Center on Downtown Pittsburgh (Point State Park)
+          mapProvider.setCenter({ lat: 40.4406, lng: -80.0112 });
+          mapProvider.setZoom(14);
           console.log('Centering on default Pittsburgh location');
         }
       },
       (error) => {
         // A6: Location Access Denied
         console.warn('Location access denied:', error.message);
-        alert('Location access denied. Centering on Downtown Pittsburgh by default.');
-        // TODO: Center on default Pittsburgh coordinates
+        showModal('Location Access Denied', 'Location access denied. Centering on Downtown Pittsburgh by default.');
+        // Center on default Pittsburgh coordinates (Point State Park)
+        mapProvider.setCenter({ lat: 40.4406, lng: -80.0112 });
+        mapProvider.setZoom(14);
       }
     );
   } else {
     console.warn('Geolocation not supported');
-    alert('Geolocation not supported. Centering on Downtown Pittsburgh.');
+    // A5: Unable To Access Location
+    showModal('Geolocation Unavailable', 'Geolocation is not supported by your browser. Centering on Downtown Pittsburgh.');
+    mapProvider.setCenter({ lat: 40.4406, lng: -80.0112 });
+    mapProvider.setZoom(14);
   }
 }
 

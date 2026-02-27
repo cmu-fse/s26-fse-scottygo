@@ -101,6 +101,7 @@ export interface ISuccess {
   name: SuccessName; // name describing the action that succeeded
   message?: string; // an optional, informative message about the success condition
   authorizedUser?: string; // the username of the authorized user, for information purposes
+  metadata?: Record<string, unknown>; // optional metadata for additional context
   /* 
      payload is the actual data returned in the response;
      if there is no such data, payload should be set to null

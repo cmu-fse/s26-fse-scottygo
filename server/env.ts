@@ -36,6 +36,9 @@ export const TRUETIME_BASE_URL: string =
   process.env.TRUETIME_BASE_URL ??
   'https://truetime.portauthority.org/bustime/api/v3';
 
+// Note: Tripshot API for CMU Shuttle is public and doesn't require API keys
+// The base URL is hardcoded in the tripshot.service.ts file
+
 // Set the HOST URL depending on the build environment and where the app is served from
 export const HOST: string =
   ENV === 'RENDER'

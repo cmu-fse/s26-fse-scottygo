@@ -5,7 +5,9 @@ import { Request, Response } from 'express';
 import Controller from './controller';
 import trueTimeService from '../services/truetime.service';
 import gtfsService from '../services/gtfs.service';
+import tripshotService from '../services/tripshot.service';
 import * as responses from '../../common/server.responses';
+import { IRoute, IVehicle } from '../../common/transit.interface';
 
 export default class BusController extends Controller {
   public constructor(path: string) {
@@ -27,16 +29,42 @@ export default class BusController extends Controller {
     const systemParam = req.query.system as string | undefined;
 
     try {
-      let routes = await trueTimeService.getRoutes();
+      const routes: IRoute[] = [];
+      let usingFallback = false;
 
-      if (systemParam) {
-        routes = routes.filter((r) => r.system === systemParam);
+      // Fetch PRT routes if no system filter or PRT is requested
+      if (!systemParam || systemParam === 'PRT') {
+        try {
+          const prtRoutes = await trueTimeService.getRoutes();
+          routes.push(...prtRoutes);
+        } catch (error: unknown) {
+          // A2: PRT API is down - fall back to GTFS static data
+          console.warn('[TrueTime] API unavailable, using GTFS fallback data');
+          if (gtfsService.isLoaded()) {
+            const gtfsRoutes = gtfsService.getRoutes();
+            routes.push(...gtfsRoutes);
+            usingFallback = true;
+          } else {
+            console.error('[GTFS] Static data not loaded, cannot provide fallback');
+          }
+        }
+      }
+
+      // Fetch CMU routes if no system filter or CMU is requested
+      if (!systemParam || systemParam === 'CMU') {
+        if (tripshotService.isConfigured()) {
+          const cmuRoutes = await tripshotService.getRoutes();
+          routes.push(...cmuRoutes);
+        } else {
+          console.warn('[Tripshot] Service not configured, skipping CMU routes');
+        }
       }
 
       const successRes: responses.ISuccess = {
         name: 'RoutesRetrieved',
-        message: `Found ${routes.length} routes`,
-        payload: routes
+        message: `Found ${routes.length} routes${usingFallback ? ' (using fallback data)' : ''}`,
+        payload: routes,
+        ...(usingFallback && { metadata: { usingFallback: true } })
       };
       res.status(200).json(successRes);
     } catch (error: unknown) {
@@ -79,11 +107,29 @@ export default class BusController extends Controller {
   private async getPatterns(req: Request, res: Response): Promise<void> {
     const { id } = req.params;
     try {
-      let patterns = await trueTimeService.getPatterns(id).catch(() => null);
+      let patterns = null;
 
-      // A2 fallback: if TrueTime failed or returned nothing, use GTFS static geometry
-      if ((!patterns || patterns.length === 0) && gtfsService.isLoaded()) {
-        patterns = gtfsService.getPatterns(id);
+      // Check if this is a CMU route
+      if (id.startsWith('CMU-')) {
+        if (tripshotService.isConfigured()) {
+          patterns = await tripshotService.getPatterns(id).catch(() => null);
+        } else {
+          const err: responses.IAppError = {
+            type: 'ServerError',
+            name: 'ServiceUnavailable',
+            message: 'CMU Shuttle tracking service not configured'
+          };
+          res.status(451).json(err);
+          return;
+        }
+      } else {
+        // PRT route - use TrueTime with GTFS fallback
+        patterns = await trueTimeService.getPatterns(id).catch(() => null);
+
+        // A2 fallback: if TrueTime failed or returned nothing, use GTFS static geometry
+        if ((!patterns || patterns.length === 0) && gtfsService.isLoaded()) {
+          patterns = gtfsService.getPatterns(id);
+        }
       }
 
       if (!patterns || patterns.length === 0) {
@@ -123,12 +169,22 @@ export default class BusController extends Controller {
     }
 
     try {
-      let stops = await trueTimeService.getStops(routeId, direction).catch(() => null);
+      let stops = null;
 
-      // A2 fallback: if TrueTime failed or returned nothing, use GTFS static stops
-      // Note: GTFS stops are not filtered by direction
-      if ((!stops || stops.length === 0) && gtfsService.isLoaded()) {
-        stops = gtfsService.getStops(routeId);
+      // Check if this is a CMU route
+      if (routeId.startsWith('CMU-')) {
+        if (tripshotService.isConfigured()) {
+          stops = await tripshotService.getStops(routeId, direction).catch(() => null);
+        }
+      } else {
+        // PRT route - use TrueTime with GTFS fallback
+        stops = await trueTimeService.getStops(routeId, direction).catch(() => null);
+
+        // A2 fallback: if TrueTime failed or returned nothing, use GTFS static stops
+        // Note: GTFS stops are not filtered by direction
+        if ((!stops || stops.length === 0) && gtfsService.isLoaded()) {
+          stops = gtfsService.getStops(routeId);
+        }
       }
 
       if (!stops || stops.length === 0) {
@@ -156,7 +212,18 @@ export default class BusController extends Controller {
   private async getVehicles(req: Request, res: Response): Promise<void> {
     const { routeId } = req.params;
     try {
-      const vehicles = await trueTimeService.getVehicles(routeId);
+      let vehicles: IVehicle[] = [];
+
+      // Check if this is a CMU route
+      if (routeId.startsWith('CMU-')) {
+        if (tripshotService.isConfigured()) {
+          vehicles = await tripshotService.getVehicles(routeId);
+        }
+      } else {
+        // PRT route - use TrueTime
+        vehicles = await trueTimeService.getVehicles(routeId);
+      }
+
       const successRes: responses.ISuccess = {
         name: 'VehiclesLocated',
         message: `Found ${vehicles.length} vehicles on route ${routeId}`,
@@ -203,11 +270,15 @@ export default class BusController extends Controller {
   // -------------------------------------------------------------------------
 
   private handleError(error: unknown, res: Response): void {
+    // Log the actual error for debugging
+    console.error('[Transit Controller] Error:', error);
+    
     if (
       error &&
       typeof error === 'object' &&
       'type' in error &&
-      'name' in error
+      'name' in error &&
+      'message' in error
     ) {
       const appError = error as responses.IAppError;
       const status =
@@ -219,10 +290,16 @@ export default class BusController extends Controller {
       res.status(status).json(appError);
       return;
     }
+    
+    // Handle generic Error instances
+    if (error instanceof Error) {
+      console.error('[Transit Controller] Unexpected Error:', error.message, error.stack);
+    }
+    
     const serverError: responses.IAppError = {
       type: 'ServerError',
       name: 'GetRequestFailure',
-      message: 'An unexpected error occurred'
+      message: error instanceof Error ? error.message : 'An unexpected error occurred'
     };
     res.status(500).json(serverError);
   }
