@@ -14,14 +14,11 @@ import type { IRouteOption } from '../components/route-selector';
 
 export class FilterController {
   private static instance: FilterController;
-  private stateManager: MapStateManager;
-  private routeRenderer: RouteRenderer;
-  private vehicleTracker: VehicleTracker;
-  private urlSync: URLSyncManager;
   private token: string | null = null;
   private routeSelectorUpdateCallback:
     | ((routes: IRouteOption[]) => void)
     | null = null;
+  private routeColorCache = new Map<string, string>(); // Persists TrueTime colors across filter changes
 
   private constructor() {
     this.stateManager = MapStateManager.getInstance();
@@ -52,6 +49,7 @@ export class FilterController {
     try {
       console.log('Fetching all routes from backend...');
       const routes = await this.fetchAllRoutes();
+      routes.forEach((r) => this.routeColorCache.set(r.id, r.color));
       this.stateManager.setAvailableRoutes(routes);
 
       // Update route selector with available routes
@@ -186,6 +184,7 @@ export class FilterController {
   private async prefetchRoutes(): Promise<void> {
     try {
       const routes = await this.fetchAllRoutes();
+      routes.forEach((r) => this.routeColorCache.set(r.id, r.color));
       this.stateManager.setAvailableRoutes(routes);
 
       // Update route selector with new routes
@@ -317,8 +316,14 @@ export class FilterController {
         return;
       }
 
+      // Preserve route colors from TrueTime (GTFS routes.txt uses FFFFFF for most PRT routes)
+      const routesWithColors = availableRoutes.map((r) => ({
+        ...r,
+        color: this.routeColorCache.get(r.id) ?? r.color
+      }));
+
       // Update available routes
-      this.stateManager.setAvailableRoutes(availableRoutes);
+      this.stateManager.setAvailableRoutes(routesWithColors);
 
       // Update route selector with filtered routes
       if (this.routeSelectorUpdateCallback) {
