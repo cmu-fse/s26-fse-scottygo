@@ -71,60 +71,35 @@ class GTFSService {
       throw new Error(`[GTFS] Failed to download feed: HTTP ${res.status}`);
     }
 
-    const buffer = Buffer.from(await res.arrayBuffer());
-    const zip = new AdmZip(buffer);
+    // Use `let` so we can release the zip once all entries are extracted.
+    let zipBuffer: Buffer | null = Buffer.from(await res.arrayBuffer());
+    let zip: AdmZip | null = new AdmZip(zipBuffer);
 
     const readEntry = (name: string): string => {
-      const entry = zip.getEntry(name);
+      const entry = zip!.getEntry(name);
       if (!entry) throw new Error(`[GTFS] Missing file in zip: ${name}`);
       return entry.getData().toString('utf8');
+    };
+    const readEntryBuffer = (name: string): Buffer => {
+      const entry = zip!.getEntry(name);
+      if (!entry) throw new Error(`[GTFS] Missing file in zip: ${name}`);
+      return entry.getData();
     };
 
     const opts = { columns: true as const, skip_empty_lines: true };
 
-    console.log('[GTFS] Parsing routes.txt...');
-    const rawRoutes = parse(readEntry('routes.txt'), opts) as Record<
-      string,
-      string
-    >[];
-
-    console.log('[GTFS] Parsing stops.txt...');
-    const rawStops = parse(readEntry('stops.txt'), opts) as Record<
-      string,
-      string
-    >[];
-
-    console.log('[GTFS] Parsing trips.txt...');
-    const rawTrips = parse(readEntry('trips.txt'), opts) as Record<
-      string,
-      string
-    >[];
-
-    console.log('[GTFS] Parsing shapes.txt...');
-    const rawShapes = parse(readEntry('shapes.txt'), opts) as Record<
-      string,
-      string
-    >[];
-
-    console.log('[GTFS] Parsing calendar.txt...');
-    const rawCalendar = parse(readEntry('calendar.txt'), opts) as Record<
-      string,
-      string
-    >[];
-
-    console.log('[GTFS] Parsing calendar_dates.txt...');
-    const rawCalendarDates = parse(
-      readEntry('calendar_dates.txt'),
-      opts
-    ) as Record<string, string>[];
-
-    // stop_times.txt is deferred to stream-parsing below to avoid OOM on
-    // memory-constrained hosts (the sync parse would materialise millions of
-    // rows into a single massive JS array).
+    // ---- Parse and process each file, then let its raw array be GC'd ----
+    // By inlining the parse() result into each for-loop (instead of storing
+    // it in a named `const`), the large temporary arrays become eligible for
+    // garbage collection as soon as each loop finishes rather than all living
+    // until the end of load().
 
     // --- Build route map ---
-    // operatingDays is left empty here and computed below once calendar data is available
-    for (const r of rawRoutes) {
+    console.log('[GTFS] Parsing routes.txt...');
+    for (const r of parse(readEntry('routes.txt'), opts) as Record<
+      string,
+      string
+    >[]) {
       this.routeMap.set(r.route_id, {
         id: r.route_id,
         name: r.route_short_name || r.route_long_name,
@@ -137,7 +112,11 @@ class GTFSService {
     }
 
     // --- Build stop map (stopId → IStop) for static stop lookups and A2 fallback ---
-    for (const s of rawStops) {
+    console.log('[GTFS] Parsing stops.txt...');
+    for (const s of parse(readEntry('stops.txt'), opts) as Record<
+      string,
+      string
+    >[]) {
       this.stopMap.set(s.stop_id, {
         stopId: s.stop_id,
         stopName: s.stop_name,
@@ -149,11 +128,15 @@ class GTFSService {
     }
 
     // --- Build shape points (shapeId → sorted lat/lng array) ---
-    const shapeSeqs = new Map<
+    console.log('[GTFS] Parsing shapes.txt...');
+    let shapeSeqs: Map<
       string,
       { seq: number; lat: number; lng: number }[]
-    >();
-    for (const p of rawShapes) {
+    > | null = new Map();
+    for (const p of parse(readEntry('shapes.txt'), opts) as Record<
+      string,
+      string
+    >[]) {
       if (!shapeSeqs.has(p.shape_id)) shapeSeqs.set(p.shape_id, []);
       shapeSeqs.get(p.shape_id)!.push({
         seq: parseFloat(p.shape_pt_sequence),
@@ -161,7 +144,8 @@ class GTFSService {
         lng: parseFloat(p.shape_pt_lon)
       });
     }
-    const shapePoints = new Map<string, { lat: number; lng: number }[]>();
+    let shapePoints: Map<string, { lat: number; lng: number }[]> | null =
+      new Map();
     for (const [id, pts] of shapeSeqs) {
       pts.sort((a, b) => a.seq - b.seq);
       shapePoints.set(
@@ -169,17 +153,22 @@ class GTFSService {
         pts.map((p) => ({ lat: p.lat, lng: p.lng }))
       );
     }
+    shapeSeqs = null; // free ~30-40 MB — no longer needed
 
     // --- Build trip maps and route patterns ---
-    const seenPatterns = new Set<string>(); // "routeId:shapeId" dedup key
-    for (const t of rawTrips) {
+    console.log('[GTFS] Parsing trips.txt...');
+    const seenPatterns = new Set<string>();
+    for (const t of parse(readEntry('trips.txt'), opts) as Record<
+      string,
+      string
+    >[]) {
       this.tripService.set(t.trip_id, t.service_id);
       this.tripRoute.set(t.trip_id, t.route_id);
 
       const patternKey = `${t.route_id}:${t.shape_id}`;
       if (t.shape_id && !seenPatterns.has(patternKey)) {
         seenPatterns.add(patternKey);
-        const path = shapePoints.get(t.shape_id) ?? [];
+        const path = shapePoints!.get(t.shape_id) ?? [];
         const direction = t.direction_id === '0' ? 'OUTBOUND' : 'INBOUND';
         if (!this.patternMap.has(t.route_id)) {
           this.patternMap.set(t.route_id, []);
@@ -187,9 +176,14 @@ class GTFSService {
         this.patternMap.get(t.route_id)!.push({ direction, path });
       }
     }
+    shapePoints = null; // free — paths already stored in patternMap
 
     // --- Build calendar (regular service periods) ---
-    for (const c of rawCalendar) {
+    console.log('[GTFS] Parsing calendar.txt...');
+    for (const c of parse(readEntry('calendar.txt'), opts) as Record<
+      string,
+      string
+    >[]) {
       const days = GTFS_DAY_COLS.map((col) => c[col] === '1');
       this.calendar.set(c.service_id, {
         days,
@@ -199,7 +193,11 @@ class GTFSService {
     }
 
     // --- Build calendar exceptions ---
-    for (const d of rawCalendarDates) {
+    console.log('[GTFS] Parsing calendar_dates.txt...');
+    for (const d of parse(readEntry('calendar_dates.txt'), opts) as Record<
+      string,
+      string
+    >[]) {
       if (!this.calendarExceptions.has(d.date)) {
         this.calendarExceptions.set(d.date, {
           added: new Set(),
@@ -210,6 +208,12 @@ class GTFSService {
       if (d.exception_type === '1') ex.added.add(d.service_id);
       else if (d.exception_type === '2') ex.removed.add(d.service_id);
     }
+
+    // --- Extract stop_times as raw Buffer, then release the zip ---
+    // Using Buffer (not string) avoids the V8 string conversion overhead.
+    const stopTimesBuffer = readEntryBuffer('stop_times.txt');
+    zip = null; // free ~30 MB
+    zipBuffer = null;
 
     // --- Compute operatingDays per route by joining trips → services → calendar days ---
     const routeActiveDays = new Map<string, Set<number>>();
@@ -230,12 +234,11 @@ class GTFSService {
       if (route) route.operatingDays = [...days].sort((a, b) => a - b);
     }
 
-    // --- Build trip time ranges and route→stops by STREAMING stop_times.txt ---
-    // Stream-parsing avoids holding the entire parsed array in memory, which
-    // was causing OOM crashes on Render's 256 MB default heap.
+    // --- Build trip time ranges and route→stops by STREAMING stop_times ---
+    // Stream-parsing avoids holding the entire parsed output array in memory,
+    // and using a Buffer (not string) avoids the extra string allocation.
     console.log('[GTFS] Parsing stop_times.txt (streaming to save memory)...');
     const routeStopIds = new Map<string, Set<string>>();
-    const stopTimesContent = readEntry('stop_times.txt');
     await new Promise<void>((resolve, reject) => {
       const parser = createCsvParser({ columns: true, skip_empty_lines: true });
       parser.on('readable', () => {
@@ -263,7 +266,7 @@ class GTFSService {
       });
       parser.on('end', resolve);
       parser.on('error', reject);
-      parser.write(stopTimesContent);
+      parser.write(stopTimesBuffer);
       parser.end();
     });
 
