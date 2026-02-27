@@ -3,7 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ScottyGo</title>
+    <title>ScottyGo - Route Map</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="../styles/map.css" />
   </head>
   <body>
@@ -110,7 +112,19 @@
       </nav>
     </header>
     <main class="content">
-      <div id="map"></div>
+      <div class="map-container">
+        <div id="map"></div>
+        <transit-search></transit-search>
+        <location-indicator></location-indicator>
+        <map-controls></map-controls>
+        <zoom-controls></zoom-controls>
+        <dark-toggle></dark-toggle>
+        <toggle-panel id="direction-panel"></toggle-panel>
+        <toggle-panel id="system-panel"></toggle-panel>
+        <time-picker-panel></time-picker-panel>
+        <calendar-picker-panel></calendar-picker-panel>
+        <route-selector-panel></route-selector-panel>
+      </div>
     </main>
     <script type="module" src="../scripts/map.ts"></script>
   </body>

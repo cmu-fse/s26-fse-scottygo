@@ -26,7 +26,14 @@ export class GoogleMapProvider implements IMapProvider {
     await this.loadScript(config.apiKey);
     this.map = new google.maps.Map(container, {
       center: { lat: config.lat, lng: config.lon },
-      zoom: config.defaultZoom
+      zoom: config.defaultZoom,
+      zoomControl: false, // Disable default zoom controls (we have custom ones)
+      mapTypeControl: false, // Disable map type selector
+      streetViewControl: false, // Disable street view pegman
+      fullscreenControl: false, // Disable fullscreen button
+      zoomControlOptions: {
+        position: google.maps.ControlPosition.RIGHT_BOTTOM
+      }
     });
   }
 
@@ -111,6 +118,14 @@ export class GoogleMapProvider implements IMapProvider {
         callback({ lat: e.latLng.lat(), lng: e.latLng.lng() });
       }
     });
+  }
+
+  fitBounds(bounds: { north: number; south: number; east: number; west: number }): void {
+    const googleBounds = new google.maps.LatLngBounds(
+      { lat: bounds.south, lng: bounds.west },
+      { lat: bounds.north, lng: bounds.east }
+    );
+    this.map.fitBounds(googleBounds);
   }
 
   /**
