@@ -3,6 +3,7 @@
  * A reusable time picker panel for selecting time
  * Used for Time Filter in VisRoute feature (Basic Flow steps 15-18)
  */
+//TODO esnure input for se
 
 export interface ITimeSelection {
   hour: number;
@@ -18,17 +19,40 @@ export interface ITimePickerElement extends HTMLElement {
 }
 
 export class TimePickerPanel extends HTMLElement implements ITimePickerElement {
-  private hour = 7;
+  private hour = 12;
   private minute = 0;
-  private period: 'AM' | 'PM' = 'AM';
+  private period: 'AM' | 'PM' = 'PM';
   private isVisible = false;
 
   constructor() {
     super();
+    // Initialize with current time
+    const now = new Date();
+    const currentHour = now.getHours();
+    this.minute = now.getMinutes();
+    
+    // Convert to 12-hour format
+    if (currentHour === 0) {
+      this.hour = 12;
+      this.period = 'AM';
+    } else if (currentHour < 12) {
+      this.hour = currentHour;
+      this.period = 'AM';
+    } else if (currentHour === 12) {
+      this.hour = 12;
+      this.period = 'PM';
+    } else {
+      this.hour = currentHour - 12;
+      this.period = 'PM';
+    }
   }
 
   connectedCallback(): void {
     this.render();
+    // Add stopPropagation at the component level to prevent any clicks from bubbling
+    this.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
   }
 
   /**
@@ -39,6 +63,7 @@ export class TimePickerPanel extends HTMLElement implements ITimePickerElement {
     if (panel) {
       console.log('Showing time picker panel');
       panel.style.display = 'block';
+      panel.style.pointerEvents = 'auto'; // Enable pointer events immediately
       this.isVisible = true;
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -56,6 +81,7 @@ export class TimePickerPanel extends HTMLElement implements ITimePickerElement {
     if (panel) {
       console.log('Hiding time picker panel');
       panel.classList.remove('visible');
+      panel.style.pointerEvents = 'none'; // Disable pointer events
       setTimeout(() => {
         panel.style.display = 'none';
         this.isVisible = false;
@@ -82,17 +108,21 @@ export class TimePickerPanel extends HTMLElement implements ITimePickerElement {
   }
 
   private render(): void {
+    // Preserve display and pointer-events styles if panel is currently visible
+    const displayStyle = this.isVisible ? 'block' : 'none';
+    const pointerEvents = this.isVisible ? 'auto' : 'none';
+    
     this.innerHTML = `
-      <div class="time-picker-panel panel" style="display: none;">
+      <div class="time-picker-panel panel" style="display: ${displayStyle}; pointer-events: ${pointerEvents};">
         <h3 class="panel-title">Select Time</h3>
 
         <div class="digital">
           <div class="time-box" id="hour-box">
-            <span>${this.format(this.hour)}</span>
+            <input type="number" class="time-input" id="hour-input" min="1" max="12" value="${this.hour}" />
           </div>
           <div class="colon">:</div>
           <div class="time-box" id="minute-box">
-            <span>${this.format(this.minute)}</span>
+            <input type="number" class="time-input" id="minute-input" min="0" max="59" value="${this.format(this.minute)}" />
           </div>
         </div>
 
@@ -111,6 +141,14 @@ export class TimePickerPanel extends HTMLElement implements ITimePickerElement {
         </div>
       </div>
     `;
+
+    // Re-apply the visible class if panel is currently visible
+    if (this.isVisible) {
+      const panel = this.querySelector('.time-picker-panel') as HTMLElement;
+      if (panel) {
+        panel.classList.add('visible');
+      }
+    }
 
     this.attachEvents();
   }
@@ -140,13 +178,45 @@ export class TimePickerPanel extends HTMLElement implements ITimePickerElement {
   }
 
   private attachEvents(): void {
+    // Hour input
+    const hourInput = this.querySelector('#hour-input') as HTMLInputElement;
+    hourInput?.addEventListener('input', (e) => {
+      e.stopPropagation();
+      let value = parseInt((e.target as HTMLInputElement).value);
+      if (value < 1) value = 1;
+      if (value > 12) value = 12;
+      this.hour = value;
+      (e.target as HTMLInputElement).value = value.toString();
+      this.updateClock();
+    });
+    
+    hourInput?.addEventListener('blur', (e) => {
+      (e.target as HTMLInputElement).value = this.hour.toString();
+    });
+
+    // Minute input
+    const minuteInput = this.querySelector('#minute-input') as HTMLInputElement;
+    minuteInput?.addEventListener('input', (e) => {
+      e.stopPropagation();
+      let value = parseInt((e.target as HTMLInputElement).value);
+      if (isNaN(value) || value < 0) value = 0;
+      if (value > 59) value = 59;
+      this.minute = value;
+      (e.target as HTMLInputElement).value = this.format(value);
+    });
+    
+    minuteInput?.addEventListener('blur', (e) => {
+      (e.target as HTMLInputElement).value = this.format(this.minute);
+    });
+
     // Hour selection from clock
     this.querySelectorAll('.clock-number').forEach((el) => {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
         const hour = Number((e.currentTarget as HTMLElement).dataset.hour);
         this.hour = hour;
-        this.render();
+        this.updateDigital();
+        this.updateClock();
       });
     });
 
@@ -155,7 +225,7 @@ export class TimePickerPanel extends HTMLElement implements ITimePickerElement {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         this.period = (e.currentTarget as HTMLElement).dataset.period as 'AM' | 'PM';
-        this.render();
+        this.updatePeriod();
       });
     });
 
@@ -187,6 +257,44 @@ export class TimePickerPanel extends HTMLElement implements ITimePickerElement {
 
   private format(n: number): string {
     return n.toString().padStart(2, '0');
+  }
+
+  /**
+   * Update digital display without re-rendering entire panel
+   */
+  private updateDigital(): void {
+    const hourInput = this.querySelector('#hour-input') as HTMLInputElement;
+    const minuteInput = this.querySelector('#minute-input') as HTMLInputElement;
+    if (hourInput) hourInput.value = this.hour.toString();
+    if (minuteInput) minuteInput.value = this.format(this.minute);
+  }
+
+  /**
+   * Update clock display without re-rendering entire panel
+   */
+  private updateClock(): void {
+    this.querySelectorAll('.clock-number').forEach((el) => {
+      const hour = Number((el as HTMLElement).dataset.hour);
+      if (hour === this.hour) {
+        el.classList.add('active');
+      } else {
+        el.classList.remove('active');
+      }
+    });
+  }
+
+  /**
+   * Update period buttons without re-rendering entire panel
+   */
+  private updatePeriod(): void {
+    this.querySelectorAll('.period-btn').forEach((btn) => {
+      const period = (btn as HTMLElement).dataset.period;
+      if (period === this.period) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
   }
 }
 

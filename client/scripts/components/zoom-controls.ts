@@ -12,12 +12,16 @@ export class ZoomControls extends HTMLElement {
         <button class="circle-btn" id="zoom-out-btn" title="Zoom Out">
           <span class="material-icons-outlined">remove</span>
         </button>
+        <button class="circle-btn" id="recenter-btn" title="Recenter on User Location">
+          <span class="material-icons-outlined">my_location</span>
+        </button>
       </div>
     `;
 
     // Add event listeners
     const zoomInBtn = this.querySelector('#zoom-in-btn');
     const zoomOutBtn = this.querySelector('#zoom-out-btn');
+    const recenterBtn = this.querySelector('#recenter-btn');
 
     zoomInBtn?.addEventListener('click', () => {
       this.dispatchEvent(new CustomEvent('zoomIn', { bubbles: true }));
@@ -25,6 +29,10 @@ export class ZoomControls extends HTMLElement {
 
     zoomOutBtn?.addEventListener('click', () => {
       this.dispatchEvent(new CustomEvent('zoomOut', { bubbles: true }));
+    });
+
+    recenterBtn?.addEventListener('click', () => {
+      this.dispatchEvent(new CustomEvent('recenter', { bubbles: true }));
     });
   }
 }

@@ -15,8 +15,15 @@
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-    Helvetica, Arial, sans-serif;
+  font-family:
+    'Inter',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
   height: 100vh;
   display: flex;
   flex-direction: column;
@@ -270,7 +277,7 @@ body.dark .circle-btn.primary {
   max-width: 66.67%; /* Constrain to 2/3 of screen width */
   width: calc(100% - 40px); /* Full width minus margins */
   gap: 12px;
-  z-index: 1000;
+  z-index: 30;
 }
 
 .search-box {
@@ -531,7 +538,26 @@ body.dark .toggle-label {
   z-index: 25;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.3s ease, transform 0.3s ease;
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
+}
+
+/* Mobile: Reduce toggle filter panel width */
+@media (max-width: 480px) {
+  .toggle-filter-panel {
+    min-width: 200px;
+    max-width: 240px;
+  }
+
+  .filter-label {
+    font-size: 11px;
+  }
+
+  .filter-btn {
+    font-size: 13px;
+    padding: 6px 12px;
+  }
 }
 
 .toggle-filter-panel.visible {
@@ -624,8 +650,8 @@ body.dark input:checked + .slider {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-top: 8px;
-  margin-top: 8px;
+  padding-top: 4px;
+  margin-top: 4px;
   border-top: 1px solid rgba(0, 0, 0, 0.05);
 }
 
@@ -671,7 +697,29 @@ body.dark .filter-btn:hover {
   z-index: 25;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.3s ease, transform 0.3s ease;
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
+}
+
+/* Mobile: Reduce time picker panel width */
+@media (max-width: 480px) {
+  .time-picker-panel {
+    min-width: 240px;
+  }
+
+  .panel-title {
+    font-size: 11px;
+  }
+
+  .digital input {
+    font-size: 22px;
+  }
+
+  .analog-clock-face {
+    width: 180px;
+    height: 180px;
+  }
 }
 
 .time-picker-panel.visible {
@@ -713,6 +761,30 @@ body.dark .time-box {
   background: var(--gray-800);
 }
 
+.time-box .time-input {
+  font-size: 32px;
+  font-family: 'Roboto Mono', monospace;
+  color: var(--primary);
+  font-weight: 500;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: center;
+  outline: none;
+  -moz-appearance: textfield; /* Remove spinners in Firefox */
+}
+
+.time-box .time-input::-webkit-outer-spin-button,
+.time-box .time-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+body.dark .time-box .time-input {
+  color: var(--primary);
+}
+
+/* Legacy support for span if any component still uses it */
 .time-box span {
   font-size: 32px;
   font-family: 'Roboto Mono', monospace;
@@ -833,6 +905,7 @@ body.dark .clock-number:hover {
   border-radius: 24px;
   padding: 20px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  overflow: visible;
 }
 
 .calendar-picker-panel.visible {
@@ -896,11 +969,13 @@ body.dark .clock-number:hover {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   text-align: center;
-  gap: 2px;
+  gap: 4px;
+  align-content: start;
+  padding: 0 4px;
 }
 
 .cal-day {
-  padding: 8px;
+  padding: 0;
   cursor: pointer;
   border-radius: 50%;
   width: 36px;
@@ -911,8 +986,9 @@ body.dark .clock-number:hover {
   margin: 0 auto;
   font-size: 14px;
   color: var(--gray-900);
-  transition: background 0.2s;
+  transition: all 0.2s;
   user-select: none;
+  border: 2px solid transparent;
 }
 
 .cal-day:hover:not(.muted) {
@@ -928,6 +1004,9 @@ body.dark .clock-number:hover {
   background: var(--primary);
   color: white;
   font-weight: 600;
+  border: 2px solid var(--primary);
+  box-shadow: 0 0 0 2px rgba(196, 18, 48, 0.2);
+  transform: scale(1.05);
 }
 
 /* Dark Mode Calendar Styles */
@@ -964,6 +1043,64 @@ body.dark .cal-day.muted {
   color: var(--gray-600);
 }
 
+/* Mobile and Tablet: Reduce calendar to 6 columns */
+@media (max-width: 820px) {
+  .calendar-picker-panel {
+    width: 240px;
+    padding: 12px;
+    border-radius: 16px;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .cal-header {
+    margin-bottom: 6px;
+  }
+
+  .cal-month-year {
+    font-size: 12px;
+  }
+
+  .cal-nav-btn .material-icons-outlined {
+    font-size: 18px;
+  }
+
+  /* Hide weekday labels on mobile for 6-column layout */
+  .cal-weekdays {
+    display: none;
+  }
+
+  .cal-day {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
+
+  .cal-grid {
+    grid-template-columns: repeat(6, 1fr) !important;
+    min-height: auto;
+    max-height: 168px;
+    gap: 2px;
+    padding: 0;
+    margin-bottom: 6px;
+  }
+
+  .filter-actions {
+    margin-top: 0;
+    padding-top: 6px;
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+  }
+
+  .filter-btn {
+    font-size: 12px;
+    padding: 6px 12px;
+  }
+
+  body.dark .filter-actions {
+    border-top-color: rgba(255, 255, 255, 0.1);
+  }
+}
+
 /* Route Selector Panel Styles */
 .route-selector-panel {
   position: absolute;
@@ -979,6 +1116,31 @@ body.dark .cal-day.muted {
   border-radius: 28px;
   padding: 16px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+/* Mobile: Reduce route selector width and font sizes */
+@media (max-width: 480px) {
+  .route-selector-panel {
+    width: 220px;
+    padding: 12px;
+    border-radius: 20px;
+  }
+
+  .route-search-input {
+    height: 32px;
+    font-size: 13px;
+    padding: 0 10px 0 32px;
+  }
+
+  .route-search-icon {
+    font-size: 16px;
+    left: 8px;
+  }
+
+  .route-btn {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
 }
 
 .route-selector-panel.visible {
@@ -1060,7 +1222,7 @@ body.dark .cal-day.muted {
   font-family: 'Inter', sans-serif;
   color: var(--gray-900);
   transition: all 0.2s ease;
-  text-align: left;
+  text-align: center;
 }
 
 .route-btn:hover {
@@ -1161,4 +1323,91 @@ body.dark .route-btn:hover {
   .route-selector-panel {
     left: 80px;
   }
+}
+
+/* Modal Styles */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 1000;
+}
+
+.modal-backdrop.is-open {
+  display: flex;
+}
+
+.modal {
+  background: #fff;
+  border: 2px solid #c41230;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 400px;
+  padding: 24px;
+  text-align: center;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+}
+
+body.dark .modal {
+  background: var(--gray-800);
+  border-color: var(--primary);
+  color: var(--white);
+}
+
+.modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+  color: #c41230;
+}
+
+body.dark .modal-title {
+  color: var(--primary);
+}
+
+.modal-message {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #333;
+  margin: 0 0 20px 0;
+}
+
+body.dark .modal-message {
+  color: var(--gray-100);
+}
+
+.modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.modal-btn {
+  border: none;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s;
+}
+
+.modal-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.modal-btn--primary {
+  background-color: #c41230;
+  color: #fff;
+}
+
+.modal-btn--primary:hover {
+  background-color: #a00e26;
 }

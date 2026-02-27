@@ -104,7 +104,7 @@ class GTFSService {
         id: r.route_id,
         name: r.route_short_name || r.route_long_name,
         system: 'PRT',
-        color: r.route_color ? `#${r.route_color}` : '#1e90ff',
+        color: (r.route_color && r.route_color.toUpperCase() !== 'FFFFFF') ? `#${r.route_color}` : '#1e90ff',
         directions: ['INBOUND', 'OUTBOUND'],
         activeStatus: true,
         operatingDays: []
