@@ -14,6 +14,10 @@ import type { IRouteOption } from '../components/route-selector';
 
 export class FilterController {
   private static instance: FilterController;
+  private stateManager: MapStateManager;
+  private routeRenderer: RouteRenderer;
+  private vehicleTracker: VehicleTracker;
+  private urlSync: URLSyncManager;
   private token: string | null = null;
   private routeSelectorUpdateCallback:
     | ((routes: IRouteOption[]) => void)
@@ -175,6 +179,13 @@ export class FilterController {
     // Re-apply all filters
     this.stateManager.reapplyFilters();
     await this.renderFilteredRoutes();
+
+    // If a route is still selected after system filter, re-render it fully (geometry + stops)
+    const updatedState = this.stateManager.getState();
+    if (updatedState.selectedRouteId) {
+      await this.applyRouteFilter(updatedState.selectedRouteId);
+    }
+
     this.urlSync.updateURL(state);
   }
 
@@ -334,9 +345,9 @@ export class FilterController {
         this.routeSelectorUpdateCallback(routeOptions);
       }
 
-      // If a specific route is selected, restart polling with time parameter
-      if (state.selectedRouteId && this.vehicleTracker.isPolling()) {
-        this.vehicleTracker.startPolling(state.selectedRouteId);
+      // If a specific route is selected, re-render it fully (geometry + stops)
+      if (state.selectedRouteId) {
+        await this.applyRouteFilter(state.selectedRouteId);
       } else {
         // Re-render filtered routes
         await this.renderFilteredRoutes();

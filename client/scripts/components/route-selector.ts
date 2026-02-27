@@ -177,11 +177,26 @@ export class RouteSelectorPanel extends HTMLElement implements IRouteSelectorEle
     input?.addEventListener('input', (e) => {
       e.stopPropagation();
       const value = (e.target as HTMLInputElement).value.toLowerCase();
+      const cursorPos = (e.target as HTMLInputElement).selectionStart;
       this.searchValue = value;
       this.filteredRoutes = this.routes.filter(route =>
         route.id.toLowerCase().includes(value) || route.name.toLowerCase().includes(value)
       );
+      // Save scroll position before re-render
+      const routeList = this.querySelector('.route-list') as HTMLElement;
+      const scrollTop = routeList?.scrollTop || 0;
       this.render();
+      // Restore scroll position and focus after re-render
+      const newRouteList = this.querySelector('.route-list') as HTMLElement;
+      if (newRouteList) {
+        newRouteList.scrollTop = scrollTop;
+      }
+      // Restore focus and cursor position
+      const newInput = this.querySelector('.route-search-input') as HTMLInputElement;
+      if (newInput) {
+        newInput.focus();
+        newInput.setSelectionRange(cursorPos, cursorPos);
+      }
     });
 
     // Route button selection
@@ -190,7 +205,12 @@ export class RouteSelectorPanel extends HTMLElement implements IRouteSelectorEle
         e.stopPropagation();
         const route = (e.currentTarget as HTMLElement).dataset.route;
         this.selectedRoute = route || null;
-        this.render();
+        
+        // Update selection without full re-render to preserve scroll position
+        this.querySelectorAll('.route-btn').forEach((b) => {
+          b.classList.remove('selected');
+        });
+        (e.currentTarget as HTMLElement).classList.add('selected');
       });
     });
 

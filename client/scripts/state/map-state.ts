@@ -70,8 +70,8 @@ export class MapStateManager {
   /**
    * Update a specific filter
    */
-  updateFilter(filterType: keyof IMapState, value: any): void {
-    (this.state as any)[filterType] = value;
+  updateFilter<K extends keyof IMapState>(filterType: K, value: IMapState[K]): void {
+    this.state[filterType] = value;
     this.notifyListeners();
   }
 
