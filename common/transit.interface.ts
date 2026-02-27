@@ -47,3 +47,8 @@ export interface IDetour {
   startdt: string; // Start date and time (ISO string)
   enddt: string; // End date and time (ISO string)
 }
+
+export interface IPattern {
+  direction: string; // e.g. "INBOUND" or "OUTBOUND"
+  path: { lat: number; lng: number }[]; // Ordered sequence of points forming the route geometry
+}

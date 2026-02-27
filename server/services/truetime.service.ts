@@ -7,7 +7,8 @@ import {
   IVehicle,
   IStop,
   IPrediction,
-  IDetour
+  IDetour,
+  IPattern
 } from '../../common/transit.interface';
 import { IAppError } from '../../common/server.responses';
 
@@ -68,6 +69,19 @@ interface TrueTimeDetour {
   enddt?: string;
 }
 
+interface TrueTimePoint {
+  seq: number;
+  lat: number;
+  lon: number;
+  typ: 'S' | 'W'; // S = stop, W = waypoint
+}
+
+interface TrueTimePattern {
+  pid: string;
+  rtdir: string;
+  pt: TrueTimePoint[];
+}
+
 // Date helpers
 
 /** Convert TrueTime timestamp "YYYYMMDD HH:MM" → ISO 8601 string (YYYY-MM-DDThh:mm:ss.sssZ) */
@@ -91,6 +105,7 @@ function toUnixMs(tmstmp: string): number {
 
 export interface ITrueTimeService {
   getRoutes(): Promise<IRoute[]>;
+  getPatterns(routeId: string): Promise<IPattern[]>;
   getStops(routeId: string, direction: string): Promise<IStop[]>;
   getVehicles(routeId: string): Promise<IVehicle[]>;
   getPredictions(stopId: string): Promise<IPrediction[]>;
@@ -171,6 +186,21 @@ class TrueTimeService implements ITrueTimeService {
     }));
   }
 
+  /** Retrieve route geometry (ordered lat/lng points) for each direction of a route. */
+  async getPatterns(routeId: string): Promise<IPattern[]> {
+    const data = await this.call<{
+      ptr?: TrueTimePattern[];
+      error?: TrueTimeError[];
+    }>('getpatterns', { rt: routeId, rtpidatafeed: RTPI_DATA_FEED });
+
+    if (!data.ptr || data.ptr.length === 0) return [];
+
+    return data.ptr.map((pattern) => ({
+      direction: pattern.rtdir,
+      path: pattern.pt.map((p) => ({ lat: p.lat, lng: p.lon }))
+    }));
+  }
+
   /** Retrieve stops for a route in a specific direction (INBOUND or OUTBOUND). */
   async getStops(routeId: string, direction: string): Promise<IStop[]> {
     const data = await this.call<{
@@ -192,8 +222,8 @@ class TrueTimeService implements ITrueTimeService {
     }
 
     return data.stops.map((s) => ({
-      stopid: s.stpid,
-      stopname: s.stpnm,
+      stopId: s.stpid,
+      stopName: s.stpnm,
       lat: s.lat,
       lon: s.lon,
       dtradd: s.dtradd ?? [],

@@ -2,6 +2,7 @@ import express, { Express, Request, Response, NextFunction } from 'express';
 import { Server as HttpServer, createServer } from 'http';
 import DAC, { IDatabase } from './db/dac';
 import Controller from './controllers/controller';
+import gtfsService from './services/gtfs.service';
 import { JWT_KEY as secretKey, JWT_EXP as tokenExpiry, STAGE } from './env';
 import { Server as SocketServer, Socket } from 'socket.io';
 import {
@@ -67,7 +68,10 @@ class App {
       // This runs in both PROD and non-PROD to ensure default admin exists
       await this.db.seedDefaultAdmin();
     });
-    // TODO: Add more app initialization code here if required
+    // Load GTFS static schedule data in the background (non-blocking)
+    gtfsService.load().catch((err) =>
+      console.error('[GTFS] Failed to load feed:', err)
+    );
   }
 
   private configureMiddlewares() {
