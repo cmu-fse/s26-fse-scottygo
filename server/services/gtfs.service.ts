@@ -4,11 +4,11 @@
 
 import AdmZip from 'adm-zip';
 import { parse } from 'csv-parse/sync';
+import { parse as createCsvParser } from 'csv-parse';
 import { IRoute, IPattern, IStop } from '../../common/transit.interface';
 import { IAppError } from '../../common/server.responses';
 
-const GTFS_URL =
-  'https://www.rideprt.org/developerresources/GTFS.zip';
+const GTFS_URL = 'https://www.rideprt.org/developerresources/GTFS.zip';
 
 // GTFS calendar days array indexed by JS getDay() (0=Sun, 1=Mon, ..., 6=Sat)
 const GTFS_DAY_COLS = [
@@ -46,8 +46,8 @@ class GTFSService {
 
   private routeMap = new Map<string, IRoute>();
   private patternMap = new Map<string, IPattern[]>(); // routeId → patterns
-  private stopMap = new Map<string, IStop>();         // stopId → stop details
-  private routeStops = new Map<string, IStop[]>();    // routeId → stops (unordered unique)
+  private stopMap = new Map<string, IStop>(); // stopId → stop details
+  private routeStops = new Map<string, IStop[]>(); // routeId → stops (unordered unique)
 
   // Schedule data
   private calendar = new Map<string, ServiceCalendar>(); // serviceId → calendar
@@ -56,7 +56,7 @@ class GTFSService {
     { added: Set<string>; removed: Set<string> }
   >(); // date (YYYYMMDD) → exceptions
   private tripService = new Map<string, string>(); // tripId → serviceId
-  private tripRoute = new Map<string, string>();   // tripId → routeId
+  private tripRoute = new Map<string, string>(); // tripId → routeId
   // First and last departure minute (from midnight) per trip — used for time-based route filtering
   private tripTimeRange = new Map<string, { first: number; last: number }>();
 
@@ -83,19 +83,34 @@ class GTFSService {
     const opts = { columns: true as const, skip_empty_lines: true };
 
     console.log('[GTFS] Parsing routes.txt...');
-    const rawRoutes = parse(readEntry('routes.txt'), opts) as Record<string, string>[];
+    const rawRoutes = parse(readEntry('routes.txt'), opts) as Record<
+      string,
+      string
+    >[];
 
     console.log('[GTFS] Parsing stops.txt...');
-    const rawStops = parse(readEntry('stops.txt'), opts) as Record<string, string>[];
+    const rawStops = parse(readEntry('stops.txt'), opts) as Record<
+      string,
+      string
+    >[];
 
     console.log('[GTFS] Parsing trips.txt...');
-    const rawTrips = parse(readEntry('trips.txt'), opts) as Record<string, string>[];
+    const rawTrips = parse(readEntry('trips.txt'), opts) as Record<
+      string,
+      string
+    >[];
 
     console.log('[GTFS] Parsing shapes.txt...');
-    const rawShapes = parse(readEntry('shapes.txt'), opts) as Record<string, string>[];
+    const rawShapes = parse(readEntry('shapes.txt'), opts) as Record<
+      string,
+      string
+    >[];
 
     console.log('[GTFS] Parsing calendar.txt...');
-    const rawCalendar = parse(readEntry('calendar.txt'), opts) as Record<string, string>[];
+    const rawCalendar = parse(readEntry('calendar.txt'), opts) as Record<
+      string,
+      string
+    >[];
 
     console.log('[GTFS] Parsing calendar_dates.txt...');
     const rawCalendarDates = parse(
@@ -103,8 +118,9 @@ class GTFSService {
       opts
     ) as Record<string, string>[];
 
-    console.log('[GTFS] Parsing stop_times.txt (may take a moment)...');
-    const rawStopTimes = parse(readEntry('stop_times.txt'), opts) as Record<string, string>[];
+    // stop_times.txt is deferred to stream-parsing below to avoid OOM on
+    // memory-constrained hosts (the sync parse would materialise millions of
+    // rows into a single massive JS array).
 
     // --- Build route map ---
     // operatingDays is left empty here and computed below once calendar data is available
@@ -202,7 +218,8 @@ class GTFSService {
       if (!serviceId) continue;
       const cal = this.calendar.get(serviceId);
       if (!cal) continue;
-      if (!routeActiveDays.has(routeId)) routeActiveDays.set(routeId, new Set());
+      if (!routeActiveDays.has(routeId))
+        routeActiveDays.set(routeId, new Set());
       const days = routeActiveDays.get(routeId)!;
       for (let day = 0; day <= 6; day++) {
         if (cal.days[day]) days.add(day);
@@ -213,26 +230,42 @@ class GTFSService {
       if (route) route.operatingDays = [...days].sort((a, b) => a - b);
     }
 
-    // --- Build trip time ranges and route→stops in a single pass over stop_times ---
-    // tripTimeRange: tracks first and last departure minute per trip for time-based filtering
-    // routeStopIds: collects unique stop IDs per route for static stop lookups
+    // --- Build trip time ranges and route→stops by STREAMING stop_times.txt ---
+    // Stream-parsing avoids holding the entire parsed array in memory, which
+    // was causing OOM crashes on Render's 256 MB default heap.
+    console.log('[GTFS] Parsing stop_times.txt (streaming to save memory)...');
     const routeStopIds = new Map<string, Set<string>>();
-    for (const st of rawStopTimes) {
-      const minutes = timeToMinutes(st.departure_time);
-      const existing = this.tripTimeRange.get(st.trip_id);
-      if (!existing) {
-        this.tripTimeRange.set(st.trip_id, { first: minutes, last: minutes });
-      } else {
-        if (minutes < existing.first) existing.first = minutes;
-        if (minutes > existing.last) existing.last = minutes;
-      }
+    const stopTimesContent = readEntry('stop_times.txt');
+    await new Promise<void>((resolve, reject) => {
+      const parser = createCsvParser({ columns: true, skip_empty_lines: true });
+      parser.on('readable', () => {
+        let st: Record<string, string>;
+        while ((st = parser.read()) !== null) {
+          const minutes = timeToMinutes(st.departure_time);
+          const existing = this.tripTimeRange.get(st.trip_id);
+          if (!existing) {
+            this.tripTimeRange.set(st.trip_id, {
+              first: minutes,
+              last: minutes
+            });
+          } else {
+            if (minutes < existing.first) existing.first = minutes;
+            if (minutes > existing.last) existing.last = minutes;
+          }
 
-      const routeId = this.tripRoute.get(st.trip_id);
-      if (routeId && st.stop_id) {
-        if (!routeStopIds.has(routeId)) routeStopIds.set(routeId, new Set());
-        routeStopIds.get(routeId)!.add(st.stop_id);
-      }
-    }
+          const routeId = this.tripRoute.get(st.trip_id);
+          if (routeId && st.stop_id) {
+            if (!routeStopIds.has(routeId))
+              routeStopIds.set(routeId, new Set());
+            routeStopIds.get(routeId)!.add(st.stop_id);
+          }
+        }
+      });
+      parser.on('end', resolve);
+      parser.on('error', reject);
+      parser.write(stopTimesContent);
+      parser.end();
+    });
 
     // Resolve stop IDs to IStop objects for each route
     for (const [routeId, stopIds] of routeStopIds) {
