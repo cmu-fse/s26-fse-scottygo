@@ -76,7 +76,8 @@ export default class AuthController extends Controller {
         }
       };
 
-      return res.status(201).json({
+      const userLocation = `/auth/users/${savedUser.credentials.username}`;
+      return res.status(201).location(userLocation).json({
         name: 'UserRegistered',
         payload: sanitizedUser
       });
