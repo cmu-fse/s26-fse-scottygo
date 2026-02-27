@@ -15,9 +15,12 @@ export interface ICalendarPickerElement extends HTMLElement {
   isOpen(): boolean;
 }
 
-export class CalendarPickerPanel extends HTMLElement implements ICalendarPickerElement {
+export class CalendarPickerPanel
+  extends HTMLElement
+  implements ICalendarPickerElement
+{
   private currentDate = new Date();
-  private selectedDate: Date | null = null;
+  private selectedDate: Date | null = new Date(); // Default to today
   private isVisible = false;
 
   constructor() {
@@ -85,7 +88,9 @@ export class CalendarPickerPanel extends HTMLElement implements ICalendarPickerE
   private render(): void {
     const month = this.currentDate.getMonth();
     const year = this.currentDate.getFullYear();
-    const monthName = this.currentDate.toLocaleString('default', { month: 'long' });
+    const monthName = this.currentDate.toLocaleString('default', {
+      month: 'long'
+    });
 
     const firstDay = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -116,7 +121,7 @@ export class CalendarPickerPanel extends HTMLElement implements ICalendarPickerE
     // Preserve display and pointer-events styles if panel is currently visible
     const displayStyle = this.isVisible ? 'block' : 'none';
     const pointerEvents = this.isVisible ? 'auto' : 'none';
-    
+
     this.innerHTML = `
       <div class="calendar-picker-panel panel" style="display: ${displayStyle}; pointer-events: ${pointerEvents};">
         <div class="cal-header">
@@ -177,14 +182,18 @@ export class CalendarPickerPanel extends HTMLElement implements ICalendarPickerE
     this.querySelectorAll('.cal-day:not(.muted)').forEach((day) => {
       day.addEventListener('click', (e) => {
         e.stopPropagation();
-        const selectedDay = Number((e.currentTarget as HTMLElement).dataset.day);
+        const selectedDay = Number(
+          (e.currentTarget as HTMLElement).dataset.day
+        );
         this.selectedDate = new Date(
           this.currentDate.getFullYear(),
           this.currentDate.getMonth(),
           selectedDay
         );
         // Update selected state without full re-render to avoid flicker
-        this.querySelectorAll('.cal-day').forEach(d => d.classList.remove('selected'));
+        this.querySelectorAll('.cal-day').forEach((d) =>
+          d.classList.remove('selected')
+        );
         (e.currentTarget as HTMLElement).classList.add('selected');
       });
     });

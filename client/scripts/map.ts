@@ -8,15 +8,27 @@ import { GoogleMapProvider } from './maps/google-map.provider';
 import './components/transit-search';
 import './components/map-controls';
 import './components/zoom-controls';
-import './components/location-indicator';
+import { LocationIndicator } from './components/location-indicator';
 import './components/toggle-panel';
 import './components/time-picker';
 import './components/calendar-picker';
 import './components/route-selector';
-import type { ITogglePanelConfig, ITogglePanelElement } from './components/toggle-panel';
-import type { ITimePickerElement, ITimeSelection } from './components/time-picker';
-import type { ICalendarPickerElement, IDateSelection } from './components/calendar-picker';
-import type { IRouteSelectorElement, IRouteSelection } from './components/route-selector';
+import type {
+  ITogglePanelConfig,
+  ITogglePanelElement
+} from './components/toggle-panel';
+import type {
+  ITimePickerElement,
+  ITimeSelection
+} from './components/time-picker';
+import type {
+  ICalendarPickerElement,
+  IDateSelection
+} from './components/calendar-picker';
+import type {
+  IRouteSelectorElement,
+  IRouteSelection
+} from './components/route-selector';
 
 // Import state management and controllers
 import { MapStateManager } from './state/map-state';
@@ -29,6 +41,14 @@ import { VehicleTracker } from './trackers/vehicle-tracker';
 export {};
 
 // Modal utility functions
+
+// Extend the global Window interface to include showModal
+declare global {
+  interface Window {
+    showModal?: (title: string, message: string) => void;
+  }
+}
+
 function showModal(title: string, message: string): void {
   const modal = document.getElementById('message-modal');
   const modalTitle = document.getElementById('modal-title');
@@ -62,7 +82,7 @@ function showModal(title: string, message: string): void {
 }
 
 // Export modal function for use in other modules
-(window as any).showModal = showModal;
+window.showModal = showModal;
 console.log('showModal function registered globally');
 
 // Global instances
@@ -167,6 +187,10 @@ const mapProvider: IMapProvider = new GoogleMapProvider();
 // Store user/initial location for recenter functionality
 let userLocation: { lat: number; lng: number } | null = null;
 
+// Store user location marker reference
+import type { IMapMarker } from '../../common/map.interface';
+let userLocationMarker: IMapMarker | null = null;
+
 // Fetch map config (API key, default center, zoom) from server
 async function getMapConfig(): Promise<IConfig | null> {
   try {
@@ -201,32 +225,41 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
   if (config) {
     const container = document.getElementById('map') as HTMLElement;
     await mapProvider.initialize(container, config);
-    
+
     // Initialize all components
     routeRenderer.initialize(mapProvider);
     vehicleTracker.initialize(mapProvider);
-    
+
     // Initialize toggle panels
     await initializeTogglePanels();
-    
+
     // Initialize URL sync and restore state from URL
     urlSyncManager.initialize();
-    
+
     // Set up route selector update callback before initializing filter controller
     filterController.setRouteSelectorCallback((routes) => {
-      const routeSelector = document.querySelector('route-selector-panel') as IRouteSelectorElement;
+      const routeSelector = document.querySelector(
+        'route-selector-panel'
+      ) as IRouteSelectorElement;
       if (routeSelector && 'setRoutes' in routeSelector) {
         routeSelector.setRoutes(routes);
         console.log(`Updated route selector with ${routes.length} routes`);
       }
     });
-    
+
     // Initialize filter controller (fetches and renders routes)
     await filterController.initialize();
-    
+
     // Setup event listeners for filter panels
     setupMapEventListeners();
-    
+
+    // After initialization, if a route was restored from URL, apply route filter to render stops
+    const restoredState = mapStateManager.getState();
+    if (restoredState.selectedRouteId) {
+      console.log('Restoring route from URL:', restoredState.selectedRouteId);
+      await filterController.applyRouteFilter(restoredState.selectedRouteId);
+    }
+
     // Request user location for centering map
     requestUserLocation();
   } else {
@@ -240,11 +273,11 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
 async function initializeTogglePanels(): Promise<void> {
   // Wait for the custom element to be defined
   await customElements.whenDefined('toggle-panel');
-  
+
   // Direction Filter Panel Configuration
   const directionPanel = document.getElementById('direction-panel');
   console.log('Direction panel element:', directionPanel);
-  
+
   if (directionPanel && 'configure' in directionPanel) {
     const directionConfig: ITogglePanelConfig = {
       options: [
@@ -259,11 +292,15 @@ async function initializeTogglePanels(): Promise<void> {
   // System Filter Panel Configuration (Rule R2: PRT ON, CMU OFF by default)
   const systemPanel = document.getElementById('system-panel');
   console.log('System panel element:', systemPanel);
-  
+
   if (systemPanel && 'configure' in systemPanel) {
     const systemConfig: ITogglePanelConfig = {
       options: [
-        { id: 'prt', label: 'Pittsburgh Regional Transit Routes', defaultChecked: true },
+        {
+          id: 'prt',
+          label: 'Pittsburgh Regional Transit Routes',
+          defaultChecked: true
+        },
         { id: 'cmu', label: 'CMU Shuttle Routes', defaultChecked: false }
       ],
       eventName: 'systemFilterApplied'
@@ -275,8 +312,8 @@ async function initializeTogglePanels(): Promise<void> {
 }
 
 // Helper function to get panel references
-function getPanels(): { 
-  direction: HTMLElement | null; 
+function getPanels(): {
+  direction: HTMLElement | null;
   system: HTMLElement | null;
   time: HTMLElement | null;
   calendar: HTMLElement | null;
@@ -294,19 +331,39 @@ function getPanels(): {
 // Helper function to close all panels
 function closeAllPanels(): void {
   const panels = getPanels();
-  if (panels.direction && 'isOpen' in panels.direction && (panels.direction as ITogglePanelElement).isOpen()) {
+  if (
+    panels.direction &&
+    'isOpen' in panels.direction &&
+    (panels.direction as ITogglePanelElement).isOpen()
+  ) {
     (panels.direction as ITogglePanelElement).hide();
   }
-  if (panels.system && 'isOpen' in panels.system && (panels.system as ITogglePanelElement).isOpen()) {
+  if (
+    panels.system &&
+    'isOpen' in panels.system &&
+    (panels.system as ITogglePanelElement).isOpen()
+  ) {
     (panels.system as ITogglePanelElement).hide();
   }
-  if (panels.time && 'isOpen' in panels.time && (panels.time as ITimePickerElement).isOpen()) {
+  if (
+    panels.time &&
+    'isOpen' in panels.time &&
+    (panels.time as ITimePickerElement).isOpen()
+  ) {
     (panels.time as ITimePickerElement).hide();
   }
-  if (panels.calendar && 'isOpen' in panels.calendar && (panels.calendar as ICalendarPickerElement).isOpen()) {
+  if (
+    panels.calendar &&
+    'isOpen' in panels.calendar &&
+    (panels.calendar as ICalendarPickerElement).isOpen()
+  ) {
     (panels.calendar as ICalendarPickerElement).hide();
   }
-  if (panels.route && 'isOpen' in panels.route && (panels.route as IRouteSelectorElement).isOpen()) {
+  if (
+    panels.route &&
+    'isOpen' in panels.route &&
+    (panels.route as IRouteSelectorElement).isOpen()
+  ) {
     (panels.route as IRouteSelectorElement).hide();
   }
 }
@@ -331,21 +388,37 @@ function setupMapEventListeners(): void {
     console.log('Route filter clicked');
     const panels = getPanels();
     console.log('Route selector panel found:', panels.route);
-    
+
     // Close other panels if open
-    if (panels.direction && 'isOpen' in panels.direction && (panels.direction as ITogglePanelElement).isOpen()) {
+    if (
+      panels.direction &&
+      'isOpen' in panels.direction &&
+      (panels.direction as ITogglePanelElement).isOpen()
+    ) {
       (panels.direction as ITogglePanelElement).hide();
     }
-    if (panels.system && 'isOpen' in panels.system && (panels.system as ITogglePanelElement).isOpen()) {
+    if (
+      panels.system &&
+      'isOpen' in panels.system &&
+      (panels.system as ITogglePanelElement).isOpen()
+    ) {
       (panels.system as ITogglePanelElement).hide();
     }
-    if (panels.time && 'isOpen' in panels.time && (panels.time as ITimePickerElement).isOpen()) {
+    if (
+      panels.time &&
+      'isOpen' in panels.time &&
+      (panels.time as ITimePickerElement).isOpen()
+    ) {
       (panels.time as ITimePickerElement).hide();
     }
-    if (panels.calendar && 'isOpen' in panels.calendar && (panels.calendar as ICalendarPickerElement).isOpen()) {
+    if (
+      panels.calendar &&
+      'isOpen' in panels.calendar &&
+      (panels.calendar as ICalendarPickerElement).isOpen()
+    ) {
       (panels.calendar as ICalendarPickerElement).hide();
     }
-    
+
     // Toggle route selector panel
     if (panels.route && 'toggle' in panels.route) {
       (panels.route as IRouteSelectorElement).toggle();
@@ -355,21 +428,37 @@ function setupMapEventListeners(): void {
   document.addEventListener('filterCalendar', () => {
     console.log('Calendar filter clicked');
     const panels = getPanels();
-    
+
     // Close other panels if open
-    if (panels.direction && 'isOpen' in panels.direction && (panels.direction as ITogglePanelElement).isOpen()) {
+    if (
+      panels.direction &&
+      'isOpen' in panels.direction &&
+      (panels.direction as ITogglePanelElement).isOpen()
+    ) {
       (panels.direction as ITogglePanelElement).hide();
     }
-    if (panels.system && 'isOpen' in panels.system && (panels.system as ITogglePanelElement).isOpen()) {
+    if (
+      panels.system &&
+      'isOpen' in panels.system &&
+      (panels.system as ITogglePanelElement).isOpen()
+    ) {
       (panels.system as ITogglePanelElement).hide();
     }
-    if (panels.time && 'isOpen' in panels.time && (panels.time as ITimePickerElement).isOpen()) {
+    if (
+      panels.time &&
+      'isOpen' in panels.time &&
+      (panels.time as ITimePickerElement).isOpen()
+    ) {
       (panels.time as ITimePickerElement).hide();
     }
-    if (panels.route && 'isOpen' in panels.route && (panels.route as IRouteSelectorElement).isOpen()) {
+    if (
+      panels.route &&
+      'isOpen' in panels.route &&
+      (panels.route as IRouteSelectorElement).isOpen()
+    ) {
       (panels.route as IRouteSelectorElement).hide();
     }
-    
+
     // Toggle calendar picker panel
     if (panels.calendar && 'toggle' in panels.calendar) {
       (panels.calendar as ICalendarPickerElement).toggle();
@@ -380,21 +469,37 @@ function setupMapEventListeners(): void {
     console.log('Time filter clicked');
     const panels = getPanels();
     console.log('Time picker panel found:', panels.time);
-    
+
     // Close other panels if open
-    if (panels.direction && 'isOpen' in panels.direction && (panels.direction as ITogglePanelElement).isOpen()) {
+    if (
+      panels.direction &&
+      'isOpen' in panels.direction &&
+      (panels.direction as ITogglePanelElement).isOpen()
+    ) {
       (panels.direction as ITogglePanelElement).hide();
     }
-    if (panels.system && 'isOpen' in panels.system && (panels.system as ITogglePanelElement).isOpen()) {
+    if (
+      panels.system &&
+      'isOpen' in panels.system &&
+      (panels.system as ITogglePanelElement).isOpen()
+    ) {
       (panels.system as ITogglePanelElement).hide();
     }
-    if (panels.calendar && 'isOpen' in panels.calendar && (panels.calendar as ICalendarPickerElement).isOpen()) {
+    if (
+      panels.calendar &&
+      'isOpen' in panels.calendar &&
+      (panels.calendar as ICalendarPickerElement).isOpen()
+    ) {
       (panels.calendar as ICalendarPickerElement).hide();
     }
-    if (panels.route && 'isOpen' in panels.route && (panels.route as IRouteSelectorElement).isOpen()) {
+    if (
+      panels.route &&
+      'isOpen' in panels.route &&
+      (panels.route as IRouteSelectorElement).isOpen()
+    ) {
       (panels.route as IRouteSelectorElement).hide();
     }
-    
+
     // Toggle time picker panel
     if (panels.time && 'toggle' in panels.time) {
       (panels.time as ITimePickerElement).toggle();
@@ -405,21 +510,37 @@ function setupMapEventListeners(): void {
     console.log('System filter clicked');
     const panels = getPanels();
     console.log('System panel found:', panels.system);
-    
+
     // Close other panels if open
-    if (panels.direction && 'isOpen' in panels.direction && (panels.direction as ITogglePanelElement).isOpen()) {
+    if (
+      panels.direction &&
+      'isOpen' in panels.direction &&
+      (panels.direction as ITogglePanelElement).isOpen()
+    ) {
       (panels.direction as ITogglePanelElement).hide();
     }
-    if (panels.time && 'isOpen' in panels.time && (panels.time as ITimePickerElement).isOpen()) {
+    if (
+      panels.time &&
+      'isOpen' in panels.time &&
+      (panels.time as ITimePickerElement).isOpen()
+    ) {
       (panels.time as ITimePickerElement).hide();
     }
-    if (panels.calendar && 'isOpen' in panels.calendar && (panels.calendar as ICalendarPickerElement).isOpen()) {
+    if (
+      panels.calendar &&
+      'isOpen' in panels.calendar &&
+      (panels.calendar as ICalendarPickerElement).isOpen()
+    ) {
       (panels.calendar as ICalendarPickerElement).hide();
     }
-    if (panels.route && 'isOpen' in panels.route && (panels.route as IRouteSelectorElement).isOpen()) {
+    if (
+      panels.route &&
+      'isOpen' in panels.route &&
+      (panels.route as IRouteSelectorElement).isOpen()
+    ) {
       (panels.route as IRouteSelectorElement).hide();
     }
-    
+
     // Toggle system panel
     if (panels.system && 'toggle' in panels.system) {
       (panels.system as ITogglePanelElement).toggle();
@@ -430,21 +551,37 @@ function setupMapEventListeners(): void {
     console.log('Direction filter clicked');
     const panels = getPanels();
     console.log('Direction panel found:', panels.direction);
-    
+
     // Close other panels if open
-    if (panels.system && 'isOpen' in panels.system && (panels.system as ITogglePanelElement).isOpen()) {
+    if (
+      panels.system &&
+      'isOpen' in panels.system &&
+      (panels.system as ITogglePanelElement).isOpen()
+    ) {
       (panels.system as ITogglePanelElement).hide();
     }
-    if (panels.time && 'isOpen' in panels.time && (panels.time as ITimePickerElement).isOpen()) {
+    if (
+      panels.time &&
+      'isOpen' in panels.time &&
+      (panels.time as ITimePickerElement).isOpen()
+    ) {
       (panels.time as ITimePickerElement).hide();
     }
-    if (panels.calendar && 'isOpen' in panels.calendar && (panels.calendar as ICalendarPickerElement).isOpen()) {
+    if (
+      panels.calendar &&
+      'isOpen' in panels.calendar &&
+      (panels.calendar as ICalendarPickerElement).isOpen()
+    ) {
       (panels.calendar as ICalendarPickerElement).hide();
     }
-    if (panels.route && 'isOpen' in panels.route && (panels.route as IRouteSelectorElement).isOpen()) {
+    if (
+      panels.route &&
+      'isOpen' in panels.route &&
+      (panels.route as IRouteSelectorElement).isOpen()
+    ) {
       (panels.route as IRouteSelectorElement).hide();
     }
-    
+
     // Toggle direction panel
     if (panels.direction && 'toggle' in panels.direction) {
       (panels.direction as ITogglePanelElement).toggle();
@@ -502,7 +639,12 @@ function setupMapEventListeners(): void {
   document.addEventListener('directionFilterApplied', async (e: Event) => {
     const customEvent = e as CustomEvent;
     const { inbound, outbound } = customEvent.detail;
-    console.log('Direction filters applied - Inbound:', inbound, 'Outbound:', outbound);
+    console.log(
+      'Direction filters applied - Inbound:',
+      inbound,
+      'Outbound:',
+      outbound
+    );
     mapStateManager.updateFilter('selectedDirections', { inbound, outbound });
     await filterController.applyDirectionFilter();
   });
@@ -511,7 +653,16 @@ function setupMapEventListeners(): void {
   document.addEventListener('timeSelected', async (e: Event) => {
     const customEvent = e as CustomEvent<ITimeSelection>;
     const { hour, minute, period } = customEvent.detail;
-    console.log(`Time selected: ${hour}:${minute.toString().padStart(2, '0')} ${period}`);
+    console.log(
+      `Time selected: ${hour}:${minute.toString().padStart(2, '0')} ${period}`
+    );
+
+    // Highlight the time filter button to indicate active filter
+    const timeBtn = document.querySelector('#time-filter-btn');
+    if (timeBtn) {
+      timeBtn.classList.add('primary');
+    }
+
     mapStateManager.updateFilter('selectedTime', { hour, minute, period });
     await filterController.applyDateTimeFilter();
   });
@@ -543,17 +694,30 @@ function requestUserLocation(): void {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         console.log('User location:', lat, lng);
-        
+
         // Check if location is in Pittsburgh area (Rule R5)
         if (isInPittsburghArea(lat, lng)) {
           // Store and center map on user location
           userLocation = { lat, lng };
           mapProvider.setCenter({ lat, lng });
           mapProvider.setZoom(15);
+
+          // Place a marker on the map to show user location
+          addUserLocationMarker(lat, lng);
+
+          // Also show the location indicator component
+          const locationIndicator =
+            document.querySelector<LocationIndicator>('location-indicator');
+          if (locationIndicator) {
+            locationIndicator.show(lat, lng);
+          }
           console.log('Centered map on user location');
         } else {
           // A3: Location Out of Bounds
-          showModal('Location Out of Bounds', 'This transit app only supports the Pittsburgh bus system.');
+          showModal(
+            'Location Out of Bounds',
+            'This transit app only supports the Pittsburgh bus system.'
+          );
           // Center on Downtown Pittsburgh (Point State Park)
           mapProvider.setCenter({ lat: 40.4406, lng: -80.0112 });
           mapProvider.setZoom(14);
@@ -563,7 +727,10 @@ function requestUserLocation(): void {
       (error) => {
         // A6: Location Access Denied
         console.warn('Location access denied:', error.message);
-        showModal('Location Access Denied', 'Location access denied. Centering on Downtown Pittsburgh by default.');
+        showModal(
+          'Location Access Denied',
+          'Location access denied. Centering on Downtown Pittsburgh by default.'
+        );
         // Center on default Pittsburgh coordinates (Point State Park)
         mapProvider.setCenter({ lat: 40.4406, lng: -80.0112 });
         mapProvider.setZoom(14);
@@ -572,10 +739,39 @@ function requestUserLocation(): void {
   } else {
     console.warn('Geolocation not supported');
     // A5: Unable To Access Location
-    showModal('Geolocation Unavailable', 'Geolocation is not supported by your browser. Centering on Downtown Pittsburgh.');
+    showModal(
+      'Geolocation Unavailable',
+      'Geolocation is not supported by your browser. Centering on Downtown Pittsburgh.'
+    );
     mapProvider.setCenter({ lat: 40.4406, lng: -80.0112 });
     mapProvider.setZoom(14);
   }
+}
+
+// Add a blue dot marker on the map for user location
+function addUserLocationMarker(lat: number, lng: number): void {
+  // Remove previous user location marker if exists
+  if (userLocationMarker) {
+    userLocationMarker.remove();
+    userLocationMarker = null;
+  }
+
+  // Create a blue dot SVG icon for user location
+  const size = 18;
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+      <circle cx="${size / 2}" cy="${size / 2}" r="${size / 2 - 1}" fill="#4285F4" stroke="white" stroke-width="2"/>
+    </svg>
+  `;
+  const icon =
+    'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg.trim());
+
+  userLocationMarker = mapProvider.addMarker({
+    position: { lat, lng },
+    title: 'Your Location',
+    icon: icon
+  });
+  console.log('User location marker added to map');
 }
 
 // Check if coordinates are within Pittsburgh area (Rule R5)
@@ -584,7 +780,7 @@ function isInPittsburghArea(lat: number, lng: number): boolean {
   const MAX_LAT = 40.7;
   const MIN_LNG = -80.4;
   const MAX_LNG = -79.6;
-  
+
   return lat >= MIN_LAT && lat <= MAX_LAT && lng >= MIN_LNG && lng <= MAX_LNG;
 }
 

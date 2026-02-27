@@ -19,7 +19,9 @@ export class FilterController {
   private vehicleTracker: VehicleTracker;
   private urlSync: URLSyncManager;
   private token: string | null = null;
-  private routeSelectorUpdateCallback: ((routes: IRouteOption[]) => void) | null = null;
+  private routeSelectorUpdateCallback:
+    | ((routes: IRouteOption[]) => void)
+    | null = null;
 
   private constructor() {
     this.stateManager = MapStateManager.getInstance();
@@ -51,20 +53,24 @@ export class FilterController {
       console.log('Fetching all routes from backend...');
       const routes = await this.fetchAllRoutes();
       this.stateManager.setAvailableRoutes(routes);
-      
+
       // Update route selector with available routes
       if (this.routeSelectorUpdateCallback) {
-        const routeOptions = routes.map(r => ({
+        const routeOptions = routes.map((r) => ({
           id: r.id,
           name: this.formatRouteName(r)
         }));
         this.routeSelectorUpdateCallback(routeOptions);
       }
-      
+
       // Render initial routes based on default filters (Rule R2: PRT ON, CMU OFF)
       await this.renderFilteredRoutes();
-      
-      console.log('Filter controller initialized with', routes.length, 'routes');
+
+      console.log(
+        'Filter controller initialized with',
+        routes.length,
+        'routes'
+      );
     } catch (error) {
       console.error('Failed to initialize filter controller:', error);
       throw error;
@@ -84,8 +90,10 @@ export class FilterController {
       if (response.status === 200 && response.data.name === 'RoutesRetrieved') {
         // Check if we're using fallback data (A2: PRT API is down)
         if (response.data.metadata?.usingFallback) {
-          console.warn('Using fallback route data - real-time tracking unavailable');
-          const showModal = (window as any).showModal;
+          console.warn(
+            'Using fallback route data - real-time tracking unavailable'
+          );
+          const showModal = window.showModal;
           if (showModal && typeof showModal === 'function') {
             showModal(
               'Real-time Tracking Unavailable',
@@ -101,7 +109,7 @@ export class FilterController {
     } catch (error) {
       console.error('Error fetching routes:', error);
       // A1: No Network Access
-      const showModal = (window as any).showModal;
+      const showModal = window.showModal;
       if (showModal && typeof showModal === 'function') {
         showModal(
           'Connection Lost',
@@ -117,7 +125,7 @@ export class FilterController {
    */
   async applySystemFilter(): Promise<void> {
     const state = this.stateManager.getState();
-    
+
     // A8: Multi-System Toggle - both OFF
     if (!state.selectedSystems.prt && !state.selectedSystems.cmu) {
       this.routeRenderer.clearAllRoutes();
@@ -128,18 +136,26 @@ export class FilterController {
 
     // Check if selected route belongs to a disabled system
     if (state.selectedRouteId) {
-      const selectedRoute = state.availableRoutes.find(r => r.id === state.selectedRouteId);
+      const selectedRoute = state.availableRoutes.find(
+        (r) => r.id === state.selectedRouteId
+      );
       if (selectedRoute) {
-        const systemDisabled = 
+        const systemDisabled =
           (selectedRoute.system === 'PRT' && !state.selectedSystems.prt) ||
           (selectedRoute.system === 'CMU' && !state.selectedSystems.cmu);
-        
+
         if (systemDisabled) {
           // Clear the route and stop polling
-          console.log(`Clearing route ${state.selectedRouteId} - system ${selectedRoute.system} is disabled`);
+          console.log(
+            `Clearing route ${state.selectedRouteId} - system ${selectedRoute.system} is disabled`
+          );
           this.routeRenderer.clearRoutePolylines(state.selectedRouteId);
-          this.routeRenderer.clearStopMarkers(`${state.selectedRouteId}_INBOUND`);
-          this.routeRenderer.clearStopMarkers(`${state.selectedRouteId}_OUTBOUND`);
+          this.routeRenderer.clearStopMarkers(
+            `${state.selectedRouteId}_INBOUND`
+          );
+          this.routeRenderer.clearStopMarkers(
+            `${state.selectedRouteId}_OUTBOUND`
+          );
           this.vehicleTracker.stopPolling();
           // Clear selected route from state
           this.stateManager.updateFilter('selectedRouteId', null);
@@ -149,8 +165,8 @@ export class FilterController {
 
     // Check if we need to prefetch routes for newly enabled systems
     const currentRoutes = state.availableRoutes;
-    const hasPRTRoutes = currentRoutes.some(r => r.system === 'PRT');
-    const hasCMURoutes = currentRoutes.some(r => r.system === 'CMU');
+    const hasPRTRoutes = currentRoutes.some((r) => r.system === 'PRT');
+    const hasCMURoutes = currentRoutes.some((r) => r.system === 'CMU');
 
     // If CMU is enabled but we don't have CMU routes yet, fetch all routes
     if (state.selectedSystems.cmu && !hasCMURoutes) {
@@ -171,24 +187,28 @@ export class FilterController {
     try {
       const routes = await this.fetchAllRoutes();
       this.stateManager.setAvailableRoutes(routes);
-      
+
       // Update route selector with new routes
       if (this.routeSelectorUpdateCallback) {
         const state = this.stateManager.getState();
         // Filter route IDs based on enabled systems
-        const filteredRoutes = routes.filter(r => {
+        const filteredRoutes = routes.filter((r) => {
           if (r.system === 'PRT') return state.selectedSystems.prt;
           if (r.system === 'CMU') return state.selectedSystems.cmu;
           return false;
         });
-        const routeOptions = filteredRoutes.map(r => ({
+        const routeOptions = filteredRoutes.map((r) => ({
           id: r.id,
           name: this.formatRouteName(r)
         }));
         this.routeSelectorUpdateCallback(routeOptions);
       }
-      
-      console.log('Routes prefetched successfully:', routes.length, 'total routes');
+
+      console.log(
+        'Routes prefetched successfully:',
+        routes.length,
+        'total routes'
+      );
     } catch (error) {
       console.error('Failed to prefetch routes:', error);
     }
@@ -212,7 +232,7 @@ export class FilterController {
   async applyRouteFilter(routeId: string): Promise<void> {
     try {
       console.log('Applying route filter:', routeId);
-      
+
       // Clear all existing routes
       this.routeRenderer.clearAllRoutes();
       this.vehicleTracker.stopPolling();
@@ -225,13 +245,13 @@ export class FilterController {
       } else {
         // Find route info for color
         const state = this.stateManager.getState();
-        const route = state.availableRoutes.find(r => r.id === routeId);
+        const route = state.availableRoutes.find((r) => r.id === routeId);
         const color = route?.color || '#FF0000';
 
         // Render route geometry
         this.routeRenderer.renderRouteGeometry(routeId, geometry, color);
       }
-      
+
       // Fetch and render stops for both directions (if both enabled)
       await this.applyDirectionFilter();
 
@@ -250,7 +270,7 @@ export class FilterController {
    */
   async applyDateTimeFilter(): Promise<void> {
     const state = this.stateManager.getState();
-    
+
     // If neither date nor time is selected, nothing to do
     if (!state.selectedDate && !state.selectedTime) {
       console.log('Date and time not selected');
@@ -259,7 +279,7 @@ export class FilterController {
 
     // Use current date if only time is selected
     const dateToUse = state.selectedDate || new Date();
-    
+
     // If only date is selected without time, we can't filter properly
     if (!state.selectedTime) {
       console.log('Time not selected, cannot apply time-based filter');
@@ -267,8 +287,11 @@ export class FilterController {
     }
 
     try {
-      console.log('Applying date/time filter', { date: dateToUse, time: state.selectedTime });
-      
+      console.log('Applying date/time filter', {
+        date: dateToUse,
+        time: state.selectedTime
+      });
+
       // Call backend to get available routes for this date/time
       const availableRoutes = await this.fetchAvailableRoutes(
         dateToUse,
@@ -281,9 +304,12 @@ export class FilterController {
         this.vehicleTracker.stopPolling();
         console.log('A7: No service available for this selection');
         // Use modal instead of alert
-        const showModal = (window as any).showModal;
+        const showModal = window.showModal;
         if (showModal && typeof showModal === 'function') {
-          showModal('No Service Available', 'No service available for this selection.');
+          showModal(
+            'No Service Available',
+            'No service available for this selection.'
+          );
         } else {
           console.error('showModal function not available');
           alert('No service available for this selection.');
@@ -293,16 +319,16 @@ export class FilterController {
 
       // Update available routes
       this.stateManager.setAvailableRoutes(availableRoutes);
-      
+
       // Update route selector with filtered routes
       if (this.routeSelectorUpdateCallback) {
-        const routeOptions = availableRoutes.map(r => ({
+        const routeOptions = availableRoutes.map((r) => ({
           id: r.id,
           name: this.formatRouteName(r)
         }));
         this.routeSelectorUpdateCallback(routeOptions);
       }
-      
+
       // If a specific route is selected, restart polling with time parameter
       if (state.selectedRouteId && this.vehicleTracker.isPolling()) {
         this.vehicleTracker.startPolling(state.selectedRouteId);
@@ -322,7 +348,7 @@ export class FilterController {
    */
   async applyDirectionFilter(): Promise<void> {
     const state = this.stateManager.getState();
-    
+
     if (!state.selectedRouteId) {
       console.log('No route selected for direction filter');
       return;
@@ -330,7 +356,9 @@ export class FilterController {
 
     try {
       // Get the selected route to check available directions
-      const selectedRoute = state.availableRoutes.find(r => r.id === state.selectedRouteId);
+      const selectedRoute = state.availableRoutes.find(
+        (r) => r.id === state.selectedRouteId
+      );
       if (!selectedRoute) {
         console.error('Selected route not found in available routes');
         return;
@@ -340,11 +368,17 @@ export class FilterController {
       // 1. What directions are available for this route
       // 2. What directions are enabled in the toggle
       const directions: string[] = [];
-      
-      if (state.selectedDirections.inbound && selectedRoute.directions.includes('INBOUND')) {
+
+      if (
+        state.selectedDirections.inbound &&
+        selectedRoute.directions.includes('INBOUND')
+      ) {
         directions.push('INBOUND');
       }
-      if (state.selectedDirections.outbound && selectedRoute.directions.includes('OUTBOUND')) {
+      if (
+        state.selectedDirections.outbound &&
+        selectedRoute.directions.includes('OUTBOUND')
+      ) {
         directions.push('OUTBOUND');
       }
 
@@ -352,17 +386,29 @@ export class FilterController {
       // Only show/hide if the route actually has that direction
       if (selectedRoute.directions.includes('INBOUND')) {
         if (state.selectedDirections.inbound) {
-          this.routeRenderer.showDirectionPolylines(state.selectedRouteId, 'INBOUND');
+          this.routeRenderer.showDirectionPolylines(
+            state.selectedRouteId,
+            'INBOUND'
+          );
         } else {
-          this.routeRenderer.hideDirectionPolylines(state.selectedRouteId, 'INBOUND');
+          this.routeRenderer.hideDirectionPolylines(
+            state.selectedRouteId,
+            'INBOUND'
+          );
         }
       }
 
       if (selectedRoute.directions.includes('OUTBOUND')) {
         if (state.selectedDirections.outbound) {
-          this.routeRenderer.showDirectionPolylines(state.selectedRouteId, 'OUTBOUND');
+          this.routeRenderer.showDirectionPolylines(
+            state.selectedRouteId,
+            'OUTBOUND'
+          );
         } else {
-          this.routeRenderer.hideDirectionPolylines(state.selectedRouteId, 'OUTBOUND');
+          this.routeRenderer.hideDirectionPolylines(
+            state.selectedRouteId,
+            'OUTBOUND'
+          );
         }
       }
 
@@ -374,7 +420,11 @@ export class FilterController {
       for (const direction of directions) {
         const stops = await this.fetchStops(state.selectedRouteId, direction);
         if (stops.length > 0) {
-          this.routeRenderer.renderStopMarkers(state.selectedRouteId, stops, direction);
+          this.routeRenderer.renderStopMarkers(
+            state.selectedRouteId,
+            stops,
+            direction
+          );
         }
       }
 
@@ -394,7 +444,7 @@ export class FilterController {
     console.log(`Rendering ${routesToRender.length} filtered routes`);
 
     // Get set of route IDs that should be visible
-    const visibleRouteIds = new Set(routesToRender.map(r => r.id));
+    const visibleRouteIds = new Set(routesToRender.map((r) => r.id));
 
     // Clear routes that are no longer in the filtered set
     // This ensures system toggle overrides route selection
@@ -412,23 +462,33 @@ export class FilterController {
       try {
         // Check if we already have geometry for this route
         if (this.routeRenderer.hasRouteGeometry(route.id)) {
-          console.log(`Route ${route.id} already has geometry, showing existing polylines`);
+          console.log(
+            `Route ${route.id} already has geometry, showing existing polylines`
+          );
           // Route is already rendered, just ensure it's visible
           // The polylines are already on the map, we just filtered which routes to show
           continue;
         }
-        
+
         // Need to fetch geometry for this route
         const geometry = await this.fetchRouteGeometry(route.id);
         if (geometry) {
-          this.routeRenderer.renderRouteGeometry(route.id, geometry, route.color);
+          this.routeRenderer.renderRouteGeometry(
+            route.id,
+            geometry,
+            route.color
+          );
         } else {
           console.warn(`No geometry data available for route ${route.id}`);
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         // Silently skip routes without geometry (404 errors from GTFS routes without shape data)
-        if (error?.response?.status === 404 || error?.type === 'ClientError') {
-          console.debug(`Route ${route.id} geometry not available - skipping render`);
+        const err = error as Record<string, unknown>;
+        const response = err?.response as Record<string, unknown> | undefined;
+        if (response?.status === 404 || err?.type === 'ClientError') {
+          console.debug(
+            `Route ${route.id} geometry not available - skipping render`
+          );
         } else {
           console.error(`Failed to render route ${route.id}:`, error);
         }
@@ -440,10 +500,13 @@ export class FilterController {
    * Fetch route geometry from backend
    */
   private async fetchRouteGeometry(routeId: string): Promise<RouteData | null> {
-    const response: AxiosResponse = await axios.get(`/transit/routes/${routeId}`, {
-      headers: { Authorization: `Bearer ${this.token}` },
-      validateStatus: () => true
-    });
+    const response: AxiosResponse = await axios.get(
+      `/transit/routes/${routeId}`,
+      {
+        headers: { Authorization: `Bearer ${this.token}` },
+        validateStatus: () => true
+      }
+    );
 
     if (response.status === 200 && response.data.name === 'PathGenerated') {
       return response.data.payload as RouteData;
@@ -466,7 +529,7 @@ export class FilterController {
     try {
       // Convert date to YYYY-MM-DD format
       const dateStr = date.toISOString().split('T')[0];
-      
+
       // Convert time object to HH:MM 24-hour format
       let hour24 = time.hour;
       if (time.period === 'PM' && time.hour !== 12) {
@@ -475,9 +538,9 @@ export class FilterController {
         hour24 = 0;
       }
       const timeStr = `${hour24.toString().padStart(2, '0')}:${time.minute.toString().padStart(2, '0')}`;
-      
+
       console.log('Fetching routes for:', { date: dateStr, time: timeStr });
-      
+
       const response: AxiosResponse = await axios.post(
         '/transit/routes/available',
         { date: dateStr, time: timeStr },
@@ -493,16 +556,22 @@ export class FilterController {
         console.error('Failed to fetch available routes:', response.data);
         // Don't show error modal for expected errors like no service available
         // The caller will handle showing the "No Service Available" modal
-        if (response.status === 500 && (window as any).showModal) {
-          (window as any).showModal('Service Error', 'Unable to fetch route schedules. Please try again later.');
+        if (response.status === 500 && window.showModal) {
+          window.showModal(
+            'Service Error',
+            'Unable to fetch route schedules. Please try again later.'
+          );
         }
         return [];
       }
     } catch (error) {
       console.error('Error fetching available routes:', error);
-      // Show error modal for network errors  
-      if ((window as any).showModal) {
-        (window as any).showModal('Network Error', 'Unable to connect to the server. Please check your internet connection.');
+      // Show error modal for network errors
+      if (window.showModal) {
+        window.showModal(
+          'Network Error',
+          'Unable to connect to the server. Please check your internet connection.'
+        );
       }
       return [];
     }
@@ -511,7 +580,10 @@ export class FilterController {
   /**
    * Fetch stops for a specific route and direction
    */
-  private async fetchStops(routeId: string, direction: string): Promise<IStop[]> {
+  private async fetchStops(
+    routeId: string,
+    direction: string
+  ): Promise<IStop[]> {
     try {
       const response: AxiosResponse = await axios.get(
         `/transit/stops/${routeId}?dir=${direction}`,
