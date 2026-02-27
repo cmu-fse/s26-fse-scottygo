@@ -2,6 +2,7 @@
  * Map Controls Component
  * Provides filter controls for route, calendar, time, and direction
  */
+
 export class MapControls extends HTMLElement {
   connectedCallback(): void {
     this.innerHTML = `

@@ -338,7 +338,6 @@ function setupMapEventListeners(): void {
   document.addEventListener('filterCalendar', () => {
     console.log('Calendar filter clicked');
     const panels = getPanels();
-    console.log('Calendar picker panel found:', panels.calendar);
     
     // Close other panels if open
     if (panels.direction && 'isOpen' in panels.direction && (panels.direction as ITogglePanelElement).isOpen()) {
@@ -502,33 +501,6 @@ function setupMapEventListeners(): void {
 
   // Request user location for centering map (VisRoute flow)
   requestUserLocation();
-
-  // Close panels when clicking outside them
-  const mapContainer = document.querySelector('.map-container');
-  mapContainer?.addEventListener('click', (e: Event) => {
-    const target = e.target as HTMLElement;
-    
-    // Don't close if clicking inside any panel or control
-    if (
-      target.closest('.panel') ||
-      target.closest('.control-panel') ||
-      target.closest('time-picker-panel') ||
-      target.closest('calendar-picker-panel') ||
-      target.closest('route-selector-panel') ||
-      target.closest('toggle-panel') ||
-      target.closest('map-controls')
-    ) {
-      return;
-    }
-    
-    // Close panels if clicking on map or map container
-    if (
-      target.id === 'map' ||
-      target.classList.contains('map-container')
-    ) {
-      closeAllPanels();
-    }
-  });
 }
 
 // Request user's geographic location (VisRoute Basic Flow step 2-3)
@@ -545,13 +517,14 @@ function requestUserLocation(): void {
           // Center map on user location
           // TODO: Implement map centering via provider
           
-          // Show location indicator
-          const locationIndicator = document.querySelector(
-            'location-indicator'
-          ) as HTMLElement & { show: (lat?: number, lng?: number) => void };
-          if (locationIndicator && locationIndicator.show) {
-            locationIndicator.show(lat, lng);
-          }
+          // TODO: Show location indicator when proper map-based positioning is implemented
+          // The location indicator currently just shows a centered dot without using lat/lng
+          // const locationIndicator = document.querySelector(
+          //   'location-indicator'
+          // ) as HTMLElement & { show: (lat?: number, lng?: number) => void };
+          // if (locationIndicator && locationIndicator.show) {
+          //   locationIndicator.show(lat, lng);
+          // }
         } else {
           // A3: Location Out of Bounds
           alert('This transit app only supports the Pittsburgh bus system.');
