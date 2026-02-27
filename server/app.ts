@@ -2,7 +2,7 @@ import express, { Express, Request, Response, NextFunction } from 'express';
 import { Server as HttpServer, createServer } from 'http';
 import DAC, { IDatabase } from './db/dac';
 import Controller from './controllers/controller';
-import { JWT_KEY as secretKey, JWT_EXP as tokenExpiry } from './env';
+import { JWT_KEY as secretKey, JWT_EXP as tokenExpiry, STAGE } from './env';
 import { Server as SocketServer, Socket } from 'socket.io';
 import {
   ClientToServerEvents,
@@ -54,7 +54,6 @@ class App {
     this.configureApp(params.initOnStart);
     this.configureMiddlewares();
     this.configureControllers(controllers);
-    // more TODO here? Perhaps, perhaps not!
   }
 
   private configureApp(initOnStart: boolean) {
@@ -72,7 +71,9 @@ class App {
   }
 
   private configureMiddlewares() {
-    // TODO
+    // SECURITY: Enforce HTTPS in production - throw hard error, never redirect non-SSL to SSL
+    // This prevents poorly configured clients from leaking data over unencrypted connections
+    this.app.use(this.enforceHttps);
     this.app.use(express.static(this.clientDir)); // serve the static assets from the client folder
     this.app.use(express.json()); // for parsing request's json body
     this.app.use(express.urlencoded({ extended: true })); // for decoding the encoded url
@@ -86,6 +87,43 @@ class App {
     controllers.forEach((controller) => {
       this.app.use(controller.path, controller.router);
     });
+  }
+
+  /**
+   * Middleware to enforce HTTPS in production environments.
+   * Following security best practices: throws a hard error instead of redirecting
+   * to ensure misconfigured clients are caught early.
+   *
+   * In production environments (like Render), TLS termination happens at the
+   * load balancer/reverse proxy level. The proxy sets X-Forwarded-Proto header
+   * to indicate the original protocol used by the client.
+   *
+   * Reference: https://www.vinaysahni.com/best-practices-for-a-pragmatic-restful-api
+   * "Do not redirect non-SSL to SSL. Throw a hard error instead"
+   */
+  private enforceHttps(req: Request, res: Response, next: NextFunction) {
+    // Only enforce in production
+    if (STAGE !== 'PROD') {
+      return next();
+    }
+
+    // Check the protocol - in production behind a proxy, check X-Forwarded-Proto
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+
+    // If the original request was not HTTPS, throw a hard error
+    if (protocol !== 'https') {
+      console.error(
+        `[Security]: Blocked non-HTTPS request to ${req.method} ${req.path} from ${req.ip}`
+      );
+
+      return res.status(403).json({
+        error: 'HTTPS Required',
+        message:
+          'This API requires all requests to be made over HTTPS. Please update your configuration to use https:// instead of http://'
+      });
+    }
+
+    next();
   }
 
   public serverLogger(req: Request, res: Response, next: NextFunction) {
@@ -126,6 +164,19 @@ class App {
 
         // Get user from socket (attached during authentication)
         const socketUser = (socket as Socket & { user?: ITokenPayload }).user;
+
+        // Auto-join admins to the admin:usernames broadcast room
+        if (socketUser) {
+          User.getUserAccount(socketUser.username)
+            .then((account) => {
+              if (account.privilegeLevel === 'Administrator') {
+                socket.join('admin:usernames');
+              }
+            })
+            .catch(() => {
+              // Ignore — user may have been deleted
+            });
+        }
 
         // Handle subscribeAccount event
         socket.on('subscribeAccount', async (username: string) => {

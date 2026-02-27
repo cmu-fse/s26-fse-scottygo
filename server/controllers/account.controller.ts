@@ -485,6 +485,15 @@ export default class AccountController extends Controller {
         .to(oldRoomName)
         .emit('accountUpdated', this.obfuscatePassword(updatedUser));
 
+      // Notify all admins about the username change
+      Controller.io
+        .to('admin:usernames')
+        .emit(
+          'usernameChanged',
+          targetUsername,
+          updatedUser.credentials.username
+        );
+
       // Move sockets from old room to new room
       const socketsInRoom =
         Controller.io.sockets.adapter.rooms.get(oldRoomName);
