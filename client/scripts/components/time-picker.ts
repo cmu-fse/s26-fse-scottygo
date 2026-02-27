@@ -19,13 +19,32 @@ export interface ITimePickerElement extends HTMLElement {
 }
 
 export class TimePickerPanel extends HTMLElement implements ITimePickerElement {
-  private hour = 7;
+  private hour = 12;
   private minute = 0;
-  private period: 'AM' | 'PM' = 'AM';
+  private period: 'AM' | 'PM' = 'PM';
   private isVisible = false;
 
   constructor() {
     super();
+    // Initialize with current time
+    const now = new Date();
+    let currentHour = now.getHours();
+    this.minute = now.getMinutes();
+    
+    // Convert to 12-hour format
+    if (currentHour === 0) {
+      this.hour = 12;
+      this.period = 'AM';
+    } else if (currentHour < 12) {
+      this.hour = currentHour;
+      this.period = 'AM';
+    } else if (currentHour === 12) {
+      this.hour = 12;
+      this.period = 'PM';
+    } else {
+      this.hour = currentHour - 12;
+      this.period = 'PM';
+    }
   }
 
   connectedCallback(): void {
