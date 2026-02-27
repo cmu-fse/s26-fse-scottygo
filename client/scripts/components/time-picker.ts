@@ -28,7 +28,7 @@ export class TimePickerPanel extends HTMLElement implements ITimePickerElement {
     super();
     // Initialize with current time
     const now = new Date();
-    let currentHour = now.getHours();
+    const currentHour = now.getHours();
     this.minute = now.getMinutes();
     
     // Convert to 12-hour format
