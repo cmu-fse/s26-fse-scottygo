@@ -705,10 +705,10 @@ function requestUserLocation(): void {
           // Place a marker on the map to show user location
           addUserLocationMarker(lat, lng);
 
-          // Also show the location indicator component
+          // Also show the location indicator component (wait for custom element to be defined)
           const locationIndicator =
             document.querySelector<LocationIndicator>('location-indicator');
-          if (locationIndicator) {
+          if (locationIndicator && typeof locationIndicator.show === 'function') {
             locationIndicator.show(lat, lng);
           }
           console.log('Centered map on user location');
