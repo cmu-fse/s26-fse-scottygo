@@ -4,7 +4,10 @@
 import { Request, Response } from 'express';
 import Controller from './controller';
 import trueTimeService from '../services/truetime.service';
+<<<<<<< HEAD
 import gtfsService from '../services/gtfs.service';
+=======
+>>>>>>> 2aed65f897d3ce959316e0ee58d641946437c976
 import * as responses from '../../common/server.responses';
 
 export default class BusController extends Controller {
@@ -14,6 +17,7 @@ export default class BusController extends Controller {
 
   public initializeRoutes(): void {
     this.router.get('/routes', this.getRoutes.bind(this));
+<<<<<<< HEAD
     this.router.post('/routes/available', this.filterRoutesByDateTime.bind(this));
     this.router.get('/routes/:id', this.getPatterns.bind(this));
     this.router.get('/vehicles/:routeId', this.getVehicles.bind(this));
@@ -33,6 +37,18 @@ export default class BusController extends Controller {
         routes = routes.filter((r) => r.system === systemParam);
       }
 
+=======
+    this.router.get('/vehicles/:routeId', this.getVehicles.bind(this));
+    this.router.get('/stops/:stopId/predictions', this.getPredictions.bind(this));
+    this.router.get('/stops/:routeId', this.getStops.bind(this));
+    this.router.get('/detours/:routeId', this.getDetours.bind(this));
+  }
+
+  // GET /transit/routes
+  private async getRoutes(req: Request, res: Response): Promise<void> {
+    try {
+      const routes = await trueTimeService.getRoutes();
+>>>>>>> 2aed65f897d3ce959316e0ee58d641946437c976
       const successRes: responses.ISuccess = {
         name: 'RoutesRetrieved',
         message: `Found ${routes.length} routes`,
@@ -44,6 +60,7 @@ export default class BusController extends Controller {
     }
   }
 
+<<<<<<< HEAD
   // POST /transit/routes/available
   // Body: { date: string (YYYY-MM-DD), time?: string (HH:MM) }
   private async filterRoutesByDateTime(req: Request, res: Response): Promise<void> {
@@ -107,6 +124,8 @@ export default class BusController extends Controller {
     }
   }
 
+=======
+>>>>>>> 2aed65f897d3ce959316e0ee58d641946437c976
   // GET /transit/stops/:routeId?dir=INBOUND|OUTBOUND
   private async getStops(req: Request, res: Response): Promise<void> {
     const { routeId } = req.params;
@@ -123,6 +142,7 @@ export default class BusController extends Controller {
     }
 
     try {
+<<<<<<< HEAD
       let stops = await trueTimeService.getStops(routeId, direction).catch(() => null);
 
       // A2 fallback: if TrueTime failed or returned nothing, use GTFS static stops
@@ -141,6 +161,9 @@ export default class BusController extends Controller {
         return;
       }
 
+=======
+      const stops = await trueTimeService.getStops(routeId, direction);
+>>>>>>> 2aed65f897d3ce959316e0ee58d641946437c976
       const successRes: responses.ISuccess = {
         name: 'StopsRetrieved',
         message: `Found ${stops.length} stops for route ${routeId} ${direction}`,

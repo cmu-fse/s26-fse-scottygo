@@ -7,8 +7,12 @@ import {
   IVehicle,
   IStop,
   IPrediction,
+<<<<<<< HEAD
   IDetour,
   IPattern
+=======
+  IDetour
+>>>>>>> 2aed65f897d3ce959316e0ee58d641946437c976
 } from '../../common/transit.interface';
 import { IAppError } from '../../common/server.responses';
 
@@ -69,6 +73,7 @@ interface TrueTimeDetour {
   enddt?: string;
 }
 
+<<<<<<< HEAD
 interface TrueTimePoint {
   seq: number;
   lat: number;
@@ -82,6 +87,8 @@ interface TrueTimePattern {
   pt: TrueTimePoint[];
 }
 
+=======
+>>>>>>> 2aed65f897d3ce959316e0ee58d641946437c976
 // Date helpers
 
 /** Convert TrueTime timestamp "YYYYMMDD HH:MM" → ISO 8601 string (YYYY-MM-DDThh:mm:ss.sssZ) */
@@ -105,7 +112,10 @@ function toUnixMs(tmstmp: string): number {
 
 export interface ITrueTimeService {
   getRoutes(): Promise<IRoute[]>;
+<<<<<<< HEAD
   getPatterns(routeId: string): Promise<IPattern[]>;
+=======
+>>>>>>> 2aed65f897d3ce959316e0ee58d641946437c976
   getStops(routeId: string, direction: string): Promise<IStop[]>;
   getVehicles(routeId: string): Promise<IVehicle[]>;
   getPredictions(stopId: string): Promise<IPrediction[]>;
@@ -186,6 +196,7 @@ class TrueTimeService implements ITrueTimeService {
     }));
   }
 
+<<<<<<< HEAD
   /** Retrieve route geometry (ordered lat/lng points) for each direction of a route. */
   async getPatterns(routeId: string): Promise<IPattern[]> {
     const data = await this.call<{
@@ -201,6 +212,8 @@ class TrueTimeService implements ITrueTimeService {
     }));
   }
 
+=======
+>>>>>>> 2aed65f897d3ce959316e0ee58d641946437c976
   /** Retrieve stops for a route in a specific direction (INBOUND or OUTBOUND). */
   async getStops(routeId: string, direction: string): Promise<IStop[]> {
     const data = await this.call<{
@@ -222,8 +235,13 @@ class TrueTimeService implements ITrueTimeService {
     }
 
     return data.stops.map((s) => ({
+<<<<<<< HEAD
       stopId: s.stpid,
       stopName: s.stpnm,
+=======
+      stopid: s.stpid,
+      stopname: s.stpnm,
+>>>>>>> 2aed65f897d3ce959316e0ee58d641946437c976
       lat: s.lat,
       lon: s.lon,
       dtradd: s.dtradd ?? [],
