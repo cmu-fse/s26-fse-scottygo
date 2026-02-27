@@ -178,6 +178,22 @@ export class FilterController {
 
     // Re-apply all filters
     this.stateManager.reapplyFilters();
+
+    // Update route selector with filtered routes based on enabled systems
+    if (this.routeSelectorUpdateCallback) {
+      const updatedState = this.stateManager.getState();
+      const filteredRoutes = updatedState.availableRoutes.filter((r) => {
+        if (r.system === 'PRT') return updatedState.selectedSystems.prt;
+        if (r.system === 'CMU') return updatedState.selectedSystems.cmu;
+        return false;
+      });
+      const routeOptions = filteredRoutes.map((r) => ({
+        id: r.id,
+        name: this.formatRouteName(r)
+      }));
+      this.routeSelectorUpdateCallback(routeOptions);
+    }
+
     await this.renderFilteredRoutes();
 
     // If a route is still selected after system filter, re-render it fully (geometry + stops)
@@ -186,7 +202,7 @@ export class FilterController {
       await this.applyRouteFilter(updatedState.selectedRouteId);
     }
 
-    this.urlSync.updateURL(state);
+    this.urlSync.updateURL(updatedState);
   }
 
   /**
@@ -353,7 +369,8 @@ export class FilterController {
         await this.renderFilteredRoutes();
       }
 
-      this.urlSync.updateURL(state);
+      // Update URL with latest state
+      this.urlSync.updateURL(this.stateManager.getState());
     } catch (error) {
       console.error('Error applying date/time filter:', error);
     }
