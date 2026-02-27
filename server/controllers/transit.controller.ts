@@ -4,6 +4,7 @@
 import { Request, Response } from 'express';
 import Controller from './controller';
 import trueTimeService from '../services/truetime.service';
+import gtfsService from '../services/gtfs.service';
 import * as responses from '../../common/server.responses';
 
 export default class BusController extends Controller {
@@ -13,20 +14,92 @@ export default class BusController extends Controller {
 
   public initializeRoutes(): void {
     this.router.get('/routes', this.getRoutes.bind(this));
+    this.router.post('/routes/available', this.filterRoutesByDateTime.bind(this));
+    this.router.get('/routes/:id', this.getPatterns.bind(this));
     this.router.get('/vehicles/:routeId', this.getVehicles.bind(this));
-    this.router.get('/stops/:stopId/predictions', this.getPredictions.bind(this));
     this.router.get('/stops/:routeId', this.getStops.bind(this));
+    this.router.get('/stops/:stopId/predictions', this.getPredictions.bind(this));
     this.router.get('/detours/:routeId', this.getDetours.bind(this));
   }
 
-  // GET /transit/routes
+  // GET /transit/routes?system=PRT|CMU
   private async getRoutes(req: Request, res: Response): Promise<void> {
+    const systemParam = req.query.system as string | undefined;
+
     try {
-      const routes = await trueTimeService.getRoutes();
+      let routes = await trueTimeService.getRoutes();
+
+      if (systemParam) {
+        routes = routes.filter((r) => r.system === systemParam);
+      }
+
       const successRes: responses.ISuccess = {
         name: 'RoutesRetrieved',
         message: `Found ${routes.length} routes`,
         payload: routes
+      };
+      res.status(200).json(successRes);
+    } catch (error: unknown) {
+      this.handleError(error, res);
+    }
+  }
+
+  // POST /transit/routes/available
+  // Body: { date: string (YYYY-MM-DD), time?: string (HH:MM) }
+  private async filterRoutesByDateTime(req: Request, res: Response): Promise<void> {
+    const { date, time } = req.body as { date?: string; time?: string };
+
+    if (!date) {
+      const errorRes: responses.IAppError = {
+        type: 'ClientError',
+        name: 'MissingParameter',
+        message: 'Request body must include "date" (YYYY-MM-DD)'
+      };
+      res.status(400).json(errorRes);
+      return;
+    }
+
+    try {
+      const routes = time
+        ? gtfsService.filterRoutesByDateTime(new Date(date), time)
+        : gtfsService.filterRoutesByDate(new Date(date));
+
+      const successRes: responses.ISuccess = {
+        name: 'RoutesRetrieved',
+        message: `Found ${routes.length} routes`,
+        payload: routes
+      };
+      res.status(200).json(successRes);
+    } catch (error: unknown) {
+      this.handleError(error, res);
+    }
+  }
+
+  // GET /transit/routes/:id
+  private async getPatterns(req: Request, res: Response): Promise<void> {
+    const { id } = req.params;
+    try {
+      let patterns = await trueTimeService.getPatterns(id).catch(() => null);
+
+      // A2 fallback: if TrueTime failed or returned nothing, use GTFS static geometry
+      if ((!patterns || patterns.length === 0) && gtfsService.isLoaded()) {
+        patterns = gtfsService.getPatterns(id);
+      }
+
+      if (!patterns || patterns.length === 0) {
+        const err: responses.IAppError = {
+          type: 'ClientError',
+          name: 'RouteNotFound',
+          message: `No geometry found for route ${id}`
+        };
+        res.status(404).json(err);
+        return;
+      }
+
+      const successRes: responses.ISuccess = {
+        name: 'PathGenerated',
+        message: `Found ${patterns.length} patterns for route ${id}`,
+        payload: patterns
       };
       res.status(200).json(successRes);
     } catch (error: unknown) {
@@ -50,7 +123,24 @@ export default class BusController extends Controller {
     }
 
     try {
-      const stops = await trueTimeService.getStops(routeId, direction);
+      let stops = await trueTimeService.getStops(routeId, direction).catch(() => null);
+
+      // A2 fallback: if TrueTime failed or returned nothing, use GTFS static stops
+      // Note: GTFS stops are not filtered by direction
+      if ((!stops || stops.length === 0) && gtfsService.isLoaded()) {
+        stops = gtfsService.getStops(routeId);
+      }
+
+      if (!stops || stops.length === 0) {
+        const err: responses.IAppError = {
+          type: 'ClientError',
+          name: 'StopNotFound',
+          message: `No stops found for route ${routeId}`
+        };
+        res.status(404).json(err);
+        return;
+      }
+
       const successRes: responses.ISuccess = {
         name: 'StopsRetrieved',
         message: `Found ${stops.length} stops for route ${routeId} ${direction}`,

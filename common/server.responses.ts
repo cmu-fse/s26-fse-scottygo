@@ -4,7 +4,8 @@ import {
   IVehicle,
   IStop,
   IPrediction,
-  IDetour
+  IDetour,
+  IPattern
 } from './transit.interface';
 import { IConfig } from './map.interface';
 
@@ -89,6 +90,7 @@ export type IPayload =
   | IStop[]
   | IPrediction[]
   | IDetour[]
+  | IPattern[]
   | IConfig
   | null;
 
