@@ -713,6 +713,30 @@ body.dark .time-box {
   background: var(--gray-800);
 }
 
+.time-box .time-input {
+  font-size: 32px;
+  font-family: 'Roboto Mono', monospace;
+  color: var(--primary);
+  font-weight: 500;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: center;
+  outline: none;
+  -moz-appearance: textfield; /* Remove spinners in Firefox */
+}
+
+.time-box .time-input::-webkit-outer-spin-button,
+.time-box .time-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+body.dark .time-box .time-input {
+  color: var(--primary);
+}
+
+/* Legacy support for span if any component still uses it */
 .time-box span {
   font-size: 32px;
   font-family: 'Roboto Mono', monospace;
@@ -897,6 +921,8 @@ body.dark .clock-number:hover {
   grid-template-columns: repeat(7, 1fr);
   text-align: center;
   gap: 2px;
+  min-height: 322px; /* Fixed height for 6 rows to prevent resizing between months */
+  align-content: start;
 }
 
 .cal-day {
