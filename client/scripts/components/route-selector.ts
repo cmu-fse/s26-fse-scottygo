@@ -31,6 +31,10 @@ export class RouteSelectorPanel extends HTMLElement implements IRouteSelectorEle
 
   connectedCallback(): void {
     this.render();
+    // Add stopPropagation at the component level to prevent any clicks from bubbling
+    this.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
   }
 
   /**
@@ -41,6 +45,7 @@ export class RouteSelectorPanel extends HTMLElement implements IRouteSelectorEle
     if (panel) {
       console.log('Showing route selector panel');
       panel.style.display = 'block';
+      panel.style.pointerEvents = 'auto'; // Enable pointer events immediately
       this.isVisible = true;
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -58,6 +63,7 @@ export class RouteSelectorPanel extends HTMLElement implements IRouteSelectorEle
     if (panel) {
       console.log('Hiding route selector panel');
       panel.classList.remove('visible');
+      panel.style.pointerEvents = 'none'; // Disable pointer events
       setTimeout(() => {
         panel.style.display = 'none';
         this.isVisible = false;
@@ -93,8 +99,12 @@ export class RouteSelectorPanel extends HTMLElement implements IRouteSelectorEle
   }
 
   private render(): void {
+    // Preserve display and pointer-events styles if panel is currently visible
+    const displayStyle = this.isVisible ? 'block' : 'none';
+    const pointerEvents = this.isVisible ? 'auto' : 'none';
+    
     this.innerHTML = `
-      <div class="route-selector-panel panel" style="display: none;">
+      <div class="route-selector-panel panel" style="display: ${displayStyle}; pointer-events: ${pointerEvents};">
         <div class="route-search-wrapper">
           <span class="material-icons-outlined route-search-icon">search</span>
           <input type="text" class="route-search-input" placeholder="Search route..." />
@@ -119,7 +129,25 @@ export class RouteSelectorPanel extends HTMLElement implements IRouteSelectorEle
       </div>
     `;
 
+    // Re-apply the visible class if panel is currently visible
+    if (this.isVisible) {
+      const panel = this.querySelector('.route-selector-panel') as HTMLElement;
+      if (panel) {
+        panel.classList.add('visible');
+      }
+    }
+
     this.attachEvents();
+    
+    // Scroll to selected route if one exists
+    if (this.selectedRoute) {
+      requestAnimationFrame(() => {
+        const selectedBtn = this.querySelector(`.route-btn[data-route="${this.selectedRoute}"]`) as HTMLElement;
+        if (selectedBtn) {
+          selectedBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      });
+    }
   }
 
   private attachEvents(): void {

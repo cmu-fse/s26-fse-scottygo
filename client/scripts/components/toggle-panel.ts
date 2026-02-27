@@ -30,6 +30,10 @@ export class TogglePanel extends HTMLElement implements ITogglePanelElement {
   private state: Map<string, boolean> = new Map();
 
   connectedCallback(): void {
+    // Add stopPropagation at the component level to prevent any clicks from bubbling
+    this.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
     // Component will be initialized when configure() is called
   }
 
