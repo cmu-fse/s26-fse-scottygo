@@ -1,7 +1,7 @@
 /**
  * Vehicle Tracker
  * Manages real-time vehicle position updates and rendering
- * Polls backend every 15 seconds for selected route
+ * Polls backend every 30 seconds to match the GTFS-RT feed refresh rate
  */
 
 import axios from 'axios';
@@ -55,10 +55,10 @@ export class VehicleTracker {
     // Initial fetch
     this.updateVehiclePositions();
 
-    // Poll every 15 seconds (per REST API spec)
+    // Poll every 30 seconds (matches GTFS-RT feed refresh rate)
     this.pollingInterval = window.setInterval(() => {
       this.updateVehiclePositions();
-    }, 15000);
+    }, 30000);
 
     console.log(`Started vehicle polling for route ${routeId}`);
   }
@@ -132,9 +132,11 @@ export class VehicleTracker {
       currentVehicleIds.add(vehicle.vid);
 
       if (this.vehicleMarkers.has(vehicle.vid)) {
-        // Update existing marker position
+        // Smoothly animate existing marker to new position
         const marker = this.vehicleMarkers.get(vehicle.vid)!;
-        marker.setPosition({ lat: vehicle.lat, lng: vehicle.lon });
+        marker.animatePosition({ lat: vehicle.lat, lng: vehicle.lon }, 5000);
+        // Update icon in case heading changed
+        marker.setIcon(this.createBusIcon(vehicle));
       } else {
         // Create new marker
         const marker = this.mapProvider!.addMarker({
@@ -177,18 +179,32 @@ export class VehicleTracker {
   }
 
   /**
-   * Create bus icon based on vehicle state
+   * Create bus icon based on vehicle state, with a heading direction indicator.
+   * The entire SVG is rotated so the arrow-tip points in the vehicle's heading.
    */
   private createBusIcon(vehicle: IVehicle): string {
-    const color = vehicle.isDetoured ? '#FFA500' : '#4285F4'; // Orange if detoured, blue otherwise
-    const size = 16;
-    
+    const color = vehicle.isDetoured ? '#FFA500' : '#4285F4';
+    const size = 32;
+    const half = size / 2;
+    const heading = vehicle.heading ?? 0;
+
+    // A teardrop / navigation-pointer shape:
+    //   - wide circle body for the bus
+    //   - pointed top as the direction arrow
+    // Drawn pointing UP (0°), then rotated by heading degrees.
     const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-        <circle cx="${size / 2}" cy="${size / 2}" r="${size / 2 - 1}" fill="${color}" stroke="white" stroke-width="2"/>
-        <path d="M${size / 2},${size / 4} L${size / 2},${size * 3 / 4}" stroke="white" stroke-width="2" stroke-linecap="round"/>
-      </svg>
-    `;
+<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+  <g transform="rotate(${heading}, ${half}, ${half})">
+    <!-- direction pointer (triangle on top) -->
+    <polygon points="${half},2 ${half - 6},13 ${half + 6},13" fill="${color}" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+    <!-- bus body -->
+    <circle cx="${half}" cy="${half + 2}" r="9" fill="${color}" stroke="white" stroke-width="2"/>
+    <!-- bus icon (simple rectangle + windows) -->
+    <rect x="${half - 4}" y="${half - 2}" width="8" height="8" rx="1.5" fill="white"/>
+    <rect x="${half - 2.5}" y="${half - 0.5}" width="5" height="2" rx="0.5" fill="${color}"/>
+    <rect x="${half - 2.5}" y="${half + 3}" width="5" height="1.5" rx="0.5" fill="${color}"/>
+  </g>
+</svg>`;
     return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg.trim());
   }
 

@@ -41,6 +41,8 @@ export interface IMapPolylineOptions {
 export interface IMapMarker {
   id: string;
   setPosition(position: ILatLng): void;
+  animatePosition(position: ILatLng, durationMs?: number): void;
+  setIcon(icon: string): void;
   setVisible(visible: boolean): void;
   remove(): void;
 }

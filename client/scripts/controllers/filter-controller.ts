@@ -5,12 +5,19 @@
  */
 
 import axios, { AxiosResponse } from 'axios';
-import type { IRoute, IStop } from '../../../common/transit.interface';
+import type { IRoute, IStop, IPattern, IBulkTransitData } from '../../../common/transit.interface';
 import { MapStateManager } from '../state/map-state';
 import { RouteRenderer, type RouteData } from '../renderers/route-renderer';
 import { VehicleTracker } from '../trackers/vehicle-tracker';
 import { URLSyncManager } from '../state/url-sync';
 import type { IRouteOption } from '../components/route-selector';
+
+// Augment the global Window interface with the showModal utility
+declare global {
+  interface Window {
+    showModal?: (title: string, message: string) => void;
+  }
+}
 
 export class FilterController {
   private static instance: FilterController;
@@ -23,6 +30,12 @@ export class FilterController {
     | ((routes: IRouteOption[]) => void)
     | null = null;
   private routeColorCache = new Map<string, string>(); // Persists TrueTime colors across filter changes
+  /** Client-side pattern store populated from /transit/bulk */
+  private patternCache = new Map<string, IPattern[]>();
+  /** Client-side stop store populated from /transit/bulk, keyed "routeId:DIRECTION" */
+  private stopCache = new Map<string, IStop[]>();
+  /** Whether bulk data has been loaded */
+  private bulkLoaded = false;
 
   private constructor() {
     this.stateManager = MapStateManager.getInstance();
@@ -47,12 +60,12 @@ export class FilterController {
   }
 
   /**
-   * Initialize - load all routes from backend
+   * Initialize - load all transit data from the bulk endpoint in one call
    */
   async initialize(): Promise<void> {
     try {
-      console.log('Fetching all routes from backend...');
-      const routes = await this.fetchAllRoutes();
+      console.log('Fetching bulk transit data from backend...');
+      const routes = await this.fetchBulkData();
       routes.forEach((r) => this.routeColorCache.set(r.id, r.color));
       this.stateManager.setAvailableRoutes(routes);
 
@@ -71,7 +84,7 @@ export class FilterController {
       console.log(
         'Filter controller initialized with',
         routes.length,
-        'routes'
+        'routes (bulk)'
       );
     } catch (error) {
       console.error('Failed to initialize filter controller:', error);
@@ -111,6 +124,57 @@ export class FilterController {
     } catch (error) {
       console.error('Error fetching routes:', error);
       // A1: No Network Access
+      const showModal = window.showModal;
+      if (showModal && typeof showModal === 'function') {
+        showModal(
+          'Connection Lost',
+          'Unable to connect to the server. Please check your internet connection.'
+        );
+      }
+      return [];
+    }
+  }
+
+  /**
+   * Fetch all transit data (routes, patterns, stops) in a single call.
+   * Populates local patternCache and stopCache so subsequent render
+   * operations never need additional network requests for static data.
+   */
+  private async fetchBulkData(): Promise<IRoute[]> {
+    try {
+      const response: AxiosResponse = await axios.get('/transit/bulk', {
+        headers: { Authorization: `Bearer ${this.token}` },
+        validateStatus: () => true
+      });
+
+      if (response.status === 200 && response.data.name === 'BulkDataRetrieved') {
+        const bulk: IBulkTransitData = response.data.payload;
+
+        // Populate local caches
+        this.patternCache.clear();
+        this.stopCache.clear();
+
+        for (const [routeId, patterns] of Object.entries(bulk.patterns)) {
+          this.patternCache.set(routeId, patterns);
+        }
+        for (const [key, stops] of Object.entries(bulk.stops)) {
+          this.stopCache.set(key, stops);
+        }
+
+        this.bulkLoaded = true;
+        console.log(
+          `Bulk data loaded: ${bulk.routes.length} routes, ` +
+            `${this.patternCache.size} pattern sets, ` +
+            `${this.stopCache.size} stop sets`
+        );
+
+        return bulk.routes;
+      } else {
+        console.warn('Bulk endpoint failed, falling back to /transit/routes');
+        return this.fetchAllRoutes();
+      }
+    } catch (error) {
+      console.error('Error fetching bulk data:', error);
       const showModal = window.showModal;
       if (showModal && typeof showModal === 'function') {
         showModal(
@@ -206,11 +270,14 @@ export class FilterController {
   }
 
   /**
-   * Prefetch routes for newly enabled systems
+   * Prefetch routes for newly enabled systems.
+   * Uses bulk endpoint to also cache patterns and stops for new routes.
    */
   private async prefetchRoutes(): Promise<void> {
     try {
-      const routes = await this.fetchAllRoutes();
+      const routes = this.bulkLoaded
+        ? await this.fetchBulkData()
+        : await this.fetchAllRoutes();
       routes.forEach((r) => this.routeColorCache.set(r.id, r.color));
       this.stateManager.setAvailableRoutes(routes);
 
@@ -530,9 +597,16 @@ export class FilterController {
   }
 
   /**
-   * Fetch route geometry from backend
+   * Fetch route geometry — uses local cache from bulk data when available,
+   * otherwise falls back to the per-route API call.
    */
   private async fetchRouteGeometry(routeId: string): Promise<RouteData | null> {
+    // Try local pattern cache first (populated by fetchBulkData)
+    if (this.bulkLoaded && this.patternCache.has(routeId)) {
+      console.log(`Route ${routeId} geometry served from local cache`);
+      return this.patternCache.get(routeId) as unknown as RouteData;
+    }
+
     const response: AxiosResponse = await axios.get(
       `/transit/routes/${routeId}`,
       {
@@ -611,12 +685,20 @@ export class FilterController {
   }
 
   /**
-   * Fetch stops for a specific route and direction
+   * Fetch stops for a specific route and direction — uses local cache from
+   * bulk data when available, otherwise falls back to the per-route API call.
    */
   private async fetchStops(
     routeId: string,
     direction: string
   ): Promise<IStop[]> {
+    // Try local stop cache first (populated by fetchBulkData)
+    const cacheKey = `${routeId}:${direction}`;
+    if (this.bulkLoaded && this.stopCache.has(cacheKey)) {
+      console.log(`Stops for ${cacheKey} served from local cache`);
+      return this.stopCache.get(cacheKey) || [];
+    }
+
     try {
       const response: AxiosResponse = await axios.get(
         `/transit/stops/${routeId}?dir=${direction}`,

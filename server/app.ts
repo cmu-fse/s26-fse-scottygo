@@ -3,6 +3,8 @@ import { Server as HttpServer, createServer } from 'http';
 import DAC, { IDatabase } from './db/dac';
 import Controller from './controllers/controller';
 import gtfsService from './services/gtfs.service';
+import vehiclePositionsService from './services/vehicle-positions.service';
+import { TransitModel } from './models/transit.model';
 import { JWT_KEY as secretKey, JWT_EXP as tokenExpiry, STAGE } from './env';
 import { Server as SocketServer, Socket } from 'socket.io';
 import {
@@ -59,6 +61,12 @@ class App {
 
   private configureApp(initOnStart: boolean) {
     DAC.db = this.db;
+
+    // Load GTFS static schedule data (needed before cache refresh)
+    const gtfsReady = gtfsService.load().catch((err) => {
+      console.error('[GTFS] Failed to load feed:', err);
+    });
+
     DAC.db.connect().then(async () => {
       if (initOnStart) {
         await this.db.init();
@@ -67,11 +75,26 @@ class App {
       // Seed default admin user if it doesn't exist
       // This runs in both PROD and non-PROD to ensure default admin exists
       await this.db.seedDefaultAdmin();
+
+      // Wait for GTFS to finish loading before populating the cache
+      await gtfsReady;
+
+      // Populate the transit cache from GTFS data + one TrueTime call for colors.
+      TransitModel.refreshAllCaches().catch((err) =>
+        console.error('[TransitModel] Initial cache refresh failed:', err)
+      );
+
+      // Start polling GTFS-RT vehicle positions feed every 30 s (in-memory)
+      vehiclePositionsService.start();
+
+      // Schedule a daily cache refresh (every 24 h).
+      const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+      setInterval(() => {
+        TransitModel.refreshAllCaches().catch((err) =>
+          console.error('[TransitModel] Scheduled cache refresh failed:', err)
+        );
+      }, TWENTY_FOUR_HOURS);
     });
-    // Load GTFS static schedule data in the background (non-blocking)
-    gtfsService.load().catch((err) =>
-      console.error('[GTFS] Failed to load feed:', err)
-    );
   }
 
   private configureMiddlewares() {

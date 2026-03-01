@@ -5,7 +5,8 @@ import {
   IStop,
   IPrediction,
   IDetour,
-  IPattern
+  IPattern,
+  IBulkTransitData
 } from './transit.interface';
 import { IConfig } from './map.interface';
 
@@ -41,6 +42,7 @@ export type SuccessName =
   | 'StopsRetrieved'
   | 'PredictionsRetrieved'
   | 'DetoursRetrieved'
+  | 'BulkDataRetrieved'
   | 'ConfigFound';
 
 export type ClientErrorName =
@@ -91,6 +93,7 @@ export type IPayload =
   | IPrediction[]
   | IDetour[]
   | IPattern[]
+  | IBulkTransitData
   | IConfig
   | null;
 
