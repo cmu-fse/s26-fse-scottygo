@@ -3,7 +3,6 @@
 
 import { Request, Response } from 'express';
 import Controller from './controller';
-import trueTimeService from '../services/truetime.service';
 import tripshotService from '../services/tripshot.service';
 import vehiclePositionsService from '../services/vehicle-positions.service';
 import tripUpdatesService from '../services/trip-updates.service';

@@ -14,7 +14,6 @@ import {
   ITransitCache,
   ITransitCacheType
 } from '../../common/transit.interface';
-import { IAppError } from '../../common/server.responses';
 import bcrypt from 'bcrypt';
 import { v4 as uuidV4 } from 'uuid';
 

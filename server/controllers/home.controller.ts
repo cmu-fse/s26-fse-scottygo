@@ -16,7 +16,7 @@ export default class HomeController extends Controller {
     this.router.get('/home', this.homePage.bind(this));
   }
 
-  public homePage(req: Request, res: Response): void {
+  public homePage(_req: Request, res: Response): void {
     this.sendPage(res, 'home.html');
   }
 }

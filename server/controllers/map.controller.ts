@@ -1,15 +1,13 @@
 // Controller serving the map page where the user lands after login
 // Note that controllers don't access the DB direcly, only through the models
 
-import { ILogin, IUser } from '../../common/user.interface';
+import { IUser, ILogin } from '../../common/user.interface';
 import { User } from '../models/user.model';
 import Controller from './controller';
 import { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import {
   JWT_KEY as secretKey,
-  JWT_EXP as tokenExpiry,
-  STAGE as appStage,
   GOOGLE_MAPS_KEY
 } from '../env';
 import * as responses from '../../common/server.responses';
@@ -78,10 +76,18 @@ export default class MapController extends Controller {
       const user: IUser | null = await User.getUserForUsername(
         req.params.username
       );
+      // Obfuscate password before sending to client
+      const sanitizedUser = user ? {
+        ...user,
+        credentials: {
+          username: user.credentials.username,
+          password: 'obfuscated'
+        }
+      } : null;
       const successRes: responses.ISuccess = {
         name: 'UserFound',
         message: 'User retrieved successfully',
-        payload: user
+        payload: sanitizedUser
       };
       return res.status(200).json(successRes);
     } catch (error: unknown) {

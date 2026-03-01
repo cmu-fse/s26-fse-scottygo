@@ -6,7 +6,7 @@ import gtfsService from './services/gtfs.service';
 import vehiclePositionsService from './services/vehicle-positions.service';
 import tripUpdatesService from './services/trip-updates.service';
 import { TransitModel } from './models/transit.model';
-import { JWT_KEY as secretKey, JWT_EXP as tokenExpiry, STAGE } from './env';
+import { JWT_KEY as secretKey, STAGE } from './env';
 import { Server as SocketServer, Socket } from 'socket.io';
 import {
   ClientToServerEvents,
