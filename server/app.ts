@@ -4,6 +4,7 @@ import DAC, { IDatabase } from './db/dac';
 import Controller from './controllers/controller';
 import gtfsService from './services/gtfs.service';
 import vehiclePositionsService from './services/vehicle-positions.service';
+import tripUpdatesService from './services/trip-updates.service';
 import { TransitModel } from './models/transit.model';
 import { JWT_KEY as secretKey, JWT_EXP as tokenExpiry, STAGE } from './env';
 import { Server as SocketServer, Socket } from 'socket.io';
@@ -84,8 +85,9 @@ class App {
         console.error('[TransitModel] Initial cache refresh failed:', err)
       );
 
-      // Start polling GTFS-RT vehicle positions feed every 30 s (in-memory)
+      // Start polling GTFS-RT feeds every 30 s (in-memory)
       vehiclePositionsService.start();
+      tripUpdatesService.start();
 
       // Schedule a daily cache refresh (every 24 h).
       const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;

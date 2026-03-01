@@ -6,6 +6,7 @@ import Controller from './controller';
 import trueTimeService from '../services/truetime.service';
 import tripshotService from '../services/tripshot.service';
 import vehiclePositionsService from '../services/vehicle-positions.service';
+import tripUpdatesService from '../services/trip-updates.service';
 import { TransitModel } from '../models/transit.model';
 import gtfsService from '../services/gtfs.service';
 import * as responses from '../../common/server.responses';
@@ -229,10 +230,10 @@ export default class BusController extends Controller {
   }
 
   // GET /transit/stops/:stopId/predictions
-  private async getPredictions(req: Request, res: Response): Promise<void> {
+  private getPredictions(req: Request, res: Response): void {
     const { stopId } = req.params;
     try {
-      const predictions = await trueTimeService.getPredictions(stopId);
+      const predictions = tripUpdatesService.getPredictions(stopId);
       const successRes: responses.ISuccess = {
         name: 'PredictionsRetrieved',
         message: `Found ${predictions.length} predictions for stop ${stopId}`,

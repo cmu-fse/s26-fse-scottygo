@@ -96,6 +96,9 @@ export class GoogleMapProvider implements IMapProvider {
       },
       setIcon: (icon: string) => marker.setIcon(icon),
       setVisible: (visible: boolean) => marker.setVisible(visible),
+      onClick: (callback: () => void) => {
+        google.maps.event.addListener(marker, 'click', callback);
+      },
       remove: () => {
         marker.setMap(null);
         this.markers.delete(id);
