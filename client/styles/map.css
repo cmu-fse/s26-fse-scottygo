@@ -1638,3 +1638,153 @@ body.dark .stop-popup__arrival {
 body.dark .stop-popup__meta {
   color: #9ca3af;
 }
+
+/* ── Bus Info Popup (vehicle marker click) ─── */
+
+.bus-popup {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  width: min(340px, calc(100% - 32px));
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  padding: 14px 16px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+  font-size: 14px;
+  color: #1f2937;
+  animation: busPopupSlideUp 0.25s ease-out;
+}
+
+@keyframes busPopupSlideUp {
+  from { opacity: 0; transform: translateX(-50%) translateY(16px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.bus-popup__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bus-popup__icon {
+  font-size: 22px;
+  color: #4285F4;
+  flex-shrink: 0;
+}
+
+.bus-popup__title {
+  font-size: 15px;
+  font-weight: 600;
+  flex: 1;
+}
+
+.bus-popup__close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 0 2px;
+}
+
+.bus-popup__close:hover {
+  color: #1f2937;
+}
+
+.bus-popup__subheader {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 2px 0 10px 28px;
+}
+
+.bus-popup__details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bus-popup__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.bus-popup__row:last-child {
+  border-bottom: none;
+}
+
+.bus-popup__label {
+  font-size: 12px;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.bus-popup__value {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.bus-popup__source {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-align: center;
+}
+
+.bus-popup__source--live {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.bus-popup__source--static {
+  background: #fef9c3;
+  color: #854d0e;
+}
+
+/* Bus popup dark mode */
+body.dark .bus-popup {
+  background: rgba(31, 41, 55, 0.97);
+  color: #f3f4f6;
+}
+
+body.dark .bus-popup__close {
+  color: #9ca3af;
+}
+
+body.dark .bus-popup__close:hover {
+  color: #f3f4f6;
+}
+
+body.dark .bus-popup__subheader {
+  color: #9ca3af;
+}
+
+body.dark .bus-popup__row {
+  border-bottom-color: #374151;
+}
+
+body.dark .bus-popup__label {
+  color: #9ca3af;
+}
+
+body.dark .bus-popup__source--live {
+  background: #065f46;
+  color: #a7f3d0;
+}
+
+body.dark .bus-popup__source--static {
+  background: #713f12;
+  color: #fef08a;
+}

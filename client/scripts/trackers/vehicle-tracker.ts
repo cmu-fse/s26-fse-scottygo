@@ -17,6 +17,7 @@ export class VehicleTracker {
   private pollingInterval: number | null = null;
   private currentRouteId: string | null = null;
   private vehicleMarkers = new Map<string, IMapMarker>(); // vehicleId → marker
+  private vehicleData = new Map<string, IVehicle>();       // vehicleId → latest data
   private hasShownStaticToast = false;
 
   private constructor() {
@@ -131,6 +132,9 @@ export class VehicleTracker {
     vehicles.forEach(vehicle => {
       currentVehicleIds.add(vehicle.vid);
 
+      // Always update the stored data so popup shows fresh info
+      this.vehicleData.set(vehicle.vid, vehicle);
+
       if (this.vehicleMarkers.has(vehicle.vid)) {
         // Smoothly animate existing marker to new position
         const marker = this.vehicleMarkers.get(vehicle.vid)!;
@@ -144,6 +148,9 @@ export class VehicleTracker {
           title: `Bus ${vehicle.vid}${vehicle.isDetoured ? ' (Detoured)' : ''}`,
           icon: this.createBusIcon(vehicle)
         });
+
+        // Attach click handler for info popup
+        marker.onClick(() => this.showVehiclePopup(vehicle.vid));
 
         this.vehicleMarkers.set(vehicle.vid, marker);
       }
@@ -166,7 +173,10 @@ export class VehicleTracker {
       }
     });
 
-    markersToRemove.forEach(vid => this.vehicleMarkers.delete(vid));
+    markersToRemove.forEach(vid => {
+      this.vehicleMarkers.delete(vid);
+      this.vehicleData.delete(vid);
+    });
   }
 
   /**
@@ -175,6 +185,8 @@ export class VehicleTracker {
   clearVehicles(): void {
     this.vehicleMarkers.forEach(marker => marker.remove());
     this.vehicleMarkers.clear();
+    this.vehicleData.clear();
+    this.closeVehiclePopup();
     console.log('Cleared all vehicle markers');
   }
 
@@ -258,6 +270,147 @@ export class VehicleTracker {
     setTimeout(() => {
       toast.remove();
     }, 5000);
+  }
+
+  /**
+   * Show info popup for a clicked bus marker.
+   * Reads the latest stored data for the vehicle.
+   */
+  private showVehiclePopup(vid: string): void {
+    const vehicle = this.vehicleData.get(vid);
+    if (!vehicle) return;
+
+    // Remove any existing bus popup
+    this.closeVehiclePopup();
+
+    const popup = document.createElement('div');
+    popup.id = 'bus-popup';
+    popup.className = 'bus-popup';
+
+    // Header
+    const header = document.createElement('div');
+    header.className = 'bus-popup__header';
+    header.innerHTML = `
+      <span class="material-icons-outlined bus-popup__icon">directions_bus</span>
+      <strong class="bus-popup__title">Bus ${vehicle.vid}</strong>
+      <button class="bus-popup__close" aria-label="Close">&times;</button>
+    `;
+    popup.appendChild(header);
+
+    // Subheader — route
+    const subheader = document.createElement('div');
+    subheader.className = 'bus-popup__subheader';
+    subheader.textContent = `Route ${vehicle.routeId}`;
+    popup.appendChild(subheader);
+
+    // Detail rows
+    const details = document.createElement('div');
+    details.className = 'bus-popup__details';
+
+    // Status
+    if (vehicle.currentStatus) {
+      const statusLabel = this.formatStatus(vehicle.currentStatus);
+      this.addDetailRow(details, 'Status', statusLabel);
+    }
+
+    // Speed
+    if (vehicle.speed != null) {
+      // GTFS-RT speed is m/s → convert to mph
+      const mph = (vehicle.speed * 2.23694).toFixed(1);
+      this.addDetailRow(details, 'Speed', `${mph} mph`);
+    }
+
+    // Heading
+    if (vehicle.heading != null) {
+      this.addDetailRow(details, 'Heading', `${this.formatHeading(vehicle.heading)}`);
+    }
+
+    // Next stop
+    if (vehicle.currentStopId) {
+      this.addDetailRow(details, 'Next Stop', `#${vehicle.currentStopId}`);
+    }
+
+    // Trip ID
+    if (vehicle.tripId) {
+      this.addDetailRow(details, 'Trip', vehicle.tripId);
+    }
+
+    // Last update
+    const lastUpdate = new Date(vehicle.lastUpdate);
+    const secsAgo = Math.round((Date.now() - lastUpdate.getTime()) / 1000);
+    this.addDetailRow(details, 'Updated', secsAgo < 60 ? `${secsAgo}s ago` : `${Math.round(secsAgo / 60)}m ago`);
+
+    // Coordinates
+    this.addDetailRow(details, 'Position', `${vehicle.lat.toFixed(5)}, ${vehicle.lon.toFixed(5)}`);
+
+    popup.appendChild(details);
+
+    // Source badge
+    const badge = document.createElement('div');
+    badge.className = `bus-popup__source bus-popup__source--${vehicle.source}`;
+    badge.textContent = vehicle.source === 'live' ? 'LIVE' : 'SCHEDULED';
+    popup.appendChild(badge);
+
+    // Append to map container
+    const container = document.querySelector('.map-container');
+    if (container) {
+      container.appendChild(popup);
+    }
+
+    // Close button
+    const closeBtn = popup.querySelector('.bus-popup__close');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => this.closeVehiclePopup());
+    }
+  }
+
+  /**
+   * Close the bus info popup.
+   */
+  private closeVehiclePopup(): void {
+    const existing = document.getElementById('bus-popup');
+    if (existing) existing.remove();
+  }
+
+  /**
+   * Add a key-value detail row to the popup.
+   */
+  private addDetailRow(container: HTMLElement, label: string, value: string): void {
+    const row = document.createElement('div');
+    row.className = 'bus-popup__row';
+
+    const lbl = document.createElement('span');
+    lbl.className = 'bus-popup__label';
+    lbl.textContent = label;
+
+    const val = document.createElement('span');
+    val.className = 'bus-popup__value';
+    val.textContent = value;
+
+    row.appendChild(lbl);
+    row.appendChild(val);
+    container.appendChild(row);
+  }
+
+  /**
+   * Format GTFS-RT VehicleStopStatus to human-readable text.
+   */
+  private formatStatus(status: string): string {
+    switch (status) {
+      case 'INCOMING_AT': return 'Arriving at stop';
+      case 'STOPPED_AT': return 'Stopped at stop';
+      case 'IN_TRANSIT_TO': return 'In transit to next stop';
+      default: return status;
+    }
+  }
+
+  /**
+   * Convert heading degrees to compass direction + degrees.
+   */
+  private formatHeading(degrees: number): string {
+    const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+    const idx = Math.round(degrees / 45) % 8;
+    return `${dirs[idx]} (${Math.round(degrees)}°)`;
   }
 
   /**

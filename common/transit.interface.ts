@@ -16,10 +16,15 @@ export interface IVehicle {
   lon: number; // Longitude
   routeId: string;
   heading: number;
+  speed?: number; // Speed in m/s from GTFS-RT (may be absent)
   source: 'live' | 'static'; // "live" from PRT API, "static" from local cache
   lastUpdate: string; // ISO Timestamp
   isDetoured: boolean;
   delay?: number;
+  tripId?: string; // GTFS trip_id (from GTFS-RT)
+  currentStatus?: 'INCOMING_AT' | 'STOPPED_AT' | 'IN_TRANSIT_TO'; // Vehicle stop status
+  currentStopSequence?: number; // Stop sequence number
+  currentStopId?: string; // Stop ID the status refers to
 }
 
 export interface IStop {

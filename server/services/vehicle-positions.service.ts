@@ -121,12 +121,24 @@ class VehiclePositionsService {
         if (!vp?.position) continue; // skip entities without a position
 
         const routeId = vp.trip?.routeId ?? '';
+
+        // Map GTFS-RT VehicleStopStatus enum to string
+        let currentStatus: IVehicle['currentStatus'];
+        if (vp.currentStatus === transit_realtime.VehiclePosition.VehicleStopStatus.INCOMING_AT) {
+          currentStatus = 'INCOMING_AT';
+        } else if (vp.currentStatus === transit_realtime.VehiclePosition.VehicleStopStatus.STOPPED_AT) {
+          currentStatus = 'STOPPED_AT';
+        } else if (vp.currentStatus === transit_realtime.VehiclePosition.VehicleStopStatus.IN_TRANSIT_TO) {
+          currentStatus = 'IN_TRANSIT_TO';
+        }
+
         const vehicle: IVehicle = {
           vid: vp.vehicle?.id ?? entity.id,
           lat: vp.position.latitude,
           lon: vp.position.longitude,
           routeId,
           heading: vp.position.bearing ?? 0,
+          speed: vp.position.speed != null ? vp.position.speed : undefined,
           source: 'live',
           lastUpdate: vp.timestamp
             ? new Date(
@@ -135,7 +147,11 @@ class VehiclePositionsService {
                   : vp.timestamp.toNumber()) * 1000
               ).toISOString()
             : new Date().toISOString(),
-          isDetoured: false
+          isDetoured: false,
+          tripId: vp.trip?.tripId || undefined,
+          currentStatus,
+          currentStopSequence: vp.currentStopSequence ?? undefined,
+          currentStopId: vp.stopId || undefined
         };
 
         all.push(vehicle);
