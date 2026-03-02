@@ -17,6 +17,7 @@ export default class BusController extends Controller {
   }
 
   public initializeRoutes(): void {
+    this.router.get('/health', this.getHealth.bind(this));
     this.router.get('/bulk', this.getBulkData.bind(this));
     this.router.get('/routes', this.getRoutes.bind(this));
     this.router.post('/routes/available', this.filterRoutesByDateTime.bind(this));
@@ -25,6 +26,34 @@ export default class BusController extends Controller {
     this.router.get('/stops/:routeId', this.getStops.bind(this));
     this.router.get('/stops/:stopId/predictions', this.getPredictions.bind(this));
     this.router.get('/detours/:routeId', this.getDetours.bind(this));
+  }
+
+  // GET /transit/health — service health status for the frontend
+  private getHealth(_req: Request, res: Response): void {
+    const vehiclesHealthy = vehiclePositionsService.isHealthy();
+    const tripsHealthy = tripUpdatesService.isHealthy();
+    const colorsAvailable = TransitModel.colorsAvailable;
+
+    const status = {
+      vehiclePositions: {
+        healthy: vehiclesHealthy,
+        lastFetched: vehiclePositionsService.getLastFetched()?.toISOString() ?? null,
+        consecutiveFailures: vehiclePositionsService.getConsecutiveFailures(),
+        error: vehiclePositionsService.getLastError()
+      },
+      tripUpdates: {
+        healthy: tripsHealthy,
+        lastFetched: tripUpdatesService.getLastFetched()?.toISOString() ?? null,
+        consecutiveFailures: tripUpdatesService.getConsecutiveFailures(),
+        error: tripUpdatesService.getLastError()
+      },
+      trueTimeColors: {
+        available: colorsAvailable
+      },
+      overall: vehiclesHealthy && tripsHealthy
+    };
+
+    res.status(200).json(status);
   }
 
   // GET /transit/bulk — all routes, patterns, and stops in one response

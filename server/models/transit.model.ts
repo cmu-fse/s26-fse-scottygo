@@ -20,6 +20,12 @@ import {
 /** How long a cache entry is considered fresh (24 hours in ms). */
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
+/** Retry interval for TrueTime color fetch when it fails (5 minutes). */
+const COLOR_RETRY_INTERVAL_MS = 5 * 60 * 1000;
+
+/** Maximum number of color retry attempts before giving up until next daily refresh. */
+const COLOR_MAX_RETRIES = 12; // 12 × 5 min = 1 hour of retrying
+
 // ── Helpers ────────────────────────────────────────────────────────────
 
 /** Build a Date that is `ttl` ms from now. */
@@ -53,6 +59,20 @@ async function writeCache(
 // ── Public API ─────────────────────────────────────────────────────────
 
 export class TransitModel {
+  /** Whether TrueTime colors have been successfully fetched. */
+  private static hasColors = false;
+
+  /** Handle for the color-retry timer (cleared once colors are obtained). */
+  private static colorRetryTimer: ReturnType<typeof setInterval> | null = null;
+
+  /** Number of consecutive color-retry failures. */
+  private static colorRetryCount = 0;
+
+  /** Whether route colors were fetched from TrueTime. */
+  static get colorsAvailable(): boolean {
+    return TransitModel.hasColors;
+  }
+
   // -------------------------------------------------------------------
   // Routes  (GTFS + TrueTime colors, cached in MongoDB)
   // -------------------------------------------------------------------
@@ -262,7 +282,7 @@ export class TransitModel {
   /**
    * Build the route list from GTFS, then call TrueTime getRoutes **once**
    * to merge real colors.  If TrueTime is unavailable the GTFS default
-   * color (#1e90ff) is used instead.
+   * color (#1e90ff) is used instead, and a retry timer is started.
    */
   private static async buildColoredRoutes(): Promise<IRoute[]> {
     if (!gtfsService.isLoaded()) return [];
@@ -275,8 +295,11 @@ export class TransitModel {
       const ttRoutes = await trueTimeService.getRoutes();
       colorMap = new Map(ttRoutes.map((r) => [r.id, r.color]));
       console.log(`[TransitModel] Fetched colors for ${colorMap.size} routes from TrueTime`);
+      TransitModel.hasColors = true;
+      TransitModel.stopColorRetry(); // cancel any pending retries
     } catch (err) {
       console.warn('[TransitModel] TrueTime unavailable — using GTFS default colors');
+      TransitModel.startColorRetry(); // schedule retry if not already running
     }
 
     // Merge: use TrueTime color if available, otherwise keep GTFS color
@@ -284,5 +307,58 @@ export class TransitModel {
       ...r,
       color: colorMap.get(r.id) ?? r.color
     }));
+  }
+
+  /**
+   * Start a periodic retry to fetch TrueTime colors if not already running.
+   * Retries every 5 minutes, up to COLOR_MAX_RETRIES times.
+   */
+  private static startColorRetry(): void {
+    if (TransitModel.colorRetryTimer) return; // already running
+
+    TransitModel.colorRetryCount = 0;
+    console.log(`[TransitModel] Scheduling TrueTime color retry every ${COLOR_RETRY_INTERVAL_MS / 1000}s`);
+
+    TransitModel.colorRetryTimer = setInterval(async () => {
+      TransitModel.colorRetryCount++;
+      console.log(`[TransitModel] Color retry attempt ${TransitModel.colorRetryCount}/${COLOR_MAX_RETRIES}`);
+
+      try {
+        const ttRoutes = await trueTimeService.getRoutes();
+        const colorMap = new Map(ttRoutes.map((r) => [r.id, r.color]));
+        console.log(`[TransitModel] Color retry succeeded — ${colorMap.size} route colors`);
+        TransitModel.hasColors = true;
+
+        // Rebuild routes with colors and update cache
+        if (gtfsService.isLoaded()) {
+          const gtfsRoutes = gtfsService.getRoutes();
+          const coloredRoutes = gtfsRoutes.map((r) => ({
+            ...r,
+            color: colorMap.get(r.id) ?? r.color
+          }));
+          if (coloredRoutes.length > 0) {
+            await writeCache('routes', 'routes', coloredRoutes);
+            console.log('[TransitModel] Updated route cache with TrueTime colors');
+          }
+        }
+
+        TransitModel.stopColorRetry();
+      } catch (err) {
+        console.warn(`[TransitModel] Color retry ${TransitModel.colorRetryCount} failed:`, err instanceof Error ? err.message : err);
+        if (TransitModel.colorRetryCount >= COLOR_MAX_RETRIES) {
+          console.warn('[TransitModel] Max color retries reached — giving up until next daily refresh');
+          TransitModel.stopColorRetry();
+        }
+      }
+    }, COLOR_RETRY_INTERVAL_MS);
+  }
+
+  /** Stop the color-retry timer. */
+  private static stopColorRetry(): void {
+    if (TransitModel.colorRetryTimer) {
+      clearInterval(TransitModel.colorRetryTimer);
+      TransitModel.colorRetryTimer = null;
+      TransitModel.colorRetryCount = 0;
+    }
   }
 }

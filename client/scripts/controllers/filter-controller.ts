@@ -36,6 +36,10 @@ export class FilterController {
   private stopCache = new Map<string, IStop[]>();
   /** Whether bulk data has been loaded */
   private bulkLoaded = false;
+  /** Interval handle for health polling */
+  private healthPollInterval: number | null = null;
+  /** Tracks whether colors were available on the last health check (for detecting recovery). */
+  private colorsWereAvailable = false;
 
   private constructor() {
     this.stateManager = MapStateManager.getInstance();
@@ -80,6 +84,9 @@ export class FilterController {
 
       // Render initial routes based on default filters (Rule R2: PRT ON, CMU OFF)
       await this.renderFilteredRoutes();
+
+      // Start polling service health status every 60 seconds
+      this.startHealthPolling();
 
       console.log(
         'Filter controller initialized with',
@@ -928,10 +935,153 @@ export class FilterController {
    * Reset all filters to default
    */
   async resetFilters(): Promise<void> {
+    this.stopHealthPolling();
     this.vehicleTracker.stopPolling();
     this.routeRenderer.clearAllRoutes();
     this.stateManager.resetFilters();
     await this.initialize();
     this.urlSync.updateURL(this.stateManager.getState());
+  }
+
+  // -------------------------------------------------------------------
+  // Service Health Monitoring
+  // -------------------------------------------------------------------
+
+  /** Poll /transit/health every 60 seconds and update the banner. */
+  private startHealthPolling(): void {
+    if (this.healthPollInterval) return;
+
+    // Initial check
+    this.checkServiceHealth();
+
+    // Poll every 60 seconds
+    this.healthPollInterval = window.setInterval(() => {
+      this.checkServiceHealth();
+    }, 60_000);
+  }
+
+  /** Stop the health polling interval. */
+  private stopHealthPolling(): void {
+    if (this.healthPollInterval) {
+      clearInterval(this.healthPollInterval);
+      this.healthPollInterval = null;
+    }
+  }
+
+  /** Fetch health status and show/hide the service-status banner. */
+  private async checkServiceHealth(): Promise<void> {
+    try {
+      const response: AxiosResponse = await axios.get('/transit/health', {
+        headers: { Authorization: `Bearer ${this.token}` },
+        validateStatus: () => true
+      });
+
+      if (response.status !== 200) return;
+
+      const health = response.data as {
+        vehiclePositions: { healthy: boolean; consecutiveFailures: number; error: string | null };
+        tripUpdates: { healthy: boolean; consecutiveFailures: number; error: string | null };
+        trueTimeColors: { available: boolean };
+        overall: boolean;
+      };
+
+      // If colors just became available, re-fetch routes to get real colors
+      if (health.trueTimeColors.available && !this.colorsWereAvailable) {
+        console.log('[FilterController] TrueTime colors now available — refreshing routes');
+        this.refreshRouteColors();
+      }
+      this.colorsWereAvailable = health.trueTimeColors.available;
+
+      // Determine if we need to show a banner
+      const allHealthy = health.overall && health.trueTimeColors.available;
+
+      if (allHealthy) {
+        this.hideServiceBanner();
+      } else {
+        const issues: string[] = [];
+        if (!health.vehiclePositions.healthy) {
+          issues.push('Real-time vehicle tracking is unavailable');
+        }
+        if (!health.tripUpdates.healthy) {
+          issues.push('Arrival predictions are unavailable');
+        }
+        if (!health.trueTimeColors.available) {
+          issues.push('Route colors are temporarily using defaults');
+        }
+        this.showServiceBanner(issues);
+      }
+    } catch {
+      // Don't show banner for network errors on the health check itself
+    }
+  }
+
+  /**
+   * Re-fetch routes from the server to pick up TrueTime colors after
+   * a successful color retry.  Updates the local cache and re-renders
+   * any currently-displayed route polylines with the correct color.
+   */
+  private async refreshRouteColors(): Promise<void> {
+    try {
+      const response: AxiosResponse = await axios.get('/transit/routes', {
+        headers: { Authorization: `Bearer ${this.token}` },
+        validateStatus: () => true
+      });
+
+      if (response.status !== 200 || response.data.name !== 'RoutesRetrieved') return;
+
+      const freshRoutes: IRoute[] = response.data.payload || [];
+
+      // Update the local route cache and color cache
+      const state = this.stateManager.getState();
+      for (const route of freshRoutes) {
+        this.routeColorCache.set(route.id, route.color);
+      }
+      this.stateManager.setAvailableRoutes(freshRoutes);
+
+      // Re-render polylines for any currently-selected route
+      if (state.selectedRouteId) {
+        const route = freshRoutes.find((r) => r.id === state.selectedRouteId);
+        const patterns = this.patternCache.get(state.selectedRouteId);
+        if (route && patterns) {
+          this.routeRenderer.renderRouteGeometry(route.id, patterns, route.color);
+        }
+      }
+
+      console.log('[FilterController] Route colors refreshed from server');
+    } catch (err) {
+      console.warn('[FilterController] Failed to refresh route colors:', err);
+    }
+  }
+
+  /** Show the service-degraded banner with a list of issues. */
+  private showServiceBanner(issues: string[]): void {
+    const banner = document.getElementById('service-status-banner');
+    if (!banner) return;
+
+    banner.innerHTML = `
+      <div class="service-status-banner__content">
+        <span class="material-icons-outlined service-status-banner__icon">cloud_off</span>
+        <div class="service-status-banner__text">
+          <strong>Some services are currently unavailable</strong>
+          <ul>${issues.map((i) => `<li>${i}</li>`).join('')}</ul>
+        </div>
+        <button class="service-status-banner__close" aria-label="Dismiss">&times;</button>
+      </div>
+    `;
+    banner.hidden = false;
+
+    const closeBtn = banner.querySelector('.service-status-banner__close');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => this.hideServiceBanner());
+    }
+  }
+
+  /** Hide the service-status banner. */
+  private hideServiceBanner(): void {
+    const banner = document.getElementById('service-status-banner');
+    if (banner) {
+      banner.hidden = true;
+      banner.innerHTML = '';
+    }
   }
 }

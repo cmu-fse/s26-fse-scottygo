@@ -36,6 +36,12 @@ class VehiclePositionsService {
   /** Timestamp of the last successful fetch. */
   private lastFetched: Date | null = null;
 
+  /** Number of consecutive fetch failures (resets on success). */
+  private consecutiveFailures = 0;
+
+  /** Last error message, if the most recent fetch failed. */
+  private lastError: string | null = null;
+
   // ── Public API ───────────────────────────────────────────────────────
 
   /**
@@ -55,6 +61,21 @@ class VehiclePositionsService {
   /** When the feed was last successfully fetched. */
   getLastFetched(): Date | null {
     return this.lastFetched;
+  }
+
+  /** True when the last fetch succeeded (or we haven't fetched yet). */
+  isHealthy(): boolean {
+    return this.consecutiveFailures === 0;
+  }
+
+  /** Number of consecutive failed fetches. */
+  getConsecutiveFailures(): number {
+    return this.consecutiveFailures;
+  }
+
+  /** Last error message (null if last fetch succeeded). */
+  getLastError(): string | null {
+    return this.lastError;
   }
 
   /**
@@ -102,8 +123,10 @@ class VehiclePositionsService {
       });
 
       if (!response.ok) {
+        this.consecutiveFailures++;
+        this.lastError = `HTTP ${response.status}`;
         console.error(
-          `[VehiclePositions] Feed returned HTTP ${response.status}`
+          `[VehiclePositions] Feed returned HTTP ${response.status} (failures: ${this.consecutiveFailures})`
         );
         return;
       }
@@ -170,12 +193,16 @@ class VehiclePositionsService {
       this.vehiclesByRoute = byRoute;
       this.allVehicles = all;
       this.lastFetched = new Date();
+      this.consecutiveFailures = 0;
+      this.lastError = null;
 
       console.log(
         `[VehiclePositions] Updated: ${all.length} vehicles across ${byRoute.size} routes`
       );
     } catch (err) {
-      console.error('[VehiclePositions] Fetch failed:', err);
+      this.consecutiveFailures++;
+      this.lastError = err instanceof Error ? err.message : String(err);
+      console.error(`[VehiclePositions] Fetch failed (failures: ${this.consecutiveFailures}):`, err);
     }
   }
 }

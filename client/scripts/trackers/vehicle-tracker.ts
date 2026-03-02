@@ -320,28 +320,15 @@ export class VehicleTracker {
       this.addDetailRow(details, 'Speed', `${mph} mph`);
     }
 
-    // Heading
-    if (vehicle.heading != null) {
-      this.addDetailRow(details, 'Heading', `${this.formatHeading(vehicle.heading)}`);
-    }
-
     // Next stop
     if (vehicle.currentStopId) {
       this.addDetailRow(details, 'Next Stop', `#${vehicle.currentStopId}`);
-    }
-
-    // Trip ID
-    if (vehicle.tripId) {
-      this.addDetailRow(details, 'Trip', vehicle.tripId);
     }
 
     // Last update
     const lastUpdate = new Date(vehicle.lastUpdate);
     const secsAgo = Math.round((Date.now() - lastUpdate.getTime()) / 1000);
     this.addDetailRow(details, 'Updated', secsAgo < 60 ? `${secsAgo}s ago` : `${Math.round(secsAgo / 60)}m ago`);
-
-    // Coordinates
-    this.addDetailRow(details, 'Position', `${vehicle.lat.toFixed(5)}, ${vehicle.lon.toFixed(5)}`);
 
     popup.appendChild(details);
 

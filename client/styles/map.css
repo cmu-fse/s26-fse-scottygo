@@ -1493,6 +1493,115 @@ body.dark .detour-banner__close:hover {
 }
 
 /* ============================================
+   SERVICE STATUS BANNER
+   ============================================ */
+
+.service-status-banner {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 600;
+  width: min(440px, calc(100% - 24px));
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  border-radius: 12px;
+  padding: 0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  font-size: 13px;
+  color: #991b1b;
+  animation: serviceBannerSlideDown 0.3s ease-out;
+}
+
+@keyframes serviceBannerSlideDown {
+  from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.service-status-banner__content {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+}
+
+.service-status-banner__icon {
+  font-size: 20px;
+  color: #dc2626;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.service-status-banner__text {
+  flex: 1;
+}
+
+.service-status-banner__text strong {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.service-status-banner__text ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.service-status-banner__text li {
+  font-size: 12px;
+  color: #b91c1c;
+  padding: 1px 0;
+}
+
+.service-status-banner__text li::before {
+  content: '• ';
+  color: #dc2626;
+}
+
+.service-status-banner__close {
+  background: none;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  color: #b91c1c;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+
+.service-status-banner__close:hover {
+  color: #7f1d1d;
+}
+
+/* Dark mode */
+body.dark .service-status-banner {
+  background: rgba(127, 29, 29, 0.4);
+  border-color: #991b1b;
+  color: #fca5a5;
+}
+
+body.dark .service-status-banner__icon {
+  color: #f87171;
+}
+
+body.dark .service-status-banner__text li {
+  color: #fca5a5;
+}
+
+body.dark .service-status-banner__text li::before {
+  color: #f87171;
+}
+
+body.dark .service-status-banner__close {
+  color: #fca5a5;
+}
+
+body.dark .service-status-banner__close:hover {
+  color: #fee2e2;
+}
+
+/* ============================================
    STOP INFO POPUP
    ============================================ */
 .stop-popup {
