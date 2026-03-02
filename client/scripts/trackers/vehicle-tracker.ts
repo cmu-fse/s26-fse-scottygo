@@ -8,6 +8,7 @@ import axios from 'axios';
 import type { IMapProvider, IMapMarker } from '../../../common/map.interface';
 import type { IVehicle } from '../../../common/transit.interface';
 import { MapStateManager } from '../state/map-state';
+import { MAP_POPUP_ID, closeMapPopup } from '../utils/map-popup';
 
 export class VehicleTracker {
   private static instance: VehicleTracker;
@@ -186,7 +187,7 @@ export class VehicleTracker {
     this.vehicleMarkers.forEach(marker => marker.remove());
     this.vehicleMarkers.clear();
     this.vehicleData.clear();
-    this.closeVehiclePopup();
+    closeMapPopup();
     console.log('Cleared all vehicle markers');
   }
 
@@ -280,32 +281,32 @@ export class VehicleTracker {
     const vehicle = this.vehicleData.get(vid);
     if (!vehicle) return;
 
-    // Remove any existing bus popup
-    this.closeVehiclePopup();
+    // Remove any existing map popup (stop or bus)
+    closeMapPopup();
 
     const popup = document.createElement('div');
-    popup.id = 'bus-popup';
-    popup.className = 'bus-popup';
+    popup.id = MAP_POPUP_ID;
+    popup.className = 'map-popup';
 
     // Header
     const header = document.createElement('div');
-    header.className = 'bus-popup__header';
+    header.className = 'map-popup__header';
     header.innerHTML = `
-      <span class="material-icons-outlined bus-popup__icon">directions_bus</span>
-      <strong class="bus-popup__title">Bus ${vehicle.vid}</strong>
-      <button class="bus-popup__close" aria-label="Close">&times;</button>
+      <span class="material-icons-outlined map-popup__icon map-popup__icon--bus">directions_bus</span>
+      <strong class="map-popup__title">Bus ${vehicle.vid}</strong>
+      <button class="map-popup__close" aria-label="Close">&times;</button>
     `;
     popup.appendChild(header);
 
     // Subheader — route
     const subheader = document.createElement('div');
-    subheader.className = 'bus-popup__subheader';
+    subheader.className = 'map-popup__subheader';
     subheader.textContent = `Route ${vehicle.routeId}`;
     popup.appendChild(subheader);
 
     // Detail rows
     const details = document.createElement('div');
-    details.className = 'bus-popup__details';
+    details.className = 'map-popup__details';
 
     // Status
     if (vehicle.currentStatus) {
@@ -334,7 +335,7 @@ export class VehicleTracker {
 
     // Source badge
     const badge = document.createElement('div');
-    badge.className = `bus-popup__source bus-popup__source--${vehicle.source}`;
+    badge.className = `map-popup__source map-popup__source--${vehicle.source}`;
     badge.textContent = vehicle.source === 'live' ? 'LIVE' : 'SCHEDULED';
     popup.appendChild(badge);
 
@@ -345,18 +346,10 @@ export class VehicleTracker {
     }
 
     // Close button
-    const closeBtn = popup.querySelector('.bus-popup__close');
+    const closeBtn = popup.querySelector('.map-popup__close');
     if (closeBtn) {
-      closeBtn.addEventListener('click', () => this.closeVehiclePopup());
+      closeBtn.addEventListener('click', () => closeMapPopup());
     }
-  }
-
-  /**
-   * Close the bus info popup.
-   */
-  private closeVehiclePopup(): void {
-    const existing = document.getElementById('bus-popup');
-    if (existing) existing.remove();
   }
 
   /**
@@ -364,14 +357,14 @@ export class VehicleTracker {
    */
   private addDetailRow(container: HTMLElement, label: string, value: string): void {
     const row = document.createElement('div');
-    row.className = 'bus-popup__row';
+    row.className = 'map-popup__row';
 
     const lbl = document.createElement('span');
-    lbl.className = 'bus-popup__label';
+    lbl.className = 'map-popup__label';
     lbl.textContent = label;
 
     const val = document.createElement('span');
-    val.className = 'bus-popup__value';
+    val.className = 'map-popup__value';
     val.textContent = value;
 
     row.appendChild(lbl);

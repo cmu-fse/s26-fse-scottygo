@@ -8,6 +8,7 @@ import axios, { AxiosResponse } from 'axios';
 import type { IRoute, IStop, IPattern, IBulkTransitData, IDetour, IPrediction } from '../../../common/transit.interface';
 import { MapStateManager } from '../state/map-state';
 import { RouteRenderer, type RouteData } from '../renderers/route-renderer';
+import { MAP_POPUP_ID, closeMapPopup } from '../utils/map-popup';
 import { VehicleTracker } from '../trackers/vehicle-tracker';
 import { URLSyncManager } from '../state/url-sync';
 import type { IRouteOption } from '../components/route-selector';
@@ -848,55 +849,55 @@ export class FilterController {
    * Render the stop-info popup on the map overlay.
    */
   private showStopPopup(stop: IStop, predictions: IPrediction[]): void {
-    // Remove any existing popup first
-    this.closeStopPopup();
+    // Remove any existing map popup (stop or bus) first
+    closeMapPopup();
 
     const popup = document.createElement('div');
-    popup.id = 'stop-popup';
-    popup.className = 'stop-popup';
+    popup.id = MAP_POPUP_ID;
+    popup.className = 'map-popup';
 
     // Header
     const header = document.createElement('div');
-    header.className = 'stop-popup__header';
+    header.className = 'map-popup__header';
     header.innerHTML = `
-      <span class="material-icons-outlined stop-popup__icon">place</span>
-      <strong class="stop-popup__name">${stop.stopName}</strong>
-      <button class="stop-popup__close" aria-label="Close">&times;</button>
+      <span class="material-icons-outlined map-popup__icon map-popup__icon--stop">place</span>
+      <strong class="map-popup__title">${stop.stopName}</strong>
+      <button class="map-popup__close" aria-label="Close">&times;</button>
     `;
     popup.appendChild(header);
 
     const subheader = document.createElement('div');
-    subheader.className = 'stop-popup__subheader';
+    subheader.className = 'map-popup__subheader';
     subheader.textContent = `Stop #${stop.stopId}`;
     popup.appendChild(subheader);
 
     // Predictions list
     if (predictions.length === 0) {
       const empty = document.createElement('p');
-      empty.className = 'stop-popup__empty';
+      empty.className = 'map-popup__empty';
       empty.textContent = 'No upcoming arrivals';
       popup.appendChild(empty);
     } else {
       const list = document.createElement('ul');
-      list.className = 'stop-popup__list';
+      list.className = 'map-popup__list';
       // Show up to 8 next arrivals
       for (const p of predictions.slice(0, 8)) {
         const li = document.createElement('li');
-        li.className = 'stop-popup__arrival';
+        li.className = 'map-popup__arrival';
 
         const routeBadge = document.createElement('span');
-        routeBadge.className = 'stop-popup__route-badge';
+        routeBadge.className = 'map-popup__route-badge';
         const color = this.routeColorCache.get(p.routeId) || '#c41230';
         routeBadge.style.backgroundColor = color;
         routeBadge.textContent = p.routeId;
 
         const mins = document.createElement('span');
-        mins.className = 'stop-popup__minutes';
+        mins.className = 'map-popup__minutes';
         mins.textContent =
           p.minutes <= 0 ? 'NOW' : `${p.minutes} min`;
 
         const meta = document.createElement('span');
-        meta.className = 'stop-popup__meta';
+        meta.className = 'map-popup__meta';
         const parts: string[] = [];
         if (p.vid) parts.push(`Bus ${p.vid}`);
         if (p.isDelayed) parts.push('Delayed');
@@ -917,18 +918,10 @@ export class FilterController {
     }
 
     // Close button handler
-    const closeBtn = popup.querySelector('.stop-popup__close');
+    const closeBtn = popup.querySelector('.map-popup__close');
     if (closeBtn) {
-      closeBtn.addEventListener('click', () => this.closeStopPopup());
+      closeBtn.addEventListener('click', () => closeMapPopup());
     }
-  }
-
-  /**
-   * Close the stop-info popup.
-   */
-  private closeStopPopup(): void {
-    const existing = document.getElementById('stop-popup');
-    if (existing) existing.remove();
   }
 
   /**
