@@ -64,7 +64,7 @@ interface TrueTimePrediction {
 
 interface TrueTimeDetour {
   id: string;
-  nm: string;
+  desc: string;
   startdt: string;
   enddt?: string;
 }
@@ -306,7 +306,7 @@ class TrueTimeService implements ITrueTimeService {
 
     return data.dtrs.map((d) => ({
       id: d.id,
-      description: d.nm,
+      description: d.desc,
       startdt: toISOString(d.startdt),
       enddt: d.enddt ? toISOString(d.enddt) : ''
     }));
