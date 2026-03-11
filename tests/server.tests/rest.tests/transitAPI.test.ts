@@ -17,14 +17,14 @@
  */
 
 import { Server as HttpServer } from 'http';
-import App from '../../server/app';
-import { MongoDB } from '../../server/db/mongo.db';
-import AuthController from '../../server/controllers/auth.controller';
-import HomeController from '../../server/controllers/home.controller';
-import MapController from '../../server/controllers/map.controller';
-import BusController from '../../server/controllers/transit.controller';
-import DAC from '../../server/db/dac';
-import * as responses from '../../common/server.responses';
+import App from '../../../server/app';
+import { MongoDB } from '../../../server/db/mongo.db';
+import AuthController from '../../../server/controllers/auth.controller';
+import HomeController from '../../../server/controllers/home.controller';
+import MapController from '../../../server/controllers/map.controller';
+import BusController from '../../../server/controllers/transit.controller';
+import DAC from '../../../server/db/dac';
+import * as responses from '../../../common/server.responses';
 import {
   IRoute,
   IVehicle,
@@ -32,8 +32,8 @@ import {
   IPrediction,
   IDetour,
   IPattern
-} from '../../common/transit.interface';
-import { IConfig } from '../../common/map.interface';
+} from '../../../common/transit.interface';
+import { IConfig } from '../../../common/map.interface';
 
 // ---------------------------------------------------------------------------
 // Setup — real server, real services, no mocks
@@ -124,7 +124,7 @@ beforeAll(async () => {
   // Wait for GTFS to finish loading (it downloads a real zip file)
   console.log('[E2E] Waiting for GTFS feed to load (up to 120s)...');
   const deadline = Date.now() + 120_000;
-  const gtfs = (await import('../../server/services/gtfs.service')).default;
+  const gtfs = (await import('../../../server/services/gtfs.service')).default;
   while (!gtfs.isLoaded() && Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, 2000));
   }

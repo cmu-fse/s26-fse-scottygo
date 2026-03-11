@@ -8,14 +8,14 @@
  */
 
 import { Server as HttpServer } from 'http';
-import App from '../../server/app';
-import { MongoDB } from '../../server/db/mongo.db';
-import AuthController from '../../server/controllers/auth.controller';
-import HomeController from '../../server/controllers/home.controller';
-import MapController from '../../server/controllers/map.controller';
-import BusController from '../../server/controllers/transit.controller';
-import DAC from '../../server/db/dac';
-import * as responses from '../../common/server.responses';
+import App from '../../../server/app';
+import { MongoDB } from '../../../server/db/mongo.db';
+import AuthController from '../../../server/controllers/auth.controller';
+import HomeController from '../../../server/controllers/home.controller';
+import MapController from '../../../server/controllers/map.controller';
+import BusController from '../../../server/controllers/transit.controller';
+import DAC from '../../../server/db/dac';
+import * as responses from '../../../common/server.responses';
 import {
   IRoute,
   IVehicle,
@@ -23,8 +23,8 @@ import {
   IPrediction,
   IDetour,
   IPattern
-} from '../../common/transit.interface';
-import { IConfig } from '../../common/map.interface';
+} from '../../../common/transit.interface';
+import { IConfig } from '../../../common/map.interface';
 
 // ---------------------------------------------------------------------------
 // Mocks — isolate from real PRT TrueTime & GTFS feeds
@@ -151,8 +151,8 @@ jest.mock('../../server/services/gtfs.service', () => ({
   }
 }));
 
-import trueTimeService from '../../server/services/truetime.service';
-import gtfsService from '../../server/services/gtfs.service';
+import trueTimeService from '../../../server/services/truetime.service';
+import gtfsService from '../../../server/services/gtfs.service';
 
 const mockTrueTime = trueTimeService as jest.Mocked<typeof trueTimeService>;
 const mockGtfs = gtfsService as jest.Mocked<typeof gtfsService>;
