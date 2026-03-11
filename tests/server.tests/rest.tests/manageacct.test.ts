@@ -5,14 +5,14 @@
 
 import { Server as HttpServer } from 'http';
 import { io as ioClient, Socket as ClientSocket } from 'socket.io-client';
-import App from '../../server/app';
-import { MongoDB } from '../../server/db/mongo.db';
-import AccountController from '../../server/controllers/account.controller';
-import AuthController from '../../server/controllers/auth.controller';
-import HomeController from '../../server/controllers/home.controller';
-import DAC from '../../server/db/dac';
-import { IUserAccount, IPrivilegeLevel } from '../../common/user.interface';
-import * as responses from '../../common/server.responses';
+import App from '../../../server/app';
+import { MongoDB } from '../../../server/db/mongo.db';
+import AccountController from '../../../server/controllers/account.controller';
+import AuthController from '../../../server/controllers/auth.controller';
+import HomeController from '../../../server/controllers/home.controller';
+import DAC from '../../../server/db/dac';
+import { IUserAccount, IPrivilegeLevel } from '../../../common/user.interface';
+import * as responses from '../../../common/server.responses';
 
 // Store reference to original email service before mocking
 const originalEmailService = jest.requireActual(
@@ -29,7 +29,7 @@ jest.mock('../../server/services/email.service', () => ({
 }));
 
 // Import the mocked email service for verification
-import emailService from '../../server/services/email.service';
+import emailService from '../../../server/services/email.service';
 const mockEmailService = emailService as jest.Mocked<typeof emailService>;
 
 // Test configuration
@@ -39,7 +39,7 @@ const TEST_DB_URL =
   process.env.DB_URL ?? 'mongodb://localhost:27017/scottygo_test';
 
 // Test user data - use EMAIL_USER from env for the one real email test (sends to sender)
-import { EMAIL_USER } from '../../server/env';
+import { EMAIL_USER } from '../../../server/env';
 
 const adminUser = {
   credentials: { username: 'testadmin', password: 'Admin123!' },
