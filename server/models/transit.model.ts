@@ -108,7 +108,9 @@ export class TransitModel {
       return cached;
     }
 
-    console.log(`[TransitModel] Patterns cache miss for ${routeId} — reading from GTFS`);
+    console.log(
+      `[TransitModel] Patterns cache miss for ${routeId} — reading from GTFS`
+    );
     if (!gtfsService.isLoaded()) return [];
     const patterns = gtfsService.getPatterns(routeId);
     if (patterns.length > 0) {
@@ -126,11 +128,15 @@ export class TransitModel {
     const CACHE_KEY = `stops:${routeId}:${direction}`;
     const cached = await readCache<IStop[]>(CACHE_KEY);
     if (cached) {
-      console.log(`[TransitModel] Stops for ${routeId}/${direction} served from cache`);
+      console.log(
+        `[TransitModel] Stops for ${routeId}/${direction} served from cache`
+      );
       return cached;
     }
 
-    console.log(`[TransitModel] Stops cache miss for ${routeId}/${direction} — reading from GTFS`);
+    console.log(
+      `[TransitModel] Stops cache miss for ${routeId}/${direction} — reading from GTFS`
+    );
     if (!gtfsService.isLoaded()) return [];
     const stops = gtfsService.getStopsByDirection(routeId, direction);
     if (stops.length > 0) {
@@ -143,22 +149,51 @@ export class TransitModel {
   // Detours  (TrueTime only, cached)
   // -------------------------------------------------------------------
 
-  /** Return detours for route(s) from cache; on miss, fetch from TrueTime and cache. */
+  /** Filter a detour list by route IDs using detour.routeIds metadata. */
+  private static filterDetoursByRouteIds(
+    detours: IDetour[],
+    routeIds?: string[]
+  ): IDetour[] {
+    if (!routeIds || routeIds.length === 0) return detours;
+    // Note that ".filter(Boolean)" filters for truthy values, removing falsy values
+    const wanted = new Set(routeIds.map((r) => r.trim()).filter(Boolean));
+    if (wanted.size === 0) return detours;
+
+    return detours.filter((d) => {
+      const impacted = d.routeIds ?? [];
+      return impacted.some((rt) => wanted.has(rt));
+    });
+  }
+
+  /**
+   * Return detours for route(s) using the all-routes cache as the source of truth.
+   *
+   * This avoids a cache-key mismatch where route-specific requests (e.g., detours:61C)
+   * would miss even though detours:all was already cached.
+   */
   static async getDetours(routeIds?: string[]): Promise<IDetour[]> {
-    const CACHE_KEY = routeIds
-      ? `detours:${routeIds.sort().join(',')}`
-      : 'detours:all';
+    const CACHE_KEY = 'detours:all';
 
     const cached = await readCache<IDetour[]>(CACHE_KEY);
     if (cached) {
       console.log(`[TransitModel] Detours (${CACHE_KEY}) served from cache`);
-      return cached;
+      return TransitModel.filterDetoursByRouteIds(cached, routeIds);
     }
 
-    console.log(`[TransitModel] Detours cache miss (${CACHE_KEY}) — fetching from TrueTime`);
-    const detours = await trueTimeService.getDetours(routeIds);
-    await writeCache(CACHE_KEY, 'detours', detours);
-    return detours;
+    console.log(
+      `[TransitModel] Detours cache miss (${CACHE_KEY}) — fetching from TrueTime`
+    );
+    // Cache ALL route detours at once to limit TrueTime API calls
+    try {
+      const detours = await trueTimeService.getDetours();
+      await writeCache(CACHE_KEY, 'detours', detours);
+      console.log(`[TransitModel] Cached ${detours.length} detours`);
+
+      return TransitModel.filterDetoursByRouteIds(detours, routeIds);
+    } catch (err) {
+      console.warn('[TransitModel] Failed to cache detours:', err);
+      return [];
+    }
   }
 
   // -------------------------------------------------------------------
@@ -218,7 +253,9 @@ export class TransitModel {
     console.log('[TransitModel] ── Starting full cache refresh ──');
 
     if (!gtfsService.isLoaded()) {
-      console.warn('[TransitModel] GTFS not loaded yet — skipping cache refresh');
+      console.warn(
+        '[TransitModel] GTFS not loaded yet — skipping cache refresh'
+      );
       return;
     }
 
@@ -272,7 +309,9 @@ export class TransitModel {
   /** Clear all transit cache entries, or only entries of a specific type. */
   static async clearCache(dataType?: ITransitCache['dataType']): Promise<void> {
     await DAC.db.clearTransitCache(dataType);
-    console.log(`[TransitModel] Cache cleared${dataType ? ` (type: ${dataType})` : ''}`);
+    console.log(
+      `[TransitModel] Cache cleared${dataType ? ` (type: ${dataType})` : ''}`
+    );
   }
 
   // -------------------------------------------------------------------
@@ -294,11 +333,15 @@ export class TransitModel {
     try {
       const ttRoutes = await trueTimeService.getRoutes();
       colorMap = new Map(ttRoutes.map((r) => [r.id, r.color]));
-      console.log(`[TransitModel] Fetched colors for ${colorMap.size} routes from TrueTime`);
+      console.log(
+        `[TransitModel] Fetched colors for ${colorMap.size} routes from TrueTime`
+      );
       TransitModel.hasColors = true;
       TransitModel.stopColorRetry(); // cancel any pending retries
     } catch (err) {
-      console.warn('[TransitModel] TrueTime unavailable — using GTFS default colors');
+      console.warn(
+        '[TransitModel] TrueTime unavailable — using GTFS default colors'
+      );
       TransitModel.startColorRetry(); // schedule retry if not already running
     }
 
@@ -317,16 +360,22 @@ export class TransitModel {
     if (TransitModel.colorRetryTimer) return; // already running
 
     TransitModel.colorRetryCount = 0;
-    console.log(`[TransitModel] Scheduling TrueTime color retry every ${COLOR_RETRY_INTERVAL_MS / 1000}s`);
+    console.log(
+      `[TransitModel] Scheduling TrueTime color retry every ${COLOR_RETRY_INTERVAL_MS / 1000}s`
+    );
 
     TransitModel.colorRetryTimer = setInterval(async () => {
       TransitModel.colorRetryCount++;
-      console.log(`[TransitModel] Color retry attempt ${TransitModel.colorRetryCount}/${COLOR_MAX_RETRIES}`);
+      console.log(
+        `[TransitModel] Color retry attempt ${TransitModel.colorRetryCount}/${COLOR_MAX_RETRIES}`
+      );
 
       try {
         const ttRoutes = await trueTimeService.getRoutes();
         const colorMap = new Map(ttRoutes.map((r) => [r.id, r.color]));
-        console.log(`[TransitModel] Color retry succeeded — ${colorMap.size} route colors`);
+        console.log(
+          `[TransitModel] Color retry succeeded — ${colorMap.size} route colors`
+        );
         TransitModel.hasColors = true;
 
         // Rebuild routes with colors and update cache
@@ -338,15 +387,22 @@ export class TransitModel {
           }));
           if (coloredRoutes.length > 0) {
             await writeCache('routes', 'routes', coloredRoutes);
-            console.log('[TransitModel] Updated route cache with TrueTime colors');
+            console.log(
+              '[TransitModel] Updated route cache with TrueTime colors'
+            );
           }
         }
 
         TransitModel.stopColorRetry();
       } catch (err) {
-        console.warn(`[TransitModel] Color retry ${TransitModel.colorRetryCount} failed:`, err instanceof Error ? err.message : err);
+        console.warn(
+          `[TransitModel] Color retry ${TransitModel.colorRetryCount} failed:`,
+          err instanceof Error ? err.message : err
+        );
         if (TransitModel.colorRetryCount >= COLOR_MAX_RETRIES) {
-          console.warn('[TransitModel] Max color retries reached — giving up until next daily refresh');
+          console.warn(
+            '[TransitModel] Max color retries reached — giving up until next daily refresh'
+          );
           TransitModel.stopColorRetry();
         }
       }

@@ -51,6 +51,8 @@ export interface IDetour {
   description: string;
   startdt: string; // Start date and time (ISO string)
   enddt: string; // End date and time (ISO string)
+  /** Route IDs impacted by this detour, e.g. ["61C", "71A"] */
+  routeIds?: string[];
 }
 
 export interface IPattern {
