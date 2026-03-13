@@ -13,7 +13,7 @@
     "clean:all": "rm -rf ./.parcel-cache ./.dist",
     "build": "parcel build",
     "clean:build": "npm-run-all clean:all build",
-    "start": "node --max-old-space-size=450 ./.dist/server/serve",
+    "start": "node --max-old-space-size=400 ./.dist/server/serve",
     "watch": "nodemon --watch client --watch server --watch .env -e js,ts,html,pug,css,json --exec npm-run-all build start",
     "lint": "eslint ./",
     "pug": "ts-node ./tools/pug-compile",

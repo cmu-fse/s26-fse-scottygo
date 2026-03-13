@@ -214,7 +214,7 @@ class GTFSService {
 
     // --- Extract stop_times as raw Buffer, then release the zip ---
     // Using Buffer (not string) avoids the V8 string conversion overhead.
-    const stopTimesBuffer = readEntryBuffer('stop_times.txt');
+    let stopTimesBuffer: Buffer | null = readEntryBuffer('stop_times.txt');
     zip = null; // free ~30 MB
     zipBuffer = null;
 
@@ -279,7 +279,8 @@ class GTFSService {
       });
       parser.on('end', resolve);
       parser.on('error', reject);
-      parser.write(stopTimesBuffer);
+      parser.write(stopTimesBuffer!);
+      stopTimesBuffer = null; // free buffer memory during async streaming
       parser.end();
     });
 
@@ -302,6 +303,8 @@ class GTFSService {
       }
       this.routeDirectionStops.set(dirKey, stops);
     }
+
+    this.tripDirection = new Map(); // no longer needed after load — free memory
 
     this.loaded = true;
     console.log(
