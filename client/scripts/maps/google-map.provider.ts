@@ -27,6 +27,7 @@ export class GoogleMapProvider implements IMapProvider {
     this.map = new google.maps.Map(container, {
       center: { lat: config.lat, lng: config.lon },
       zoom: config.defaultZoom,
+      gestureHandling: 'greedy', // Allow single-finger drag on mobile
       zoomControl: false, // Disable default zoom controls (we have custom ones)
       mapTypeControl: false, // Disable map type selector
       streetViewControl: false, // Disable street view pegman
