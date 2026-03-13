@@ -56,12 +56,23 @@ export class GoogleMapProvider implements IMapProvider {
 
   addMarker(options: IMapMarkerOptions): IMapMarker {
     const id = `marker-${this.markerIdCounter++}`;
+
+    let iconOption: google.maps.Icon | string | undefined = options.icon;
+    if (options.icon && options.iconAnchor && options.iconSize) {
+      iconOption = {
+        url: options.icon,
+        scaledSize: new google.maps.Size(options.iconSize.width, options.iconSize.height),
+        anchor: new google.maps.Point(options.iconAnchor.x, options.iconAnchor.y)
+      };
+    }
+
     const marker = new google.maps.Marker({
       position: options.position,
       map: this.map,
       title: options.title,
       draggable: options.draggable,
-      icon: options.icon
+      icon: iconOption,
+      zIndex: options.zIndex
     });
     this.markers.set(id, marker);
 
@@ -69,6 +80,17 @@ export class GoogleMapProvider implements IMapProvider {
       id,
       setPosition: (pos: ILatLng) => marker.setPosition(pos),
       setVisible: (visible: boolean) => marker.setVisible(visible),
+      setIcon: (icon: string | IIconData) => {
+        if (typeof icon === 'string') {
+          marker.setIcon(icon);
+        } else {
+          marker.setIcon({
+            url: icon.url,
+            scaledSize: new google.maps.Size(icon.size.width, icon.size.height),
+            anchor: new google.maps.Point(icon.anchor.x, icon.anchor.y)
+          });
+        }
+      },
       remove: () => {
         marker.setMap(null);
         this.markers.delete(id);
@@ -117,6 +139,12 @@ export class GoogleMapProvider implements IMapProvider {
       if (e.latLng) {
         callback({ lat: e.latLng.lat(), lng: e.latLng.lng() });
       }
+    });
+  }
+
+  onZoomChanged(callback: (zoom: number) => void): void {
+    this.map.addListener('zoom_changed', () => {
+      callback(this.map.getZoom()!);
     });
   }
 

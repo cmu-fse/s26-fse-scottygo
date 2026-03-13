@@ -28,6 +28,9 @@ export interface IMapMarkerOptions {
   position: ILatLng;
   title?: string;
   icon?: string;
+  iconAnchor?: { x: number; y: number };
+  iconSize?: { width: number; height: number };
+  zIndex?: number;
   draggable?: boolean;
 }
 
@@ -42,6 +45,7 @@ export interface IMapMarker {
   id: string;
   setPosition(position: ILatLng): void;
   setVisible(visible: boolean): void;
+  setIcon(icon: string | { url: string; anchor: { x: number; y: number }; size: { width: number; height: number } }): void;
   remove(): void;
 }
 
@@ -63,5 +67,6 @@ export interface IMapProvider {
   clearPolylines(): void;
   clearAll(): void;
   onMapClick(callback: (position: ILatLng) => void): void;
+  onZoomChanged(callback: (zoom: number) => void): void;
   fitBounds(bounds: { north: number; south: number; east: number; west: number }): void;
 }

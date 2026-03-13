@@ -17,7 +17,9 @@ export class VehicleTracker {
   private pollingInterval: number | null = null;
   private currentRouteId: string | null = null;
   private vehicleMarkers = new Map<string, IMapMarker>(); // vehicleId → marker
+  private vehicleData = new Map<string, IVehicle>(); // vehicleId → vehicle data for icon rebuilds
   private hasShownStaticToast = false;
+  private currentZoom = 14;
 
   private constructor() {
     this.stateManager = MapStateManager.getInstance();
@@ -35,6 +37,13 @@ export class VehicleTracker {
    */
   initialize(mapProvider: IMapProvider): void {
     this.mapProvider = mapProvider;
+    this.currentZoom = mapProvider.getZoom();
+
+    // Listen for zoom changes and resize bus icons accordingly
+    mapProvider.onZoomChanged((zoom: number) => {
+      this.currentZoom = zoom;
+      this.updateAllIcons();
+    });
   }
 
   /**
@@ -131,16 +140,23 @@ export class VehicleTracker {
     vehicles.forEach(vehicle => {
       currentVehicleIds.add(vehicle.vid);
 
+      this.vehicleData.set(vehicle.vid, vehicle);
+
       if (this.vehicleMarkers.has(vehicle.vid)) {
-        // Update existing marker position
+        // Update existing marker position and icon (heading may have changed)
         const marker = this.vehicleMarkers.get(vehicle.vid)!;
         marker.setPosition({ lat: vehicle.lat, lng: vehicle.lon });
+        marker.setIcon(this.createBusIcon(vehicle));
       } else {
-        // Create new marker
+        // Create new marker with anchor for proper centering on route
+        const iconData = this.createBusIcon(vehicle);
         const marker = this.mapProvider!.addMarker({
           position: { lat: vehicle.lat, lng: vehicle.lon },
           title: `Bus ${vehicle.vid}${vehicle.isDetoured ? ' (Detoured)' : ''}`,
-          icon: this.createBusIcon(vehicle)
+          icon: iconData.url,
+          iconAnchor: iconData.anchor,
+          iconSize: iconData.size,
+          zIndex: 1000
         });
 
         this.vehicleMarkers.set(vehicle.vid, marker);
@@ -173,23 +189,84 @@ export class VehicleTracker {
   clearVehicles(): void {
     this.vehicleMarkers.forEach(marker => marker.remove());
     this.vehicleMarkers.clear();
+    this.vehicleData.clear();
     console.log('Cleared all vehicle markers');
   }
 
   /**
-   * Create bus icon based on vehicle state
+   * Get current vehicle positions (for zoom-to-bus)
    */
-  private createBusIcon(vehicle: IVehicle): string {
-    const color = vehicle.isDetoured ? '#FFA500' : '#4285F4'; // Orange if detoured, blue otherwise
-    const size = 16;
-    
+  getVehiclePositions(): Array<{ lat: number; lng: number }> {
+    const positions: Array<{ lat: number; lng: number }> = [];
+    this.vehicleData.forEach(vehicle => {
+      positions.push({ lat: vehicle.lat, lng: vehicle.lon });
+    });
+    return positions;
+  }
+
+  /**
+   * Update all existing bus marker icons (called on zoom change)
+   */
+  private updateAllIcons(): void {
+    this.vehicleMarkers.forEach((marker, vid) => {
+      const vehicle = this.vehicleData.get(vid);
+      if (vehicle) {
+        marker.setIcon(this.createBusIcon(vehicle));
+      }
+    });
+  }
+
+  /**
+   * Create bus icon with heading rotation and directional triangle.
+   * Returns icon data with proper anchor so bus center sits on the route.
+   */
+  private createBusIcon(vehicle: IVehicle): { url: string; anchor: { x: number; y: number }; size: { width: number; height: number } } {
+    const color = vehicle.isDetoured ? '#FFA500' : '#FFB84D';
+    const scale = Math.max(0.5, Math.min(2.5, (this.currentZoom - 10) * 0.3 + 1));
+    const heading = vehicle.heading || 0;
+
+    // ViewBox dimensions — bus centered with triangle attached below
+    const vbW = 40;
+    const vbH = 32;
+    const cx = vbW / 2;  // center x
+    const cy = 12;       // bus vertical center (where route coordinate should anchor)
+
     const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-        <circle cx="${size / 2}" cy="${size / 2}" r="${size / 2 - 1}" fill="${color}" stroke="white" stroke-width="2"/>
-        <path d="M${size / 2},${size / 4} L${size / 2},${size * 3 / 4}" stroke="white" stroke-width="2" stroke-linecap="round"/>
+      <svg xmlns="http://www.w3.org/2000/svg" width="${Math.round(vbW * scale)}" height="${Math.round(vbH * scale)}" viewBox="0 0 ${vbW} ${vbH}">
+        <g transform="rotate(${heading - 90}, ${cx}, ${cy})">
+          <!-- Bus body -->
+          <rect x="${cx - 13}" y="${cy - 6}" width="26" height="12" rx="2" fill="${color}" stroke="#333" stroke-width="1"/>
+          <!-- Windshield -->
+          <rect x="${cx - 11}" y="${cy - 4}" width="6" height="6" rx="1" fill="#B3D9FF" stroke="#333" stroke-width="0.5"/>
+          <!-- Windows -->
+          <rect x="${cx - 4}" y="${cy - 4}" width="4" height="6" rx="0.5" fill="#B3D9FF" stroke="#333" stroke-width="0.5"/>
+          <rect x="${cx + 1}" y="${cy - 4}" width="4" height="6" rx="0.5" fill="#B3D9FF" stroke="#333" stroke-width="0.5"/>
+          <rect x="${cx + 6}" y="${cy - 4}" width="4" height="6" rx="0.5" fill="#B3D9FF" stroke="#333" stroke-width="0.5"/>
+          <!-- Black stripe -->
+          <rect x="${cx - 11}" y="${cy + 3}" width="22" height="1.5" fill="#333"/>
+          <!-- Wheels -->
+          <circle cx="${cx - 7}" cy="${cy + 6}" r="2.5" fill="#333" stroke="#666" stroke-width="0.5"/>
+          <circle cx="${cx - 7}" cy="${cy + 6}" r="1.2" fill="#E85D4E"/>
+          <circle cx="${cx + 7}" cy="${cy + 6}" r="2.5" fill="#333" stroke="#666" stroke-width="0.5"/>
+          <circle cx="${cx + 7}" cy="${cy + 6}" r="1.2" fill="#E85D4E"/>
+          <!-- Headlight -->
+          <circle cx="${cx - 13}" cy="${cy - 1}" r="1" fill="#333"/>
+          <!-- Side mirror -->
+          <rect x="${cx - 15}" y="${cy - 3}" width="2" height="1.5" rx="0.5" fill="#333"/>
+          <!-- Blue directional triangle (front of bus) -->
+          <polygon points="${cx + 15},${cy} ${cx + 11},${cy - 4} ${cx + 11},${cy + 4}" fill="#4285F4" stroke="#3367D6" stroke-width="0.5"/>
+        </g>
       </svg>
     `;
-    return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg.trim());
+
+    const pixelW = Math.round(vbW * scale);
+    const pixelH = Math.round(vbH * scale);
+
+    return {
+      url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg.trim()),
+      anchor: { x: Math.round(cx * scale), y: Math.round(cy * scale) },
+      size: { width: pixelW, height: pixelH }
+    };
   }
 
   /**

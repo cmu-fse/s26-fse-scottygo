@@ -268,6 +268,9 @@ export class FilterController {
       // Start vehicle polling for this route
       this.vehicleTracker.startPolling(routeId);
 
+      // Zoom to fit the route on screen
+      this.zoomToRouteOrVehicle(routeId, geometry);
+
       const state = this.stateManager.getState();
       this.urlSync.updateURL(state);
     } catch (error) {
@@ -630,5 +633,15 @@ export class FilterController {
     this.stateManager.resetFilters();
     await this.initialize();
     this.urlSync.updateURL(this.stateManager.getState());
+  }
+
+  /**
+   * Zoom to fit the route bounding box so the entire route is visible
+   */
+  private zoomToRouteOrVehicle(routeId: string, geometry: RouteData | null): void {
+    if (geometry) {
+      this.routeRenderer.fitToRouteData(geometry);
+      console.log(`Zoomed to fit route ${routeId}`);
+    }
   }
 }
