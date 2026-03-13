@@ -23,6 +23,22 @@ const GTFSRT_TRIPS_URL =
 /** How often we re-fetch the feed (milliseconds). */
 const POLL_INTERVAL_MS = 30_000; // 30 seconds
 
+/** Return a formatted log prefix with ISO timestamp. */
+function tag(): string {
+  return `[TripUpdates ${new Date().toISOString()}]`;
+}
+
+/** Log current process memory usage in MB. */
+function logMemoryUsage(): void {
+  const mem = process.memoryUsage();
+  console.log(
+    `${tag()} Memory — rss: ${(mem.rss / 1048576).toFixed(1)}MB, ` +
+      `heapUsed: ${(mem.heapUsed / 1048576).toFixed(1)}MB, ` +
+      `heapTotal: ${(mem.heapTotal / 1048576).toFixed(1)}MB, ` +
+      `external: ${(mem.external / 1048576).toFixed(1)}MB`
+  );
+}
+
 class TripUpdatesService {
   /**
    * In-memory store: stopId → IPrediction[]
@@ -79,12 +95,12 @@ class TripUpdatesService {
    */
   start(): void {
     if (this.intervalId) {
-      console.warn('[TripUpdates] Polling already running');
+      console.warn(`${tag()} Polling already running`);
       return;
     }
 
     console.log(
-      `[TripUpdates] Starting polling (every ${POLL_INTERVAL_MS / 1000}s)`
+      `${tag()} Starting polling (every ${POLL_INTERVAL_MS / 1000}s)`
     );
 
     // Immediate first fetch
@@ -100,7 +116,7 @@ class TripUpdatesService {
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
-      console.log('[TripUpdates] Polling stopped');
+      console.log(`${tag()} Polling stopped`);
     }
   }
 
@@ -121,7 +137,7 @@ class TripUpdatesService {
         this.consecutiveFailures++;
         this.lastError = `HTTP ${response.status}`;
         console.error(
-          `[TripUpdates] Feed returned HTTP ${response.status} (failures: ${this.consecutiveFailures})`
+          `${tag()} Feed returned HTTP ${response.status} (failures: ${this.consecutiveFailures})`
         );
         return;
       }
@@ -198,12 +214,13 @@ class TripUpdatesService {
       this.lastError = null;
 
       console.log(
-        `[TripUpdates] Updated: ${totalPredictions} predictions across ${byStop.size} stops`
+        `${tag()} Updated: ${totalPredictions} predictions across ${byStop.size} stops`
       );
+      logMemoryUsage();
     } catch (err) {
       this.consecutiveFailures++;
       this.lastError = err instanceof Error ? err.message : String(err);
-      console.error(`[TripUpdates] Fetch failed (failures: ${this.consecutiveFailures}):`, err);
+      console.error(`${tag()} Fetch failed (failures: ${this.consecutiveFailures}):`, err);
     }
   }
 }

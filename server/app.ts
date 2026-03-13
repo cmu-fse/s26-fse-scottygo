@@ -65,7 +65,7 @@ class App {
 
     // Load GTFS static schedule data (needed before cache refresh)
     const gtfsReady = gtfsService.load().catch((err) => {
-      console.error('[GTFS] Failed to load feed:', err);
+      console.error(`[GTFS ${new Date().toISOString()}] Failed to load feed:`, err);
     });
 
     DAC.db.connect().then(async () => {
@@ -81,11 +81,23 @@ class App {
       await gtfsReady;
 
       // Populate the transit cache from GTFS data + one TrueTime call for colors.
-      TransitModel.refreshAllCaches().catch((err) =>
-        console.error('[TransitModel] Initial cache refresh failed:', err)
-      );
+      // Await completion so GTFS parsing temporaries can be GC'd before
+      // GTFS-RT polling adds more allocations — prevents startup peak OOM.
+      try {
+        await TransitModel.refreshAllCaches();
+      } catch (err) {
+        console.error(`[TransitModel ${new Date().toISOString()}] Initial cache refresh failed:`, err);
+      }
+
+      // Force GC to reclaim GTFS parsing temporaries (~250 MB) before
+      // GTFS-RT polling allocates more — keeps peak RSS under 512 MB.
+      if (global.gc) {
+        global.gc();
+        console.log(`[Server ${new Date().toISOString()}] Forced GC after cache refresh`);
+      }
 
       // Start polling GTFS-RT feeds every 30 s (in-memory)
+      // Delayed until after cache refresh so V8 can GC startup temporaries first.
       vehiclePositionsService.start();
       tripUpdatesService.start();
 
@@ -93,7 +105,7 @@ class App {
       const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
       setInterval(() => {
         TransitModel.refreshAllCaches().catch((err) =>
-          console.error('[TransitModel] Scheduled cache refresh failed:', err)
+          console.error(`[TransitModel ${new Date().toISOString()}] Scheduled cache refresh failed:`, err)
         );
       }, TWENTY_FOUR_HOURS);
     });
@@ -143,7 +155,7 @@ class App {
     // If the original request was not HTTPS, throw a hard error
     if (protocol !== 'https') {
       console.error(
-        `[Security]: Blocked non-HTTPS request to ${req.method} ${req.path} from ${req.ip}`
+        `[Security ${new Date().toISOString()}] Blocked non-HTTPS request to ${req.method} ${req.path} from ${req.ip}`
       );
 
       return res.status(403).json({
@@ -188,8 +200,7 @@ class App {
     return new Promise<HttpServer>((resolve, reject) => {
       this.io.on('connection', (socket: Socket) => {
         console.log(
-          '⚡️[Server]: A client connected to the socket server with id' +
-            socket.id
+          `⚡️[Server ${new Date().toISOString()}] A client connected to the socket server with id ${socket.id}`
         );
 
         // Get user from socket (attached during authentication)
@@ -212,7 +223,7 @@ class App {
         socket.on('subscribeAccount', async (username: string) => {
           if (!socketUser) {
             console.log(
-              `[Socket]: Unauthorized subscribeAccount attempt for ${username}`
+              `[Socket ${new Date().toISOString()}] Unauthorized subscribeAccount attempt for ${username}`
             );
             return;
           }
@@ -229,7 +240,7 @@ class App {
 
             if (!isAdmin && !isOwnAccount) {
               console.log(
-                `[Socket]: User ${socketUser.username} unauthorized to subscribe to ${username}`
+                `[Socket ${new Date().toISOString()}] User ${socketUser.username} unauthorized to subscribe to ${username}`
               );
               return;
             }
@@ -237,10 +248,10 @@ class App {
             const roomName = `account:${username.toLowerCase()}`;
             socket.join(roomName);
             console.log(
-              `[Socket]: User ${socketUser.username} subscribed to ${roomName}`
+              `[Socket ${new Date().toISOString()}] User ${socketUser.username} subscribed to ${roomName}`
             );
           } catch (error) {
-            console.error(`[Socket]: Error in subscribeAccount: ${error}`);
+            console.error(`[Socket ${new Date().toISOString()}] Error in subscribeAccount: ${error}`);
           }
         });
 
@@ -249,7 +260,7 @@ class App {
           const roomName = `account:${username.toLowerCase()}`;
           socket.leave(roomName);
           console.log(
-            `[Socket]: Client ${socket.id} unsubscribed from ${roomName}`
+            `[Socket ${new Date().toISOString()}] Client ${socket.id} unsubscribed from ${roomName}`
           );
         });
       });
@@ -257,7 +268,7 @@ class App {
       try {
         this.server.listen(this.port, () => {
           // must listen on http server, not express app, for socket.io to work
-          console.log(`⚡️[Server]: Running at ${this.url} ...`);
+          console.log(`⚡️[Server ${new Date().toISOString()}] Running at ${this.url} ...`);
           resolve(this.server);
         });
       } catch (err) {

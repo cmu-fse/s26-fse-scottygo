@@ -291,7 +291,7 @@ class TripshotService {
       // Process the response to extract route geometry
       return this.processTripshotResponse(data);
     } catch (error) {
-      console.error(`[Tripshot] Failed to fetch patterns for ${routeId}:`, error);
+      console.error(`[Tripshot ${new Date().toISOString()}] Failed to fetch patterns for ${routeId}:`, error);
       
       // Return empty array if API fails (client will show error)
       const appError: IAppError = {
@@ -361,7 +361,7 @@ class TripshotService {
 
     // CMU shuttles run as loops and only have OUTBOUND direction
     if (direction && direction.toUpperCase() === 'INBOUND') {
-      console.log(`[Tripshot] CMU routes only support OUTBOUND direction, returning empty for INBOUND request`);
+      console.log(`[Tripshot ${new Date().toISOString()}] CMU routes only support OUTBOUND direction, returning empty for INBOUND request`);
       return [];
     }
 
@@ -405,7 +405,7 @@ class TripshotService {
 
       return stops;
     } catch (error) {
-      console.error(`[Tripshot] Failed to fetch stops for ${routeId}:`, error);
+      console.error(`[Tripshot ${new Date().toISOString()}] Failed to fetch stops for ${routeId}:`, error);
       
       const appError: IAppError = {
         type: 'ServerError',
@@ -423,7 +423,7 @@ class TripshotService {
    */
   async getVehicles(routeId: string): Promise<IVehicle[]> {
     // TODO: Implement when Tripshot vehicle tracking API is available
-    console.warn(`[Tripshot] Real-time vehicle tracking not yet implemented for ${routeId}`);
+    console.warn(`[Tripshot ${new Date().toISOString()}] Real-time vehicle tracking not yet implemented for ${routeId}`);
     return [];
   }
 

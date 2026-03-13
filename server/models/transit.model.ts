@@ -82,12 +82,12 @@ export class TransitModel {
     const CACHE_KEY = 'routes';
     const cached = await readCache<IRoute[]>(CACHE_KEY);
     if (cached) {
-      console.log('[TransitModel] Routes served from cache');
+      console.log(`[TransitModel ${new Date().toISOString()}] Routes served from cache`);
       return cached;
     }
 
     // Cache miss — build routes from GTFS & color them
-    console.log('[TransitModel] Routes cache miss — building from GTFS');
+    console.log(`[TransitModel ${new Date().toISOString()}] Routes cache miss — building from GTFS`);
     const routes = await TransitModel.buildColoredRoutes();
     if (routes.length > 0) {
       await writeCache(CACHE_KEY, 'routes', routes);
@@ -104,12 +104,12 @@ export class TransitModel {
     const CACHE_KEY = `patterns:${routeId}`;
     const cached = await readCache<IPattern[]>(CACHE_KEY);
     if (cached) {
-      console.log(`[TransitModel] Patterns for ${routeId} served from cache`);
+      console.log(`[TransitModel ${new Date().toISOString()}] Patterns for ${routeId} served from cache`);
       return cached;
     }
 
     console.log(
-      `[TransitModel] Patterns cache miss for ${routeId} — reading from GTFS`
+      `[TransitModel ${new Date().toISOString()}] Patterns cache miss for ${routeId} — reading from GTFS`
     );
     if (!gtfsService.isLoaded()) return [];
     const patterns = gtfsService.getPatterns(routeId);
@@ -129,13 +129,13 @@ export class TransitModel {
     const cached = await readCache<IStop[]>(CACHE_KEY);
     if (cached) {
       console.log(
-        `[TransitModel] Stops for ${routeId}/${direction} served from cache`
+        `[TransitModel ${new Date().toISOString()}] Stops for ${routeId}/${direction} served from cache`
       );
       return cached;
     }
 
     console.log(
-      `[TransitModel] Stops cache miss for ${routeId}/${direction} — reading from GTFS`
+      `[TransitModel ${new Date().toISOString()}] Stops cache miss for ${routeId}/${direction} — reading from GTFS`
     );
     if (!gtfsService.isLoaded()) return [];
     const stops = gtfsService.getStopsByDirection(routeId, direction);
@@ -176,22 +176,22 @@ export class TransitModel {
 
     const cached = await readCache<IDetour[]>(CACHE_KEY);
     if (cached) {
-      console.log(`[TransitModel] Detours (${CACHE_KEY}) served from cache`);
+      console.log(`[TransitModel ${new Date().toISOString()}] Detours (${CACHE_KEY}) served from cache`);
       return TransitModel.filterDetoursByRouteIds(cached, routeIds);
     }
 
     console.log(
-      `[TransitModel] Detours cache miss (${CACHE_KEY}) — fetching from TrueTime`
+      `[TransitModel ${new Date().toISOString()}] Detours cache miss (${CACHE_KEY}) — fetching from TrueTime`
     );
     // Cache ALL route detours at once to limit TrueTime API calls
     try {
       const detours = await trueTimeService.getDetours();
       await writeCache(CACHE_KEY, 'detours', detours);
-      console.log(`[TransitModel] Cached ${detours.length} detours`);
+      console.log(`[TransitModel ${new Date().toISOString()}] Cached ${detours.length} detours`);
 
       return TransitModel.filterDetoursByRouteIds(detours, routeIds);
     } catch (err) {
-      console.warn('[TransitModel] Failed to cache detours:', err);
+      console.warn(`[TransitModel ${new Date().toISOString()}] Failed to cache detours:`, err);
       return [];
     }
   }
@@ -228,7 +228,7 @@ export class TransitModel {
     }
 
     console.log(
-      `[TransitModel] Bulk data: ${routes.length} routes, ` +
+      `[TransitModel ${new Date().toISOString()}] Bulk data: ${routes.length} routes, ` +
         `${Object.keys(patterns).length} pattern sets, ` +
         `${Object.keys(stops).length} stop sets`
     );
@@ -250,11 +250,11 @@ export class TransitModel {
    * After this, every client request is served entirely from MongoDB.
    */
   static async refreshAllCaches(): Promise<void> {
-    console.log('[TransitModel] ── Starting full cache refresh ──');
+    console.log(`[TransitModel ${new Date().toISOString()}] ── Starting full cache refresh ──`);
 
     if (!gtfsService.isLoaded()) {
       console.warn(
-        '[TransitModel] GTFS not loaded yet — skipping cache refresh'
+        `[TransitModel ${new Date().toISOString()}] GTFS not loaded yet — skipping cache refresh`
       );
       return;
     }
@@ -265,7 +265,7 @@ export class TransitModel {
       if (routes.length > 0) {
         await writeCache('routes', 'routes', routes);
       }
-      console.log(`[TransitModel] Cached ${routes.length} routes`);
+      console.log(`[TransitModel ${new Date().toISOString()}] Cached ${routes.length} routes`);
 
       // 2. Cache patterns for every route
       for (const route of routes) {
@@ -274,7 +274,7 @@ export class TransitModel {
           await writeCache(`patterns:${route.id}`, 'patterns', patterns);
         }
       }
-      console.log('[TransitModel] Cached patterns for all routes');
+      console.log(`[TransitModel ${new Date().toISOString()}] Cached patterns for all routes`);
 
       // 3. Cache stops for every route × direction
       for (const route of routes) {
@@ -285,20 +285,20 @@ export class TransitModel {
           }
         }
       }
-      console.log('[TransitModel] Cached stops for all routes');
+      console.log(`[TransitModel ${new Date().toISOString()}] Cached stops for all routes`);
 
       // 4. Cache detours (all routes at once)
       try {
         const detours = await trueTimeService.getDetours();
         await writeCache('detours:all', 'detours', detours);
-        console.log(`[TransitModel] Cached ${detours.length} detours`);
+        console.log(`[TransitModel ${new Date().toISOString()}] Cached ${detours.length} detours`);
       } catch (err) {
-        console.warn('[TransitModel] Failed to cache detours:', err);
+        console.warn(`[TransitModel ${new Date().toISOString()}] Failed to cache detours:`, err);
       }
 
-      console.log('[TransitModel] ── Cache refresh complete ──');
+      console.log(`[TransitModel ${new Date().toISOString()}] ── Cache refresh complete ──`);
     } catch (err) {
-      console.error('[TransitModel] Cache refresh failed:', err);
+      console.error(`[TransitModel ${new Date().toISOString()}] Cache refresh failed:`, err);
     }
   }
 
@@ -310,7 +310,7 @@ export class TransitModel {
   static async clearCache(dataType?: ITransitCache['dataType']): Promise<void> {
     await DAC.db.clearTransitCache(dataType);
     console.log(
-      `[TransitModel] Cache cleared${dataType ? ` (type: ${dataType})` : ''}`
+      `[TransitModel ${new Date().toISOString()}] Cache cleared${dataType ? ` (type: ${dataType})` : ''}`
     );
   }
 
@@ -334,13 +334,13 @@ export class TransitModel {
       const ttRoutes = await trueTimeService.getRoutes();
       colorMap = new Map(ttRoutes.map((r) => [r.id, r.color]));
       console.log(
-        `[TransitModel] Fetched colors for ${colorMap.size} routes from TrueTime`
+        `[TransitModel ${new Date().toISOString()}] Fetched colors for ${colorMap.size} routes from TrueTime`
       );
       TransitModel.hasColors = true;
       TransitModel.stopColorRetry(); // cancel any pending retries
     } catch (err) {
       console.warn(
-        '[TransitModel] TrueTime unavailable — using GTFS default colors'
+        `[TransitModel ${new Date().toISOString()}] TrueTime unavailable — using GTFS default colors`
       );
       TransitModel.startColorRetry(); // schedule retry if not already running
     }
@@ -361,20 +361,20 @@ export class TransitModel {
 
     TransitModel.colorRetryCount = 0;
     console.log(
-      `[TransitModel] Scheduling TrueTime color retry every ${COLOR_RETRY_INTERVAL_MS / 1000}s`
+      `[TransitModel ${new Date().toISOString()}] Scheduling TrueTime color retry every ${COLOR_RETRY_INTERVAL_MS / 1000}s`
     );
 
     TransitModel.colorRetryTimer = setInterval(async () => {
       TransitModel.colorRetryCount++;
       console.log(
-        `[TransitModel] Color retry attempt ${TransitModel.colorRetryCount}/${COLOR_MAX_RETRIES}`
+        `[TransitModel ${new Date().toISOString()}] Color retry attempt ${TransitModel.colorRetryCount}/${COLOR_MAX_RETRIES}`
       );
 
       try {
         const ttRoutes = await trueTimeService.getRoutes();
         const colorMap = new Map(ttRoutes.map((r) => [r.id, r.color]));
         console.log(
-          `[TransitModel] Color retry succeeded — ${colorMap.size} route colors`
+          `[TransitModel ${new Date().toISOString()}] Color retry succeeded — ${colorMap.size} route colors`
         );
         TransitModel.hasColors = true;
 
@@ -388,7 +388,7 @@ export class TransitModel {
           if (coloredRoutes.length > 0) {
             await writeCache('routes', 'routes', coloredRoutes);
             console.log(
-              '[TransitModel] Updated route cache with TrueTime colors'
+              `[TransitModel ${new Date().toISOString()}] Updated route cache with TrueTime colors`
             );
           }
         }
@@ -396,12 +396,12 @@ export class TransitModel {
         TransitModel.stopColorRetry();
       } catch (err) {
         console.warn(
-          `[TransitModel] Color retry ${TransitModel.colorRetryCount} failed:`,
+          `[TransitModel ${new Date().toISOString()}] Color retry ${TransitModel.colorRetryCount} failed:`,
           err instanceof Error ? err.message : err
         );
         if (TransitModel.colorRetryCount >= COLOR_MAX_RETRIES) {
           console.warn(
-            '[TransitModel] Max color retries reached — giving up until next daily refresh'
+            `[TransitModel ${new Date().toISOString()}] Max color retries reached — giving up until next daily refresh`
           );
           TransitModel.stopColorRetry();
         }
