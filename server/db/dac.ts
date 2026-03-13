@@ -9,6 +9,10 @@ import {
   IAccountStatus,
   IPrivilegeLevel
 } from '../../common/user.interface';
+import {
+  ITransitCache,
+  ITransitCacheType
+} from '../../common/transit.interface';
 
 export interface IDatabase {
   connect(): Promise<void>;
@@ -60,6 +64,13 @@ export interface IDatabase {
   getAllUsernames(): Promise<string[]>;
 
   seedDefaultAdmin(): Promise<void>;
+
+  // Transit cache methods
+  getTransitCache(cacheKey: string): Promise<ITransitCache | null>;
+
+  upsertTransitCache(entry: ITransitCache): Promise<void>;
+
+  clearTransitCache(dataType?: ITransitCacheType): Promise<void>;
 }
 
 /* Data Access Class */

@@ -1,8 +1,7 @@
 // controller superclass for behavior common to all controllers
 
-import { Router } from 'express';
+import { Router, Response } from 'express';
 import { Server as SocketServer } from 'socket.io';
-import { Request, Response } from 'express';
 import path from 'path';
 
 abstract class Controller {
@@ -25,8 +24,8 @@ abstract class Controller {
   }
 
   constructor(path: string) {
-    this.initializeRoutes();
     this.path = path;
+    this.initializeRoutes();
   }
 
   // each controller must define this method to set up its endpoints

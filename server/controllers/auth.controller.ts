@@ -269,11 +269,19 @@ export default class AuthController extends Controller {
     // Now try to update user agreed status and return response
     try {
       const agreedUser: IUser = await User.setUserAgreedToTrue(userToUpdate);
+      // Obfuscate password before sending to client
+      const sanitizedUser: IUser = {
+        ...agreedUser,
+        credentials: {
+          username: agreedUser.credentials.username,
+          password: 'obfuscated'
+        }
+      };
       // Return success response
       const successRes: responses.ISuccess = {
         name: 'UserAgreed',
         message: 'User agreed status successfully set to true',
-        payload: agreedUser
+        payload: sanitizedUser
       };
       return res.status(200).json(successRes);
     } catch (error: unknown) {

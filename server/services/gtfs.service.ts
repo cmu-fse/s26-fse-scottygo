@@ -48,8 +48,10 @@ class GTFSService {
   private patternMap = new Map<string, IPattern[]>(); // routeId → patterns
   private stopMap = new Map<string, IStop>(); // stopId → stop details
   private routeStops = new Map<string, IStop[]>(); // routeId → stops (unordered unique)
+  private routeDirectionStops = new Map<string, IStop[]>(); // "routeId:DIRECTION" → ordered stops
 
   // Schedule data
+  private tripDirection = new Map<string, string>(); // tripId → direction (INBOUND|OUTBOUND)
   private calendar = new Map<string, ServiceCalendar>(); // serviceId → calendar
   private calendarExceptions = new Map<
     string,
@@ -164,6 +166,7 @@ class GTFSService {
     >[]) {
       this.tripService.set(t.trip_id, t.service_id);
       this.tripRoute.set(t.trip_id, t.route_id);
+      this.tripDirection.set(t.trip_id, t.direction_id === '0' ? 'OUTBOUND' : 'INBOUND');
 
       const patternKey = `${t.route_id}:${t.shape_id}`;
       if (t.shape_id && !seenPatterns.has(patternKey)) {
@@ -239,6 +242,7 @@ class GTFSService {
     // and using a Buffer (not string) avoids the extra string allocation.
     console.log('[GTFS] Parsing stop_times.txt (streaming to save memory)...');
     const routeStopIds = new Map<string, Set<string>>();
+    const routeDirStopIds = new Map<string, Set<string>>(); // "routeId:DIR" → stop IDs
     await new Promise<void>((resolve, reject) => {
       const parser = createCsvParser({ columns: true, skip_empty_lines: true });
       parser.on('readable', () => {
@@ -261,6 +265,15 @@ class GTFSService {
             if (!routeStopIds.has(routeId))
               routeStopIds.set(routeId, new Set());
             routeStopIds.get(routeId)!.add(st.stop_id);
+
+            // Also track stops per route+direction
+            const dir = this.tripDirection.get(st.trip_id);
+            if (dir) {
+              const dirKey = `${routeId}:${dir}`;
+              if (!routeDirStopIds.has(dirKey))
+                routeDirStopIds.set(dirKey, new Set());
+              routeDirStopIds.get(dirKey)!.add(st.stop_id);
+            }
           }
         }
       });
@@ -278,6 +291,16 @@ class GTFSService {
         if (stop) stops.push(stop);
       }
       this.routeStops.set(routeId, stops);
+    }
+
+    // Resolve direction-specific stop IDs to IStop objects
+    for (const [dirKey, stopIds] of routeDirStopIds) {
+      const stops: IStop[] = [];
+      for (const stopId of stopIds) {
+        const stop = this.stopMap.get(stopId);
+        if (stop) stops.push(stop);
+      }
+      this.routeDirectionStops.set(dirKey, stops);
     }
 
     this.loaded = true;
@@ -302,9 +325,14 @@ class GTFSService {
     return this.patternMap.get(routeId) ?? [];
   }
 
-  /** Return all stops for a route from static GTFS data. Used as A2 fallback when TrueTime is unavailable. */
+  /** Return all stops for a route from static GTFS data. */
   getStops(routeId: string): IStop[] {
     return this.routeStops.get(routeId) ?? [];
+  }
+
+  /** Return stops for a route filtered by direction (INBOUND or OUTBOUND). */
+  getStopsByDirection(routeId: string, direction: string): IStop[] {
+    return this.routeDirectionStops.get(`${routeId}:${direction}`) ?? [];
   }
 
   /**

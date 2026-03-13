@@ -64,7 +64,18 @@ interface TrueTimePrediction {
 
 interface TrueTimeDetour {
   id: string;
-  nm: string;
+  desc: string;
+  rtdirs?: {
+    rtdir?:
+      | {
+          rt?: string;
+          dir?: string;
+        }
+      | Array<{
+      rt?: string;
+      dir?: string;
+    }>;
+  };
   startdt: string;
   enddt?: string;
 }
@@ -304,12 +315,24 @@ class TrueTimeService implements ITrueTimeService {
       return [];
     }
 
-    return data.dtrs.map((d) => ({
-      id: d.id,
-      description: d.nm,
-      startdt: toISOString(d.startdt),
-      enddt: d.enddt ? toISOString(d.enddt) : ''
-    }));
+    return data.dtrs.map((d) => {
+      const rawRtdir = d.rtdirs?.rtdir;
+      const rtdirs = Array.isArray(rawRtdir)
+        ? rawRtdir
+        : rawRtdir
+          ? [rawRtdir]
+          : [];
+
+      return {
+        id: d.id,
+        description: d.desc,
+        routeIds: rtdirs
+          .map((rd) => rd.rt)
+          .filter((rt): rt is string => typeof rt === 'string' && rt.length > 0),
+        startdt: toISOString(d.startdt),
+        enddt: d.enddt ? toISOString(d.enddt) : ''
+      };
+    });
   }
 }
 

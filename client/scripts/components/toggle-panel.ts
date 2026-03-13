@@ -96,16 +96,7 @@ export class TogglePanel extends HTMLElement implements ITogglePanelElement {
   private attachEventListeners(): void {
     if (!this.config) return;
 
-    // Attach listeners to each toggle
-    this.config.options.forEach(option => {
-      const toggle = this.querySelector(`#${option.id}`) as HTMLInputElement;
-      toggle?.addEventListener('change', (e) => {
-        e.stopPropagation();
-        this.state.set(option.id, (e.target as HTMLInputElement).checked);
-      });
-    });
-
-    // Cancel button
+    // Cancel button — restore toggles to their last-confirmed (committed) state
     const cancelBtn = this.querySelector('#toggle-cancel') as HTMLButtonElement;
     cancelBtn?.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -113,10 +104,17 @@ export class TogglePanel extends HTMLElement implements ITogglePanelElement {
       this.resetToggles();
     });
 
-    // OK button
+    // OK button — commit current toggle positions to state, then dispatch event
     const okBtn = this.querySelector('#toggle-ok') as HTMLButtonElement;
     okBtn?.addEventListener('click', (e) => {
       e.stopPropagation();
+      // Commit current toggle positions to state
+      this.config!.options.forEach(option => {
+        const toggle = this.querySelector(`#${option.id}`) as HTMLInputElement;
+        if (toggle) {
+          this.state.set(option.id, toggle.checked);
+        }
+      });
       this.applyFilters();
       this.hide();
     });
