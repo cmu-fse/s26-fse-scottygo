@@ -67,7 +67,7 @@ class GTFSService {
    * Called once at server startup — non-blocking (fire-and-forget).
    */
   async load(): Promise<void> {
-    console.log('[GTFS] Downloading feed from PRT...');
+    console.log(`[GTFS ${new Date().toISOString()}] Downloading feed from PRT...`);
     const res = await fetch(GTFS_URL);
     if (!res.ok) {
       throw new Error(`[GTFS] Failed to download feed: HTTP ${res.status}`);
@@ -97,7 +97,7 @@ class GTFSService {
     // until the end of load().
 
     // --- Build route map ---
-    console.log('[GTFS] Parsing routes.txt...');
+    console.log(`[GTFS ${new Date().toISOString()}] Parsing routes.txt...`);
     for (const r of parse(readEntry('routes.txt'), opts) as Record<
       string,
       string
@@ -114,7 +114,7 @@ class GTFSService {
     }
 
     // --- Build stop map (stopId → IStop) for static stop lookups and A2 fallback ---
-    console.log('[GTFS] Parsing stops.txt...');
+    console.log(`[GTFS ${new Date().toISOString()}] Parsing stops.txt...`);
     for (const s of parse(readEntry('stops.txt'), opts) as Record<
       string,
       string
@@ -130,7 +130,7 @@ class GTFSService {
     }
 
     // --- Build shape points (shapeId → sorted lat/lng array) ---
-    console.log('[GTFS] Parsing shapes.txt...');
+    console.log(`[GTFS ${new Date().toISOString()}] Parsing shapes.txt...`);
     let shapeSeqs: Map<
       string,
       { seq: number; lat: number; lng: number }[]
@@ -158,7 +158,7 @@ class GTFSService {
     shapeSeqs = null; // free ~30-40 MB — no longer needed
 
     // --- Build trip maps and route patterns ---
-    console.log('[GTFS] Parsing trips.txt...');
+    console.log(`[GTFS ${new Date().toISOString()}] Parsing trips.txt...`);
     const seenPatterns = new Set<string>();
     for (const t of parse(readEntry('trips.txt'), opts) as Record<
       string,
@@ -182,7 +182,7 @@ class GTFSService {
     shapePoints = null; // free — paths already stored in patternMap
 
     // --- Build calendar (regular service periods) ---
-    console.log('[GTFS] Parsing calendar.txt...');
+    console.log(`[GTFS ${new Date().toISOString()}] Parsing calendar.txt...`);
     for (const c of parse(readEntry('calendar.txt'), opts) as Record<
       string,
       string
@@ -196,7 +196,7 @@ class GTFSService {
     }
 
     // --- Build calendar exceptions ---
-    console.log('[GTFS] Parsing calendar_dates.txt...');
+    console.log(`[GTFS ${new Date().toISOString()}] Parsing calendar_dates.txt...`);
     for (const d of parse(readEntry('calendar_dates.txt'), opts) as Record<
       string,
       string
@@ -214,7 +214,7 @@ class GTFSService {
 
     // --- Extract stop_times as raw Buffer, then release the zip ---
     // Using Buffer (not string) avoids the V8 string conversion overhead.
-    const stopTimesBuffer = readEntryBuffer('stop_times.txt');
+    let stopTimesBuffer: Buffer | null = readEntryBuffer('stop_times.txt');
     zip = null; // free ~30 MB
     zipBuffer = null;
 
@@ -240,7 +240,7 @@ class GTFSService {
     // --- Build trip time ranges and route→stops by STREAMING stop_times ---
     // Stream-parsing avoids holding the entire parsed output array in memory,
     // and using a Buffer (not string) avoids the extra string allocation.
-    console.log('[GTFS] Parsing stop_times.txt (streaming to save memory)...');
+    console.log(`[GTFS ${new Date().toISOString()}] Parsing stop_times.txt (streaming to save memory)...`);
     const routeStopIds = new Map<string, Set<string>>();
     const routeDirStopIds = new Map<string, Set<string>>(); // "routeId:DIR" → stop IDs
     await new Promise<void>((resolve, reject) => {
@@ -280,6 +280,7 @@ class GTFSService {
       parser.on('end', resolve);
       parser.on('error', reject);
       parser.write(stopTimesBuffer);
+      stopTimesBuffer = null; // free ~20-40 MB during streaming
       parser.end();
     });
 
@@ -305,7 +306,7 @@ class GTFSService {
 
     this.loaded = true;
     console.log(
-      `[GTFS] Ready: ${this.routeMap.size} routes, ${this.tripRoute.size} trips, ${this.stopMap.size} stops`
+      `[GTFS ${new Date().toISOString()}] Ready: ${this.routeMap.size} routes, ${this.tripRoute.size} trips, ${this.stopMap.size} stops`
     );
   }
 

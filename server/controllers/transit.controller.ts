@@ -90,7 +90,7 @@ export default class BusController extends Controller {
           const cmuRoutes = await tripshotService.getRoutes();
           routes.push(...cmuRoutes);
         } else {
-          console.warn('[Tripshot] Service not configured, skipping CMU routes');
+          console.warn(`[Tripshot ${new Date().toISOString()}] Service not configured, skipping CMU routes`);
         }
       }
 
@@ -293,7 +293,7 @@ export default class BusController extends Controller {
 
   private handleError(error: unknown, res: Response): void {
     // Log the actual error for debugging
-    console.error('[Transit Controller] Error:', error);
+    console.error(`[Transit Controller ${new Date().toISOString()}] Error:`, error);
     
     if (
       error &&
@@ -315,7 +315,7 @@ export default class BusController extends Controller {
     
     // Handle generic Error instances
     if (error instanceof Error) {
-      console.error('[Transit Controller] Unexpected Error:', error.message, error.stack);
+      console.error(`[Transit Controller ${new Date().toISOString()}] Unexpected Error:`, error.message, error.stack);
     }
     
     const serverError: responses.IAppError = {

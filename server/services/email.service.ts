@@ -71,7 +71,7 @@ class EmailService implements IEmailService {
   ): Promise<boolean> {
     if (!this.isConfigured()) {
       console.log(
-        `[EmailService]: Email not configured. Skipping inactivation email for ${username}`
+        `[EmailService ${new Date().toISOString()}] Email not configured. Skipping inactivation email for ${username}`
       );
       return false;
     }
@@ -95,12 +95,12 @@ class EmailService implements IEmailService {
         `
       );
       console.log(
-        `[EmailService]: Account inactivation email sent to ${email} for user ${username}`
+        `[EmailService ${new Date().toISOString()}] Account inactivation email sent to ${email} for user ${username}`
       );
       return true;
     } catch (error) {
       console.error(
-        `[EmailService]: Failed to send inactivation email:`,
+        `[EmailService ${new Date().toISOString()}] Failed to send inactivation email:`,
         error
       );
       return false;
@@ -119,7 +119,7 @@ class EmailService implements IEmailService {
   ): Promise<boolean> {
     if (!this.isConfigured()) {
       console.log(
-        `[EmailService]: Email not configured. Skipping reactivation email for ${username}`
+        `[EmailService ${new Date().toISOString()}] Email not configured. Skipping reactivation email for ${username}`
       );
       return false;
     }
@@ -142,12 +142,12 @@ class EmailService implements IEmailService {
         `
       );
       console.log(
-        `[EmailService]: Account reactivation email sent to ${email} for user ${username}`
+        `[EmailService ${new Date().toISOString()}] Account reactivation email sent to ${email} for user ${username}`
       );
       return true;
     } catch (error) {
       console.error(
-        `[EmailService]: Failed to send reactivation email:`,
+        `[EmailService ${new Date().toISOString()}] Failed to send reactivation email:`,
         error
       );
       return false;

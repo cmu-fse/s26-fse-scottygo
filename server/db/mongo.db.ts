@@ -69,11 +69,11 @@ export class MongoDB implements IDatabase {
       this.db = mongoose.connection;
       // Add error event listener for ongoing issues
       this.db.on('error', (err) => {
-        console.error('[MongoDB]: Connection error:', err);
+        console.error(`[MongoDB ${new Date().toISOString()}] Connection error:`, err);
       });
-      console.log('[MongoDB]: Connected successfully');
+      console.log(`[MongoDB ${new Date().toISOString()}] Connected successfully`);
     } catch (err) {
-      console.error('[MongoDB]: Failed to connect:', err);
+      console.error(`[MongoDB ${new Date().toISOString()}] Failed to connect:`, err);
       throw err; // Prevent app from starting if DB connection fails
     }
   }
@@ -82,7 +82,7 @@ export class MongoDB implements IDatabase {
     // Check if MongoDB is actually connected before trying to drop collections
     // readyState: 0=disconnected, 1=connected, 2=connecting, 3=disconnecting
     if (mongoose.connection.readyState !== 1) {
-      console.log('[MongoDB]: Not connected, reconnecting before init...');
+      console.log(`[MongoDB ${new Date().toISOString()}] Not connected, reconnecting before init...`);
       await this.connect();
     }
 
@@ -227,7 +227,7 @@ export class MongoDB implements IDatabase {
     });
 
     if (existingAdmin) {
-      console.log('[MongoDB]: Default Administrator already exists');
+      console.log(`[MongoDB ${new Date().toISOString()}] Default Administrator already exists`);
       return;
     }
 
@@ -248,7 +248,7 @@ export class MongoDB implements IDatabase {
     const newAdmin = new MUser(defaultAdmin);
     await newAdmin.save();
     console.log(
-      '[MongoDB]: Default Administrator user created (username: Admin, password: admin)'
+      `[MongoDB ${new Date().toISOString()}] Default Administrator user created (username: Admin, password: admin)`
     );
   }
 
