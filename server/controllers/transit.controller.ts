@@ -3,7 +3,10 @@
 
 import { Request, Response } from 'express';
 import Controller from './controller';
-import trueTimeService from '../services/truetime.service';
+import tripshotService from '../services/tripshot.service';
+import vehiclePositionsService from '../services/vehicle-positions.service';
+import tripUpdatesService from '../services/trip-updates.service';
+import { TransitModel } from '../models/transit.model';
 import gtfsService from '../services/gtfs.service';
 import tripshotService from '../services/tripshot.service';
 import * as responses from '../../common/server.responses';
@@ -15,6 +18,8 @@ export default class BusController extends Controller {
   }
 
   public initializeRoutes(): void {
+    this.router.get('/health', this.getHealth.bind(this));
+    this.router.get('/bulk', this.getBulkData.bind(this));
     this.router.get('/routes', this.getRoutes.bind(this));
     this.router.post('/routes/available', this.filterRoutesByDateTime.bind(this));
     this.router.get('/routes/:id', this.getPatterns.bind(this));
@@ -24,30 +29,60 @@ export default class BusController extends Controller {
     this.router.get('/detours/:routeId', this.getDetours.bind(this));
   }
 
+  // GET /transit/health — service health status for the frontend
+  private getHealth(_req: Request, res: Response): void {
+    const vehiclesHealthy = vehiclePositionsService.isHealthy();
+    const tripsHealthy = tripUpdatesService.isHealthy();
+    const colorsAvailable = TransitModel.colorsAvailable;
+
+    const status = {
+      vehiclePositions: {
+        healthy: vehiclesHealthy,
+        lastFetched: vehiclePositionsService.getLastFetched()?.toISOString() ?? null,
+        consecutiveFailures: vehiclePositionsService.getConsecutiveFailures(),
+        error: vehiclePositionsService.getLastError()
+      },
+      tripUpdates: {
+        healthy: tripsHealthy,
+        lastFetched: tripUpdatesService.getLastFetched()?.toISOString() ?? null,
+        consecutiveFailures: tripUpdatesService.getConsecutiveFailures(),
+        error: tripUpdatesService.getLastError()
+      },
+      trueTimeColors: {
+        available: colorsAvailable
+      },
+      overall: vehiclesHealthy && tripsHealthy
+    };
+
+    res.status(200).json(status);
+  }
+
+  // GET /transit/bulk — all routes, patterns, and stops in one response
+  private async getBulkData(_req: Request, res: Response): Promise<void> {
+    try {
+      const bulk = await TransitModel.getAllTransitData();
+      const successRes: responses.ISuccess = {
+        name: 'BulkDataRetrieved',
+        message: `All transit data: ${bulk.routes.length} routes`,
+        payload: bulk
+      };
+      res.status(200).json(successRes);
+    } catch (error: unknown) {
+      this.handleError(error, res);
+    }
+  }
+
   // GET /transit/routes?system=PRT|CMU
   private async getRoutes(req: Request, res: Response): Promise<void> {
     const systemParam = req.query.system as string | undefined;
 
     try {
       const routes: IRoute[] = [];
-      let usingFallback = false;
 
       // Fetch PRT routes if no system filter or PRT is requested
       if (!systemParam || systemParam === 'PRT') {
-        try {
-          const prtRoutes = await trueTimeService.getRoutes();
-          routes.push(...prtRoutes);
-        } catch (error: unknown) {
-          // A2: PRT API is down - fall back to GTFS static data
-          console.warn('[TrueTime] API unavailable, using GTFS fallback data');
-          if (gtfsService.isLoaded()) {
-            const gtfsRoutes = gtfsService.getRoutes();
-            routes.push(...gtfsRoutes);
-            usingFallback = true;
-          } else {
-            console.error('[GTFS] Static data not loaded, cannot provide fallback');
-          }
-        }
+        const prtRoutes = await TransitModel.getRoutes();
+        routes.push(...prtRoutes);
       }
 
       // Fetch CMU routes if no system filter or CMU is requested
@@ -56,7 +91,7 @@ export default class BusController extends Controller {
           const cmuRoutes = await tripshotService.getRoutes();
           routes.push(...cmuRoutes);
         } else {
-          console.warn('[Tripshot] Service not configured, skipping CMU routes');
+          console.warn(`[Tripshot ${new Date().toISOString()}] Service not configured, skipping CMU routes`);
         }
       }
 
@@ -123,13 +158,8 @@ export default class BusController extends Controller {
           return;
         }
       } else {
-        // PRT route - use TrueTime with GTFS fallback
-        patterns = await trueTimeService.getPatterns(id).catch(() => null);
-
-        // A2 fallback: if TrueTime failed or returned nothing, use GTFS static geometry
-        if ((!patterns || patterns.length === 0) && gtfsService.isLoaded()) {
-          patterns = gtfsService.getPatterns(id);
-        }
+        // PRT route — served from GTFS cache in MongoDB
+        patterns = await TransitModel.getPatterns(id);
       }
 
       if (!patterns || patterns.length === 0) {
@@ -177,14 +207,8 @@ export default class BusController extends Controller {
           stops = await tripshotService.getStops(routeId, direction).catch(() => null);
         }
       } else {
-        // PRT route - use TrueTime with GTFS fallback
-        stops = await trueTimeService.getStops(routeId, direction).catch(() => null);
-
-        // A2 fallback: if TrueTime failed or returned nothing, use GTFS static stops
-        // Note: GTFS stops are not filtered by direction
-        if ((!stops || stops.length === 0) && gtfsService.isLoaded()) {
-          stops = gtfsService.getStops(routeId);
-        }
+        // PRT route — served from GTFS cache in MongoDB
+        stops = await TransitModel.getStops(routeId, direction);
       }
 
       if (!stops || stops.length === 0) {
@@ -220,8 +244,8 @@ export default class BusController extends Controller {
           vehicles = await tripshotService.getVehicles(routeId);
         }
       } else {
-        // PRT route - use TrueTime
-        vehicles = await trueTimeService.getVehicles(routeId);
+        // PRT route — read from the in-memory GTFS-RT store (updated every 30s)
+        vehicles = vehiclePositionsService.getVehicles(routeId);
       }
 
       const successRes: responses.ISuccess = {
@@ -236,10 +260,10 @@ export default class BusController extends Controller {
   }
 
   // GET /transit/stops/:stopId/predictions
-  private async getPredictions(req: Request, res: Response): Promise<void> {
+  private getPredictions(req: Request, res: Response): void {
     const { stopId } = req.params;
     try {
-      const predictions = await trueTimeService.getPredictions(stopId);
+      const predictions = tripUpdatesService.getPredictions(stopId);
       const successRes: responses.ISuccess = {
         name: 'PredictionsRetrieved',
         message: `Found ${predictions.length} predictions for stop ${stopId}`,
@@ -255,7 +279,7 @@ export default class BusController extends Controller {
   private async getDetours(req: Request, res: Response): Promise<void> {
     const { routeId } = req.params;
     try {
-      const detours = await trueTimeService.getDetours([routeId]);
+      const detours = await TransitModel.getDetours([routeId]);
       const successRes: responses.ISuccess = {
         name: 'DetoursRetrieved',
         message: `Found ${detours.length} detours for route ${routeId}`,
@@ -271,7 +295,7 @@ export default class BusController extends Controller {
 
   private handleError(error: unknown, res: Response): void {
     // Log the actual error for debugging
-    console.error('[Transit Controller] Error:', error);
+    console.error(`[Transit Controller ${new Date().toISOString()}] Error:`, error);
     
     if (
       error &&
@@ -293,7 +317,7 @@ export default class BusController extends Controller {
     
     // Handle generic Error instances
     if (error instanceof Error) {
-      console.error('[Transit Controller] Unexpected Error:', error.message, error.stack);
+      console.error(`[Transit Controller ${new Date().toISOString()}] Unexpected Error:`, error.message, error.stack);
     }
     
     const serverError: responses.IAppError = {

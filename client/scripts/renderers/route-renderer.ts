@@ -159,8 +159,14 @@ export class RouteRenderer {
 
   /**
    * Render stop markers for a route
+   * @param onStopClick  Optional callback invoked with the stop when its marker is clicked
    */
-  renderStopMarkers(routeId: string, stops: IStop[], direction: string): void {
+  renderStopMarkers(
+    routeId: string,
+    stops: IStop[],
+    direction: string,
+    onStopClick?: (stop: IStop) => void
+  ): void {
     if (!this.mapProvider) {
       console.error('Map provider not initialized');
       return;
@@ -180,9 +186,12 @@ export class RouteRenderer {
       const marker = this.mapProvider!.addMarker({
         position: { lat: stop.lat, lng: stop.lon },
         title: `${stop.stopName} (Stop #${index + 1})`,
-        icon: dotIcon,
-        zIndex: 100
+        icon: dotIcon
       });
+
+      if (onStopClick) {
+        marker.onClick(() => onStopClick(stop));
+      }
 
       markers.push(marker);
     });

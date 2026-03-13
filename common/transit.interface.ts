@@ -16,10 +16,15 @@ export interface IVehicle {
   lon: number; // Longitude
   routeId: string;
   heading: number;
+  speed?: number; // Speed in m/s from GTFS-RT (may be absent)
   source: 'live' | 'static'; // "live" from PRT API, "static" from local cache
   lastUpdate: string; // ISO Timestamp
   isDetoured: boolean;
   delay?: number;
+  tripId?: string; // GTFS trip_id (from GTFS-RT)
+  currentStatus?: 'INCOMING_AT' | 'STOPPED_AT' | 'IN_TRANSIT_TO'; // Vehicle stop status
+  currentStopSequence?: number; // Stop sequence number
+  currentStopId?: string; // Stop ID the status refers to
 }
 
 export interface IStop {
@@ -46,9 +51,36 @@ export interface IDetour {
   description: string;
   startdt: string; // Start date and time (ISO string)
   enddt: string; // End date and time (ISO string)
+  /** Route IDs impacted by this detour, e.g. ["61C", "71A"] */
+  routeIds?: string[];
 }
 
 export interface IPattern {
   direction: string; // e.g. "INBOUND" or "OUTBOUND"
   path: { lat: number; lng: number }[]; // Ordered sequence of points forming the route geometry
+}
+
+// ── Bulk Transit Data ──────────────────────────────────────────────────
+// Single-payload response containing all static transit data so the client
+// can do every bit of filtering on the frontend without extra API calls.
+
+export interface IBulkTransitData {
+  routes: IRoute[];
+  /** Patterns keyed by routeId, e.g. { "61C": [{ direction, path }] } */
+  patterns: Record<string, IPattern[]>;
+  /** Stops keyed by "routeId:DIRECTION", e.g. { "61C:INBOUND": [stop, …] } */
+  stops: Record<string, IStop[]>;
+}
+
+// ── Transit Cache ──────────────────────────────────────────────────────
+// Cached TrueTime data stored in MongoDB to respect the daily API limit.
+
+export type ITransitCacheType = 'routes' | 'stops' | 'patterns' | 'detours';
+
+export interface ITransitCache {
+  cacheKey: string; // e.g. "routes", "stops:61C:INBOUND", "patterns:61C", "detours:61C"
+  dataType: ITransitCacheType;
+  data: IRoute[] | IStop[] | IPattern[] | IDetour[];
+  lastUpdated: Date;
+  expiresAt: Date;
 }

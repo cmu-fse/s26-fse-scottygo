@@ -1,13 +1,14 @@
 /**
  * Vehicle Tracker
  * Manages real-time vehicle position updates and rendering
- * Polls backend every 15 seconds for selected route
+ * Polls backend every 30 seconds to match the GTFS-RT feed refresh rate
  */
 
 import axios from 'axios';
 import type { IMapProvider, IMapMarker } from '../../../common/map.interface';
 import type { IVehicle } from '../../../common/transit.interface';
 import { MapStateManager } from '../state/map-state';
+import { MAP_POPUP_ID, closeMapPopup } from '../utils/map-popup';
 
 export class VehicleTracker {
   private static instance: VehicleTracker;
@@ -64,10 +65,10 @@ export class VehicleTracker {
     // Initial fetch
     this.updateVehiclePositions();
 
-    // Poll every 15 seconds (per REST API spec)
+    // Poll every 30 seconds (matches GTFS-RT feed refresh rate)
     this.pollingInterval = window.setInterval(() => {
       this.updateVehiclePositions();
-    }, 15000);
+    }, 30000);
 
     console.log(`Started vehicle polling for route ${routeId}`);
   }
@@ -140,24 +141,25 @@ export class VehicleTracker {
     vehicles.forEach(vehicle => {
       currentVehicleIds.add(vehicle.vid);
 
+      // Always update the stored data so popup shows fresh info
       this.vehicleData.set(vehicle.vid, vehicle);
 
       if (this.vehicleMarkers.has(vehicle.vid)) {
-        // Update existing marker position and icon (heading may have changed)
+        // Smoothly animate existing marker to new position
         const marker = this.vehicleMarkers.get(vehicle.vid)!;
-        marker.setPosition({ lat: vehicle.lat, lng: vehicle.lon });
+        marker.animatePosition({ lat: vehicle.lat, lng: vehicle.lon }, 5000);
+        // Update icon in case heading changed
         marker.setIcon(this.createBusIcon(vehicle));
       } else {
-        // Create new marker with anchor for proper centering on route
-        const iconData = this.createBusIcon(vehicle);
+        // Create new marker
         const marker = this.mapProvider!.addMarker({
           position: { lat: vehicle.lat, lng: vehicle.lon },
           title: `Bus ${vehicle.vid}${vehicle.isDetoured ? ' (Detoured)' : ''}`,
-          icon: iconData.url,
-          iconAnchor: iconData.anchor,
-          iconSize: iconData.size,
-          zIndex: 1000
+          icon: this.createBusIcon(vehicle)
         });
+
+        // Attach click handler for info popup
+        marker.onClick(() => this.showVehiclePopup(vehicle.vid));
 
         this.vehicleMarkers.set(vehicle.vid, marker);
       }
@@ -180,7 +182,10 @@ export class VehicleTracker {
       }
     });
 
-    markersToRemove.forEach(vid => this.vehicleMarkers.delete(vid));
+    markersToRemove.forEach(vid => {
+      this.vehicleMarkers.delete(vid);
+      this.vehicleData.delete(vid);
+    });
   }
 
   /**
@@ -190,6 +195,7 @@ export class VehicleTracker {
     this.vehicleMarkers.forEach(marker => marker.remove());
     this.vehicleMarkers.clear();
     this.vehicleData.clear();
+    closeMapPopup();
     console.log('Cleared all vehicle markers');
   }
 
@@ -319,6 +325,126 @@ export class VehicleTracker {
     setTimeout(() => {
       toast.remove();
     }, 5000);
+  }
+
+  /**
+   * Show info popup for a clicked bus marker.
+   * Reads the latest stored data for the vehicle.
+   */
+  private showVehiclePopup(vid: string): void {
+    const vehicle = this.vehicleData.get(vid);
+    if (!vehicle) return;
+
+    // Remove any existing map popup (stop or bus)
+    closeMapPopup();
+
+    const popup = document.createElement('div');
+    popup.id = MAP_POPUP_ID;
+    popup.className = 'map-popup';
+
+    // Header
+    const header = document.createElement('div');
+    header.className = 'map-popup__header';
+    header.innerHTML = `
+      <span class="material-icons-outlined map-popup__icon map-popup__icon--bus">directions_bus</span>
+      <strong class="map-popup__title">Bus ${vehicle.vid}</strong>
+      <button class="map-popup__close" aria-label="Close">&times;</button>
+    `;
+    popup.appendChild(header);
+
+    // Subheader — route
+    const subheader = document.createElement('div');
+    subheader.className = 'map-popup__subheader';
+    subheader.textContent = `Route ${vehicle.routeId}`;
+    popup.appendChild(subheader);
+
+    // Detail rows
+    const details = document.createElement('div');
+    details.className = 'map-popup__details';
+
+    // Status
+    if (vehicle.currentStatus) {
+      const statusLabel = this.formatStatus(vehicle.currentStatus);
+      this.addDetailRow(details, 'Status', statusLabel);
+    }
+
+    // Speed
+    if (vehicle.speed != null) {
+      // GTFS-RT speed is m/s → convert to mph
+      const mph = (vehicle.speed * 2.23694).toFixed(1);
+      this.addDetailRow(details, 'Speed', `${mph} mph`);
+    }
+
+    // Next stop
+    if (vehicle.currentStopId) {
+      this.addDetailRow(details, 'Next Stop', `#${vehicle.currentStopId}`);
+    }
+
+    // Last update
+    const lastUpdate = new Date(vehicle.lastUpdate);
+    const secsAgo = Math.round((Date.now() - lastUpdate.getTime()) / 1000);
+    this.addDetailRow(details, 'Updated', secsAgo < 60 ? `${secsAgo}s ago` : `${Math.round(secsAgo / 60)}m ago`);
+
+    popup.appendChild(details);
+
+    // Source badge
+    const badge = document.createElement('div');
+    badge.className = `map-popup__source map-popup__source--${vehicle.source}`;
+    badge.textContent = vehicle.source === 'live' ? 'LIVE' : 'SCHEDULED';
+    popup.appendChild(badge);
+
+    // Append to map container
+    const container = document.querySelector('.map-container');
+    if (container) {
+      container.appendChild(popup);
+    }
+
+    // Close button
+    const closeBtn = popup.querySelector('.map-popup__close');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => closeMapPopup());
+    }
+  }
+
+  /**
+   * Add a key-value detail row to the popup.
+   */
+  private addDetailRow(container: HTMLElement, label: string, value: string): void {
+    const row = document.createElement('div');
+    row.className = 'map-popup__row';
+
+    const lbl = document.createElement('span');
+    lbl.className = 'map-popup__label';
+    lbl.textContent = label;
+
+    const val = document.createElement('span');
+    val.className = 'map-popup__value';
+    val.textContent = value;
+
+    row.appendChild(lbl);
+    row.appendChild(val);
+    container.appendChild(row);
+  }
+
+  /**
+   * Format GTFS-RT VehicleStopStatus to human-readable text.
+   */
+  private formatStatus(status: string): string {
+    switch (status) {
+      case 'INCOMING_AT': return 'Arriving at stop';
+      case 'STOPPED_AT': return 'Stopped at stop';
+      case 'IN_TRANSIT_TO': return 'In transit to next stop';
+      default: return status;
+    }
+  }
+
+  /**
+   * Convert heading degrees to compass direction + degrees.
+   */
+  private formatHeading(degrees: number): string {
+    const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+    const idx = Math.round(degrees / 45) % 8;
+    return `${dirs[idx]} (${Math.round(degrees)}°)`;
   }
 
   /**

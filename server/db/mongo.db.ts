@@ -10,7 +10,10 @@ import {
   IAccountStatus,
   IPrivilegeLevel
 } from '../../common/user.interface';
-import { IAppError } from '../../common/server.responses';
+import {
+  ITransitCache,
+  ITransitCacheType
+} from '../../common/transit.interface';
 import bcrypt from 'bcrypt';
 import { v4 as uuidV4 } from 'uuid';
 
@@ -33,6 +36,24 @@ const UserSchema = new Schema<IUserAccount>({
 
 const MUser = model<IUserAccount>('User', UserSchema);
 
+// ── Transit Cache Schema ───────────────────────────────────────────────
+const TransitCacheSchema = new Schema<ITransitCache>({
+  cacheKey: { type: String, required: true, unique: true },
+  dataType: {
+    type: String,
+    required: true,
+    enum: ['routes', 'stops', 'patterns', 'detours']
+  },
+  data: { type: Schema.Types.Mixed, required: true },
+  lastUpdated: { type: Date, required: true },
+  expiresAt: { type: Date, required: true }
+});
+
+// TTL index: MongoDB automatically removes expired documents
+TransitCacheSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+const MTransitCache = model<ITransitCache>('TransitCache', TransitCacheSchema);
+
 export class MongoDB implements IDatabase {
   public dbURL: string;
 
@@ -48,11 +69,11 @@ export class MongoDB implements IDatabase {
       this.db = mongoose.connection;
       // Add error event listener for ongoing issues
       this.db.on('error', (err) => {
-        console.error('[MongoDB]: Connection error:', err);
+        console.error(`[MongoDB ${new Date().toISOString()}] Connection error:`, err);
       });
-      console.log('[MongoDB]: Connected successfully');
+      console.log(`[MongoDB ${new Date().toISOString()}] Connected successfully`);
     } catch (err) {
-      console.error('[MongoDB]: Failed to connect:', err);
+      console.error(`[MongoDB ${new Date().toISOString()}] Failed to connect:`, err);
       throw err; // Prevent app from starting if DB connection fails
     }
   }
@@ -61,7 +82,7 @@ export class MongoDB implements IDatabase {
     // Check if MongoDB is actually connected before trying to drop collections
     // readyState: 0=disconnected, 1=connected, 2=connecting, 3=disconnecting
     if (mongoose.connection.readyState !== 1) {
-      console.log('[MongoDB]: Not connected, reconnecting before init...');
+      console.log(`[MongoDB ${new Date().toISOString()}] Not connected, reconnecting before init...`);
       await this.connect();
     }
 
@@ -206,7 +227,7 @@ export class MongoDB implements IDatabase {
     });
 
     if (existingAdmin) {
-      console.log('[MongoDB]: Default Administrator already exists');
+      console.log(`[MongoDB ${new Date().toISOString()}] Default Administrator already exists`);
       return;
     }
 
@@ -227,12 +248,44 @@ export class MongoDB implements IDatabase {
     const newAdmin = new MUser(defaultAdmin);
     await newAdmin.save();
     console.log(
-      '[MongoDB]: Default Administrator user created (username: Admin, password: admin)'
+      `[MongoDB ${new Date().toISOString()}] Default Administrator user created (username: Admin, password: admin)`
     );
   }
 
   async getAllUsernames(): Promise<string[]> {
     const users = await MUser.find({}, { 'credentials.username': 1 }).lean();
     return users.map((u) => u.credentials.username);
+  }
+
+  // ── Transit Cache Methods ──────────────────────────────────────────────
+
+  async getTransitCache(cacheKey: string): Promise<ITransitCache | null> {
+    const entry = await MTransitCache.findOne({ cacheKey }).lean();
+    if (!entry) return null;
+    // Check if the cache has expired (belt-and-suspenders alongside TTL index)
+    if (new Date() > new Date(entry.expiresAt)) return null;
+    return entry as ITransitCache;
+  }
+
+  async upsertTransitCache(entry: ITransitCache): Promise<void> {
+    await MTransitCache.findOneAndUpdate(
+      { cacheKey: entry.cacheKey },
+      {
+        cacheKey: entry.cacheKey,
+        dataType: entry.dataType,
+        data: entry.data,
+        lastUpdated: entry.lastUpdated,
+        expiresAt: entry.expiresAt
+      },
+      { upsert: true, new: true }
+    );
+  }
+
+  async clearTransitCache(dataType?: ITransitCacheType): Promise<void> {
+    if (dataType) {
+      await MTransitCache.deleteMany({ dataType });
+    } else {
+      await MTransitCache.deleteMany({});
+    }
   }
 }

@@ -27,6 +27,7 @@ export class GoogleMapProvider implements IMapProvider {
     this.map = new google.maps.Map(container, {
       center: { lat: config.lat, lng: config.lon },
       zoom: config.defaultZoom,
+      gestureHandling: 'greedy', // Allow single-finger drag on mobile
       zoomControl: false, // Disable default zoom controls (we have custom ones)
       mapTypeControl: false, // Disable map type selector
       streetViewControl: false, // Disable street view pegman
@@ -79,6 +80,33 @@ export class GoogleMapProvider implements IMapProvider {
     return {
       id,
       setPosition: (pos: ILatLng) => marker.setPosition(pos),
+      animatePosition: (pos: ILatLng, durationMs = 1000) => {
+        const start = marker.getPosition();
+        if (!start) { marker.setPosition(pos); return; }
+        const startLat = start.lat();
+        const startLng = start.lng();
+        const dLat = pos.lat - startLat;
+        const dLng = pos.lng - startLng;
+        // Skip animation for tiny moves or teleports (> ~5 km)
+        if (Math.abs(dLat) < 0.00001 && Math.abs(dLng) < 0.00001) return;
+        if (Math.abs(dLat) > 0.05 || Math.abs(dLng) > 0.05) {
+          marker.setPosition(pos); return;
+        }
+        const t0 = performance.now();
+        const step = (now: number) => {
+          const elapsed = now - t0;
+          const progress = Math.min(elapsed / durationMs, 1);
+          // Ease-out cubic for a natural deceleration feel
+          const ease = 1 - Math.pow(1 - progress, 3);
+          marker.setPosition({
+            lat: startLat + dLat * ease,
+            lng: startLng + dLng * ease
+          });
+          if (progress < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      },
+      setIcon: (icon: string) => marker.setIcon(icon),
       setVisible: (visible: boolean) => marker.setVisible(visible),
       setIcon: (icon: string | IIconData) => {
         if (typeof icon === 'string') {
@@ -90,6 +118,8 @@ export class GoogleMapProvider implements IMapProvider {
             anchor: new google.maps.Point(icon.anchor.x, icon.anchor.y)
           });
         }
+      onClick: (callback: () => void) => {
+        google.maps.event.addListener(marker, 'click', callback);
       },
       remove: () => {
         marker.setMap(null);

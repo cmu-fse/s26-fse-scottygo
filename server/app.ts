@@ -3,7 +3,10 @@ import { Server as HttpServer, createServer } from 'http';
 import DAC, { IDatabase } from './db/dac';
 import Controller from './controllers/controller';
 import gtfsService from './services/gtfs.service';
-import { JWT_KEY as secretKey, JWT_EXP as tokenExpiry, STAGE } from './env';
+import vehiclePositionsService from './services/vehicle-positions.service';
+import tripUpdatesService from './services/trip-updates.service';
+import { TransitModel } from './models/transit.model';
+import { JWT_KEY as secretKey, STAGE } from './env';
 import { Server as SocketServer, Socket } from 'socket.io';
 import {
   ClientToServerEvents,
@@ -59,6 +62,12 @@ class App {
 
   private configureApp(initOnStart: boolean) {
     DAC.db = this.db;
+
+    // Load GTFS static schedule data (needed before cache refresh)
+    const gtfsReady = gtfsService.load().catch((err) => {
+      console.error(`[GTFS ${new Date().toISOString()}] Failed to load feed:`, err);
+    });
+
     DAC.db.connect().then(async () => {
       if (initOnStart) {
         await this.db.init();
@@ -67,11 +76,39 @@ class App {
       // Seed default admin user if it doesn't exist
       // This runs in both PROD and non-PROD to ensure default admin exists
       await this.db.seedDefaultAdmin();
+
+      // Wait for GTFS to finish loading before populating the cache
+      await gtfsReady;
+
+      // Populate the transit cache from GTFS data + one TrueTime call for colors.
+      // Await completion so GTFS parsing temporaries can be GC'd before
+      // GTFS-RT polling adds more allocations — prevents startup peak OOM.
+      try {
+        await TransitModel.refreshAllCaches();
+      } catch (err) {
+        console.error(`[TransitModel ${new Date().toISOString()}] Initial cache refresh failed:`, err);
+      }
+
+      // Force GC to reclaim GTFS parsing temporaries (~250 MB) before
+      // GTFS-RT polling allocates more — keeps peak RSS under 512 MB.
+      if (global.gc) {
+        global.gc();
+        console.log(`[Server ${new Date().toISOString()}] Forced GC after cache refresh`);
+      }
+
+      // Start polling GTFS-RT feeds every 30 s (in-memory)
+      // Delayed until after cache refresh so V8 can GC startup temporaries first.
+      vehiclePositionsService.start();
+      tripUpdatesService.start();
+
+      // Schedule a daily cache refresh (every 24 h).
+      const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+      setInterval(() => {
+        TransitModel.refreshAllCaches().catch((err) =>
+          console.error(`[TransitModel ${new Date().toISOString()}] Scheduled cache refresh failed:`, err)
+        );
+      }, TWENTY_FOUR_HOURS);
     });
-    // Load GTFS static schedule data in the background (non-blocking)
-    gtfsService.load().catch((err) =>
-      console.error('[GTFS] Failed to load feed:', err)
-    );
   }
 
   private configureMiddlewares() {
@@ -118,7 +155,7 @@ class App {
     // If the original request was not HTTPS, throw a hard error
     if (protocol !== 'https') {
       console.error(
-        `[Security]: Blocked non-HTTPS request to ${req.method} ${req.path} from ${req.ip}`
+        `[Security ${new Date().toISOString()}] Blocked non-HTTPS request to ${req.method} ${req.path} from ${req.ip}`
       );
 
       return res.status(403).json({
@@ -163,8 +200,7 @@ class App {
     return new Promise<HttpServer>((resolve, reject) => {
       this.io.on('connection', (socket: Socket) => {
         console.log(
-          '⚡️[Server]: A client connected to the socket server with id' +
-            socket.id
+          `⚡️[Server ${new Date().toISOString()}] A client connected to the socket server with id ${socket.id}`
         );
 
         // Get user from socket (attached during authentication)
@@ -187,7 +223,7 @@ class App {
         socket.on('subscribeAccount', async (username: string) => {
           if (!socketUser) {
             console.log(
-              `[Socket]: Unauthorized subscribeAccount attempt for ${username}`
+              `[Socket ${new Date().toISOString()}] Unauthorized subscribeAccount attempt for ${username}`
             );
             return;
           }
@@ -204,7 +240,7 @@ class App {
 
             if (!isAdmin && !isOwnAccount) {
               console.log(
-                `[Socket]: User ${socketUser.username} unauthorized to subscribe to ${username}`
+                `[Socket ${new Date().toISOString()}] User ${socketUser.username} unauthorized to subscribe to ${username}`
               );
               return;
             }
@@ -212,10 +248,10 @@ class App {
             const roomName = `account:${username.toLowerCase()}`;
             socket.join(roomName);
             console.log(
-              `[Socket]: User ${socketUser.username} subscribed to ${roomName}`
+              `[Socket ${new Date().toISOString()}] User ${socketUser.username} subscribed to ${roomName}`
             );
           } catch (error) {
-            console.error(`[Socket]: Error in subscribeAccount: ${error}`);
+            console.error(`[Socket ${new Date().toISOString()}] Error in subscribeAccount: ${error}`);
           }
         });
 
@@ -224,7 +260,7 @@ class App {
           const roomName = `account:${username.toLowerCase()}`;
           socket.leave(roomName);
           console.log(
-            `[Socket]: Client ${socket.id} unsubscribed from ${roomName}`
+            `[Socket ${new Date().toISOString()}] Client ${socket.id} unsubscribed from ${roomName}`
           );
         });
       });
@@ -232,7 +268,7 @@ class App {
       try {
         this.server.listen(this.port, () => {
           // must listen on http server, not express app, for socket.io to work
-          console.log(`⚡️[Server]: Running at ${this.url} ...`);
+          console.log(`⚡️[Server ${new Date().toISOString()}] Running at ${this.url} ...`);
           resolve(this.server);
         });
       } catch (err) {

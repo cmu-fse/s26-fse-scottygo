@@ -14,6 +14,14 @@
   padding: 0;
 }
 
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+}
+
 body {
   font-family:
     'Inter',
@@ -204,6 +212,7 @@ body.dark {
   width: 100%;
   height: 100%;
   z-index: 1;
+  touch-action: none;
 }
 
 /* ============================================
@@ -277,7 +286,7 @@ body.dark .circle-btn.primary {
   max-width: 66.67%; /* Constrain to 2/3 of screen width */
   width: calc(100% - 40px); /* Full width minus margins */
   gap: 12px;
-  z-index: 1000;
+  z-index: 30;
 }
 
 .search-box {
@@ -538,7 +547,26 @@ body.dark .toggle-label {
   z-index: 25;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.3s ease, transform 0.3s ease;
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
+}
+
+/* Mobile: Reduce toggle filter panel width */
+@media (max-width: 480px) {
+  .toggle-filter-panel {
+    min-width: 200px;
+    max-width: 240px;
+  }
+
+  .filter-label {
+    font-size: 11px;
+  }
+
+  .filter-btn {
+    font-size: 13px;
+    padding: 6px 12px;
+  }
 }
 
 /* Mobile: Reduce toggle filter panel width */
@@ -1408,4 +1436,421 @@ body.dark .modal-message {
 
 .modal-btn--primary:hover {
   background-color: #a00e26;
+}
+
+/* ── Detour Banner ─────────────────────────────────────────────── */
+.detour-banner {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  width: min(420px, calc(100% - 32px));
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 10px;
+  padding: 10px 14px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+  font-size: 13px;
+  color: #664d03;
+  animation: detourSlideIn 0.3s ease-out;
+}
+
+@keyframes detourSlideIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.detour-banner__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.detour-banner__icon {
+  font-size: 20px;
+  color: #e6a700;
+  flex-shrink: 0;
+}
+
+.detour-banner__close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  color: #664d03;
+  padding: 0 2px;
+}
+
+.detour-banner__close:hover {
+  color: #3d2e02;
+}
+
+.detour-banner__list {
+  margin: 6px 0 0 26px;
+  padding: 0;
+  list-style: disc;
+}
+
+.detour-banner__list li {
+  margin-bottom: 2px;
+  line-height: 1.4;
+}
+
+/* Dark mode */
+body.dark .detour-banner {
+  background: #3d2e02;
+  border-color: #664d03;
+  color: #ffc107;
+}
+
+body.dark .detour-banner__icon {
+  color: #ffc107;
+}
+
+body.dark .detour-banner__close {
+  color: #ffc107;
+}
+
+body.dark .detour-banner__close:hover {
+  color: #fff3cd;
+}
+
+/* ============================================
+   SERVICE STATUS BANNER
+   ============================================ */
+
+.service-status-banner {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 600;
+  width: min(440px, calc(100% - 24px));
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  border-radius: 12px;
+  padding: 0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  font-size: 13px;
+  color: #991b1b;
+  animation: serviceBannerSlideDown 0.3s ease-out;
+}
+
+@keyframes serviceBannerSlideDown {
+  from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.service-status-banner__content {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+}
+
+.service-status-banner__icon {
+  font-size: 20px;
+  color: #dc2626;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.service-status-banner__text {
+  flex: 1;
+}
+
+.service-status-banner__text strong {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.service-status-banner__text ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.service-status-banner__text li {
+  font-size: 12px;
+  color: #b91c1c;
+  padding: 1px 0;
+}
+
+.service-status-banner__text li::before {
+  content: '• ';
+  color: #dc2626;
+}
+
+.service-status-banner__close {
+  background: none;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  color: #b91c1c;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+
+.service-status-banner__close:hover {
+  color: #7f1d1d;
+}
+
+/* Dark mode */
+body.dark .service-status-banner {
+  background: rgba(127, 29, 29, 0.4);
+  border-color: #991b1b;
+  color: #fca5a5;
+}
+
+body.dark .service-status-banner__icon {
+  color: #f87171;
+}
+
+body.dark .service-status-banner__text li {
+  color: #fca5a5;
+}
+
+body.dark .service-status-banner__text li::before {
+  color: #f87171;
+}
+
+body.dark .service-status-banner__close {
+  color: #fca5a5;
+}
+
+body.dark .service-status-banner__close:hover {
+  color: #fee2e2;
+}
+
+/* ============================================
+   UNIFIED MAP POPUP  (stop info + bus info)
+   Single overlay slot — only one popup visible
+   at a time; height adapts to content.
+   ============================================ */
+
+.map-popup {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  width: min(380px, calc(100% - 32px));
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  padding: 14px 16px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+  font-size: 14px;
+  color: #1f2937;
+  animation: mapPopupSlideUp 0.25s ease-out;
+}
+
+@keyframes mapPopupSlideUp {
+  from { opacity: 0; transform: translateX(-50%) translateY(16px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ── Shared structural elements ─── */
+
+.map-popup__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.map-popup__icon {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.map-popup__icon--stop  { color: var(--primary); }
+.map-popup__icon--bus   { color: #4285F4; }
+
+.map-popup__title {
+  font-size: 15px;
+  font-weight: 600;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.map-popup__close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 0 2px;
+}
+
+.map-popup__close:hover {
+  color: #1f2937;
+}
+
+.map-popup__subheader {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 2px 0 10px 28px;
+}
+
+/* ── Stop-specific content ─── */
+
+.map-popup__empty {
+  text-align: center;
+  color: #9ca3af;
+  padding: 12px 0 4px;
+  font-style: italic;
+}
+
+.map-popup__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.map-popup__arrival {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.map-popup__arrival:last-child {
+  border-bottom: none;
+}
+
+.map-popup__route-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'Roboto Mono', monospace;
+  text-align: center;
+}
+
+.map-popup__minutes {
+  font-size: 15px;
+  font-weight: 600;
+  min-width: 56px;
+}
+
+.map-popup__meta {
+  font-size: 12px;
+  color: #6b7280;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* ── Bus-specific content ─── */
+
+.map-popup__details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.map-popup__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.map-popup__row:last-child {
+  border-bottom: none;
+}
+
+.map-popup__label {
+  font-size: 12px;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.map-popup__value {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.map-popup__source {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-align: center;
+}
+
+.map-popup__source--live {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.map-popup__source--static {
+  background: #fef9c3;
+  color: #854d0e;
+}
+
+/* ── Dark mode ─── */
+
+body.dark .map-popup {
+  background: rgba(31, 41, 55, 0.97);
+  color: #f3f4f6;
+}
+
+body.dark .map-popup__close {
+  color: #9ca3af;
+}
+
+body.dark .map-popup__close:hover {
+  color: #f3f4f6;
+}
+
+body.dark .map-popup__subheader {
+  color: #9ca3af;
+}
+
+body.dark .map-popup__arrival {
+  border-bottom-color: #374151;
+}
+
+body.dark .map-popup__meta {
+  color: #9ca3af;
+}
+
+body.dark .map-popup__row {
+  border-bottom-color: #374151;
+}
+
+body.dark .map-popup__label {
+  color: #9ca3af;
+}
+
+body.dark .map-popup__source--live {
+  background: #065f46;
+  color: #a7f3d0;
+}
+
+body.dark .map-popup__source--static {
+  background: #713f12;
+  color: #fef08a;
 }
