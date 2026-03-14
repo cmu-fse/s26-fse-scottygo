@@ -8,6 +8,7 @@ import vehiclePositionsService from '../services/vehicle-positions.service';
 import tripUpdatesService from '../services/trip-updates.service';
 import { TransitModel } from '../models/transit.model';
 import gtfsService from '../services/gtfs.service';
+import tripshotService from '../services/tripshot.service';
 import * as responses from '../../common/server.responses';
 import { IRoute, IVehicle } from '../../common/transit.interface';
 
@@ -96,8 +97,9 @@ export default class BusController extends Controller {
 
       const successRes: responses.ISuccess = {
         name: 'RoutesRetrieved',
-        message: `Found ${routes.length} routes`,
-        payload: routes
+        message: `Found ${routes.length} routes${usingFallback ? ' (using fallback data)' : ''}`,
+        payload: routes,
+        ...(usingFallback && { metadata: { usingFallback: true } })
       };
       res.status(200).json(successRes);
     } catch (error: unknown) {

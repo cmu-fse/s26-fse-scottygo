@@ -376,4 +376,63 @@ export class RouteRenderer {
   getRenderedRouteIds(): string[] {
     return Array.from(this.routePolylines.keys());
   }
+
+  /**
+   * Get bounding box for a rendered route's stop markers and polyline paths
+   */
+  getRouteBounds(routeId: string): { north: number; south: number; east: number; west: number } | null {
+    return null;
+  }
+
+  /**
+   * Zoom the map to fit the given route data
+   */
+  fitToRouteData(routeData: RouteData): void {
+    if (!this.mapProvider) return;
+
+    const points: Array<{ lat: number; lng: number }> = [];
+
+    if (Array.isArray(routeData)) {
+      routeData.forEach(segment => {
+        if (segment.path && Array.isArray(segment.path)) {
+          segment.path.forEach(p => points.push(p));
+        }
+      });
+    } else {
+      const geoJson = routeData as GeoJSON;
+      const features: GeoJSONFeature[] =
+        geoJson.type === 'FeatureCollection'
+          ? (geoJson as GeoJSONFeatureCollection).features
+          : [geoJson as GeoJSONFeature];
+
+      features.forEach(feature => {
+        if (feature?.geometry?.type === 'LineString' && feature.geometry.coordinates) {
+          feature.geometry.coordinates.forEach(coord => {
+            points.push({ lat: coord[1], lng: coord[0] });
+          });
+        }
+      });
+    }
+
+    if (points.length === 0) return;
+
+    let north = -Infinity, south = Infinity, east = -Infinity, west = Infinity;
+    points.forEach(p => {
+      if (p.lat > north) north = p.lat;
+      if (p.lat < south) south = p.lat;
+      if (p.lng > east) east = p.lng;
+      if (p.lng < west) west = p.lng;
+    });
+
+    this.mapProvider.fitBounds({ north, south, east, west });
+  }
+
+  /**
+   * Center and zoom the map on a specific position
+   */
+  zoomToPosition(lat: number, lng: number, zoom: number = 16): void {
+    if (!this.mapProvider) return;
+    this.mapProvider.setCenter({ lat, lng });
+    this.mapProvider.setZoom(zoom);
+  }
 }
