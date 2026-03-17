@@ -19,6 +19,7 @@
     "pug": "ts-node ./tools/pug-compile",
     "serve": "ts-node server/serve",
     "test": "jest",
+    "test:unit:loginlogout": "jest ./tests/server.tests/unit.tests/loginlogout.unit.test.ts --runInBand --detectOpenHandles",
     "later": "echo \"Some future command...\" && exit 1"
   },
   "dependencies": {
