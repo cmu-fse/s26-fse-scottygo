@@ -106,9 +106,8 @@ export class GoogleMapProvider implements IMapProvider {
         };
         requestAnimationFrame(step);
       },
-      setIcon: (icon: string) => marker.setIcon(icon),
       setVisible: (visible: boolean) => marker.setVisible(visible),
-      setIcon: (icon: string | IIconData) => {
+      setIcon: (icon: string | { url: string; anchor: { x: number; y: number }; size: { width: number; height: number } }) => {
         if (typeof icon === 'string') {
           marker.setIcon(icon);
         } else {
@@ -118,6 +117,7 @@ export class GoogleMapProvider implements IMapProvider {
             anchor: new google.maps.Point(icon.anchor.x, icon.anchor.y)
           });
         }
+      },
       onClick: (callback: () => void) => {
         google.maps.event.addListener(marker, 'click', callback);
       },
