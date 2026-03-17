@@ -14,6 +14,21 @@ import {
   ITransitCacheType
 } from '../../common/transit.interface';
 
+export interface IMemorySampleRecord {
+  timestamp: Date;
+  reason: string;
+  rssMb: number;
+  heapUsedMb: number;
+  heapTotalMb: number;
+  externalMb: number;
+  arrayBuffersMb: number;
+  uptimeSec: number;
+  peakRssMb: number;
+  peakHeapUsedMb: number;
+  warning: boolean;
+  critical: boolean;
+}
+
 export interface IDatabase {
   connect(): Promise<void>;
 
@@ -71,6 +86,10 @@ export interface IDatabase {
   upsertTransitCache(entry: ITransitCache): Promise<void>;
 
   clearTransitCache(dataType?: ITransitCacheType): Promise<void>;
+
+  saveMemorySample(sample: IMemorySampleRecord): Promise<void>;
+
+  getRecentMemorySamples(limit: number): Promise<IMemorySampleRecord[]>;
 }
 
 /* Data Access Class */

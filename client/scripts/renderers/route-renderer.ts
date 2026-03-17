@@ -3,7 +3,11 @@
  * Handles rendering route geometries, stops, and managing their visibility
  */
 
-import type { IMapProvider, IMapPolyline, IMapMarker } from '../../../common/map.interface';
+import type {
+  IMapProvider,
+  IMapPolyline,
+  IMapMarker
+} from '../../../common/map.interface';
 import type { IRoute, IStop } from '../../../common/transit.interface';
 
 // GeoJSON type definitions
@@ -37,11 +41,11 @@ export type RouteData = GeoJSON | RoutePathSegment[];
 export class RouteRenderer {
   private static instance: RouteRenderer;
   private mapProvider: IMapProvider | null = null;
-  
+
   // Store references to map elements
   private routePolylines = new Map<string, IMapPolyline[]>(); // routeId_direction → polylines
-  private stopMarkers = new Map<string, IMapMarker[]>();      // routeId_direction → markers
-  private routeColors = new Map<string, string>();            // routeId → color
+  private stopMarkers = new Map<string, IMapMarker[]>(); // routeId_direction → markers
+  private routeColors = new Map<string, string>(); // routeId → color
 
   private constructor() {}
 
@@ -62,7 +66,11 @@ export class RouteRenderer {
   /**
    * Render route geometry from GeoJSON Feature or custom route format
    */
-  renderRouteGeometry(routeId: string, routeData: RouteData, color: string): void {
+  renderRouteGeometry(
+    routeId: string,
+    routeData: RouteData,
+    color: string
+  ): void {
     if (!this.mapProvider) {
       console.error('Map provider not initialized');
       return;
@@ -86,14 +94,18 @@ export class RouteRenderer {
     if (Array.isArray(routeData)) {
       // Custom format: [{direction: "INBOUND", path: [{lat, lng}, ...]}, ...]
       routeData.forEach((segment: RoutePathSegment) => {
-        if (segment.path && Array.isArray(segment.path) && segment.path.length > 0) {
+        if (
+          segment.path &&
+          Array.isArray(segment.path) &&
+          segment.path.length > 0
+        ) {
           const polyline = this.mapProvider!.addPolyline({
             path: segment.path,
             color: color,
             weight: 4,
             opacity: 1.0
           });
-          
+
           // Store with direction-specific key
           const directionKey = `${routeId}_${segment.direction}`;
           if (!this.routePolylines.has(directionKey)) {
@@ -105,11 +117,11 @@ export class RouteRenderer {
     } else {
       // GeoJSON format
       const geoJson = routeData as GeoJSON;
-      
+
       // Handle both Feature and FeatureCollection
-      const features: GeoJSONFeature[] = 
-        geoJson.type === 'FeatureCollection' 
-          ? (geoJson as GeoJSONFeatureCollection).features 
+      const features: GeoJSONFeature[] =
+        geoJson.type === 'FeatureCollection'
+          ? (geoJson as GeoJSONFeatureCollection).features
           : [geoJson as GeoJSONFeature];
 
       if (!features || !Array.isArray(features)) {
@@ -119,14 +131,21 @@ export class RouteRenderer {
 
       features.forEach((feature: GeoJSONFeature) => {
         // Validate feature structure
-        if (!feature || !feature.geometry || typeof feature.geometry !== 'object') {
+        if (
+          !feature ||
+          !feature.geometry ||
+          typeof feature.geometry !== 'object'
+        ) {
           console.warn(`Invalid feature geometry for route ${routeId}`);
           return;
         }
 
         if (feature.geometry.type === 'LineString') {
           // Validate coordinates
-          if (!feature.geometry.coordinates || !Array.isArray(feature.geometry.coordinates)) {
+          if (
+            !feature.geometry.coordinates ||
+            !Array.isArray(feature.geometry.coordinates)
+          ) {
             console.warn(`Invalid coordinates for route ${routeId}`);
             return;
           }
@@ -147,7 +166,7 @@ export class RouteRenderer {
           polylines.push(polyline);
         }
       });
-      
+
       // For GeoJSON format, store without direction (or use a default key)
       if (polylines.length > 0) {
         this.routePolylines.set(routeId, polylines);
@@ -173,7 +192,7 @@ export class RouteRenderer {
     }
 
     const key = `${routeId}_${direction}`;
-    
+
     // Clear existing markers for this route+direction
     this.clearStopMarkers(key);
 
@@ -197,7 +216,9 @@ export class RouteRenderer {
     });
 
     this.stopMarkers.set(key, markers);
-    console.log(`Rendered ${markers.length} stop markers for route ${routeId} ${direction}`);
+    console.log(
+      `Rendered ${markers.length} stop markers for route ${routeId} ${direction}`
+    );
   }
 
   /**
@@ -207,19 +228,19 @@ export class RouteRenderer {
     // Check for direction-specific keys first
     const inboundKey = `${routeId}_INBOUND`;
     const outboundKey = `${routeId}_OUTBOUND`;
-    
+
     const inboundPolylines = this.routePolylines.get(inboundKey);
     const outboundPolylines = this.routePolylines.get(outboundKey);
     const regularPolylines = this.routePolylines.get(routeId);
-    
+
     if (inboundPolylines) {
-      inboundPolylines.forEach(polyline => polyline.setVisible(false));
+      inboundPolylines.forEach((polyline) => polyline.setVisible(false));
     }
     if (outboundPolylines) {
-      outboundPolylines.forEach(polyline => polyline.setVisible(false));
+      outboundPolylines.forEach((polyline) => polyline.setVisible(false));
     }
     if (regularPolylines) {
-      regularPolylines.forEach(polyline => polyline.setVisible(false));
+      regularPolylines.forEach((polyline) => polyline.setVisible(false));
     }
   }
 
@@ -230,19 +251,19 @@ export class RouteRenderer {
     // Check for direction-specific keys first
     const inboundKey = `${routeId}_INBOUND`;
     const outboundKey = `${routeId}_OUTBOUND`;
-    
+
     const inboundPolylines = this.routePolylines.get(inboundKey);
     const outboundPolylines = this.routePolylines.get(outboundKey);
     const regularPolylines = this.routePolylines.get(routeId);
-    
+
     if (inboundPolylines) {
-      inboundPolylines.forEach(polyline => polyline.setVisible(true));
+      inboundPolylines.forEach((polyline) => polyline.setVisible(true));
     }
     if (outboundPolylines) {
-      outboundPolylines.forEach(polyline => polyline.setVisible(true));
+      outboundPolylines.forEach((polyline) => polyline.setVisible(true));
     }
     if (regularPolylines) {
-      regularPolylines.forEach(polyline => polyline.setVisible(true));
+      regularPolylines.forEach((polyline) => polyline.setVisible(true));
     }
   }
 
@@ -253,7 +274,7 @@ export class RouteRenderer {
     const key = `${routeId}_${direction}`;
     const polylines = this.routePolylines.get(key);
     if (polylines) {
-      polylines.forEach(polyline => polyline.setVisible(false));
+      polylines.forEach((polyline) => polyline.setVisible(false));
     }
   }
 
@@ -264,7 +285,7 @@ export class RouteRenderer {
     const key = `${routeId}_${direction}`;
     const polylines = this.routePolylines.get(key);
     if (polylines) {
-      polylines.forEach(polyline => polyline.setVisible(true));
+      polylines.forEach((polyline) => polyline.setVisible(true));
     }
   }
 
@@ -275,11 +296,14 @@ export class RouteRenderer {
     // Check for direction-specific polylines
     const inboundKey = `${routeId}_INBOUND`;
     const outboundKey = `${routeId}_OUTBOUND`;
-    
-    if (this.routePolylines.has(inboundKey) || this.routePolylines.has(outboundKey)) {
+
+    if (
+      this.routePolylines.has(inboundKey) ||
+      this.routePolylines.has(outboundKey)
+    ) {
       return true;
     }
-    
+
     // Check for regular polylines
     return this.routePolylines.has(routeId);
   }
@@ -291,23 +315,23 @@ export class RouteRenderer {
     // Clear direction-specific polylines
     const inboundKey = `${routeId}_INBOUND`;
     const outboundKey = `${routeId}_OUTBOUND`;
-    
+
     const inboundPolylines = this.routePolylines.get(inboundKey);
     if (inboundPolylines) {
-      inboundPolylines.forEach(polyline => polyline.remove());
+      inboundPolylines.forEach((polyline) => polyline.remove());
       this.routePolylines.delete(inboundKey);
     }
-    
+
     const outboundPolylines = this.routePolylines.get(outboundKey);
     if (outboundPolylines) {
-      outboundPolylines.forEach(polyline => polyline.remove());
+      outboundPolylines.forEach((polyline) => polyline.remove());
       this.routePolylines.delete(outboundKey);
     }
-    
+
     // Clear regular polylines
     const polylines = this.routePolylines.get(routeId);
     if (polylines) {
-      polylines.forEach(polyline => polyline.remove());
+      polylines.forEach((polyline) => polyline.remove());
       this.routePolylines.delete(routeId);
     }
   }
@@ -318,7 +342,7 @@ export class RouteRenderer {
   clearStopMarkers(key: string): void {
     const markers = this.stopMarkers.get(key);
     if (markers) {
-      markers.forEach(marker => marker.remove());
+      markers.forEach((marker) => marker.remove());
       this.stopMarkers.delete(key);
     }
   }
@@ -328,14 +352,14 @@ export class RouteRenderer {
    */
   clearAllRoutes(): void {
     // Clear all polylines
-    this.routePolylines.forEach(polylines => {
-      polylines.forEach(polyline => polyline.remove());
+    this.routePolylines.forEach((polylines) => {
+      polylines.forEach((polyline) => polyline.remove());
     });
     this.routePolylines.clear();
 
     // Clear all stop markers
-    this.stopMarkers.forEach(markers => {
-      markers.forEach(marker => marker.remove());
+    this.stopMarkers.forEach((markers) => {
+      markers.forEach((marker) => marker.remove());
     });
     this.stopMarkers.clear();
 
@@ -380,7 +404,9 @@ export class RouteRenderer {
   /**
    * Get bounding box for a rendered route's stop markers and polyline paths
    */
-  getRouteBounds(routeId: string): { north: number; south: number; east: number; west: number } | null {
+  getRouteBounds(
+    routeId: string
+  ): { north: number; south: number; east: number; west: number } | null {
     return null;
   }
 
@@ -393,9 +419,9 @@ export class RouteRenderer {
     const points: Array<{ lat: number; lng: number }> = [];
 
     if (Array.isArray(routeData)) {
-      routeData.forEach(segment => {
+      routeData.forEach((segment) => {
         if (segment.path && Array.isArray(segment.path)) {
-          segment.path.forEach(p => points.push(p));
+          segment.path.forEach((p) => points.push(p));
         }
       });
     } else {
@@ -405,9 +431,12 @@ export class RouteRenderer {
           ? (geoJson as GeoJSONFeatureCollection).features
           : [geoJson as GeoJSONFeature];
 
-      features.forEach(feature => {
-        if (feature?.geometry?.type === 'LineString' && feature.geometry.coordinates) {
-          feature.geometry.coordinates.forEach(coord => {
+      features.forEach((feature) => {
+        if (
+          feature?.geometry?.type === 'LineString' &&
+          feature.geometry.coordinates
+        ) {
+          feature.geometry.coordinates.forEach((coord) => {
             points.push({ lat: coord[1], lng: coord[0] });
           });
         }
@@ -416,8 +445,11 @@ export class RouteRenderer {
 
     if (points.length === 0) return;
 
-    let north = -Infinity, south = Infinity, east = -Infinity, west = Infinity;
-    points.forEach(p => {
+    let north = -Infinity,
+      south = Infinity,
+      east = -Infinity,
+      west = Infinity;
+    points.forEach((p) => {
       if (p.lat > north) north = p.lat;
       if (p.lat < south) south = p.lat;
       if (p.lng > east) east = p.lng;

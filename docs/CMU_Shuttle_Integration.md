@@ -26,17 +26,20 @@ ScottyGo now supports CMU Shuttle routes in addition to PRT (Port Authority Tran
 ### Backend Components
 
 #### 1. Tripshot Service (`server/services/tripshot.service.ts`)
+
 - **Polyline Decoder**: Implements Google's encoded polyline algorithm to decode route geometries
 - **Route Metadata**: Maintains color schemes and route names for all 15 CMU routes
 - **API Integration**: Fetches route data from Tripshot API endpoints
 - **Data Processing**: Converts Tripshot's JSON format to ScottyGo's `IPattern` format
 
 #### 2. Transit Controller Updates (`server/controllers/transit.controller.ts`)
+
 - **Dual System Support**: Routes PRT requests to TrueTime service, CMU requests to Tripshot service
 - **Route Detection**: Uses route ID prefix (`CMU-{index}`) to identify shuttle routes
 - **Unified Response**: Returns consistent `IPattern[]` format regardless of data source
 
 #### 3. Environment Configuration (`server/env.ts`)
+
 - `TRIPSHOT_API_KEY`: Your Tripshot API authentication key
 - `TRIPSHOT_BASE_URL`: Base URL for Tripshot API (default: `https://api.tripshot.com`)
 - `TRIPSHOT_AGENCY_ID`: CMU's agency ID in Tripshot system (default: `157`)
@@ -44,11 +47,13 @@ ScottyGo now supports CMU Shuttle routes in addition to PRT (Port Authority Tran
 ### Frontend Components
 
 #### 1. Filter Controller (`client/scripts/controllers/filter-controller.ts`)
+
 - **Prefetching Logic**: Automatically fetches CMU routes when system is toggled on
 - **Route Selector Update**: Populates route selector with CMU route IDs when available
 - **System Filtering**: Filters displayed routes based on PRT/CMU toggle state
 
 #### 2. Route Format Support (`client/scripts/renderers/route-renderer.ts`)
+
 - Handles custom `[{direction, path}]` format from both TrueTime and Tripshot
 - Gracefully falls back to GeoJSON format if needed
 - Renders multiple direction segments for each route
@@ -77,6 +82,7 @@ TRIPSHOT_AGENCY_ID=157
 ### 3. Testing Without Tripshot API
 
 The system is designed to work without Tripshot configuration:
+
 - PRT routes will work normally
 - CMU toggle will be available but won't show routes
 - No errors will occur - system logs warnings only
@@ -84,6 +90,7 @@ The system is designed to work without Tripshot configuration:
 ## Data Flow
 
 ### Route Fetching
+
 ```
 1. User toggles "CMU Shuttle" ON
    ↓
@@ -101,6 +108,7 @@ The system is designed to work without Tripshot configuration:
 ```
 
 ### Route Geometry Fetching
+
 ```
 1. User selects route (e.g., "CMU-1" for A Route)
    ↓
@@ -136,9 +144,11 @@ This prefix-based system allows the backend to easily distinguish between PRT an
 All endpoints follow the existing REST API specification with system-aware routing:
 
 ### GET `/transit/routes?system=CMU`
+
 Returns all CMU shuttle routes with metadata
 
 **Response:**
+
 ```json
 {
   "name": "RoutesRetrieved",
@@ -159,9 +169,11 @@ Returns all CMU shuttle routes with metadata
 ```
 
 ### GET `/transit/routes/CMU-1`
+
 Returns route geometry for CMU route #1
 
 **Response:**
+
 ```json
 {
   "name": "PathGenerated",
@@ -180,9 +192,11 @@ Returns route geometry for CMU route #1
 ```
 
 ### GET `/transit/stops/CMU-1?dir=OUTBOUND`
+
 Returns stops for CMU route #1
 
 **Response:**
+
 ```json
 {
   "name": "StopsRetrieved",
@@ -213,6 +227,7 @@ The Tripshot API returns route geometries as Google-encoded polylines. The servi
 5. Returns `{lat, lng}` objects compatible with Google Maps
 
 **Python Reference** (provided by user):
+
 ```python
 def decode_polyline(polyline_str):
     # ... decoding logic ...
@@ -221,21 +236,26 @@ def decode_polyline(polyline_str):
 ```
 
 **TypeScript Implementation** (in tripshot.service.ts):
+
 ```typescript
-function decodePolyline(polylineStr: string): Array<{lat: number, lng: number}> {
-    // ... ported decoding logic ...
-    coordinates.push({ lat: lat / 1e5, lng: lng / 1e5 });
-    return coordinates;
+function decodePolyline(
+  polylineStr: string
+): Array<{ lat: number; lng: number }> {
+  // ... ported decoding logic ...
+  coordinates.push({ lat: lat / 1e5, lng: lng / 1e5 });
+  return coordinates;
 }
 ```
 
 ## User Experience
 
 ### Before CMU Toggle
+
 - Map shows only PRT routes (default state)
 - Route selector lists PRT route IDs (61A, 61C, P1, etc.)
 
 ### After CMU Toggle ON
+
 1. Filter controller detects CMU system enabled
 2. Prefetches CMU routes if not already loaded
 3. Route selector updates to show CMU routes (CMU-1, CMU-2, etc.)
@@ -243,6 +263,7 @@ function decodePolyline(polylineStr: string): Array<{lat: number, lng: number}> 
 5. Stops and route geometry render on map
 
 ### If Tripshot API Not Configured
+
 - No errors displayed to user
 - CMU toggle available but selecting CMU routes returns empty
 - Console shows warning: `[Tripshot] Service not configured, skipping CMU routes`
@@ -252,27 +273,29 @@ function decodePolyline(polylineStr: string): Array<{lat: number, lng: number}> 
 ### CMU Routes Not Appearing
 
 1. **Check Environment Variables**
+
    ```bash
    echo $TRIPSHOT_API_KEY
    ```
+
    Should return your API key (not empty)
 
-2. **Check Server Logs**
-   Look for:
+2. **Check Server Logs** Look for:
+
    ```
    [Tripshot] Service not configured, skipping CMU routes
    ```
+
    This means API key is missing.
 
-3. **Check API Endpoint**
-   Test API directly:
+3. **Check API Endpoint** Test API directly:
+
    ```bash
    curl -H "Authorization: Bearer YOUR_KEY" \
         "https://api.tripshot.com/routeplanner/route/157/1"
    ```
 
-4. **Check Browser Console**
-   Look for errors when toggling CMU system or selecting routes
+4. **Check Browser Console** Look for errors when toggling CMU system or selecting routes
 
 ### Routes Render But No Stops
 
@@ -299,6 +322,7 @@ function decodePolyline(polylineStr: string): Array<{lat: number, lng: number}> 
 ### Manual Testing Steps
 
 1. **Build the project**
+
    ```bash
    npm run build
    npm run start
@@ -322,6 +346,7 @@ function decodePolyline(polylineStr: string): Array<{lat: number, lng: number}> 
 ### Automated Testing
 
 Currently, the integration relies on manual testing. Future work should include:
+
 - Unit tests for polyline decoder
 - Integration tests for Tripshot service
 - Mock API responses for CI/CD pipeline

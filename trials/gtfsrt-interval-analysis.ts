@@ -34,10 +34,10 @@ const POLL_MS = POLL_SEC * 1000;
 // ── Types ──────────────────────────────────────────────────────────────
 
 interface FeedSample {
-  timestamp: Date;       // when we fetched
-  hash: string;          // SHA-256 of raw bytes
-  byteLength: number;    // payload size
-  changed: boolean;      // true if hash differs from previous
+  timestamp: Date; // when we fetched
+  hash: string; // SHA-256 of raw bytes
+  byteLength: number; // payload size
+  changed: boolean; // true if hash differs from previous
   feedTimestamp?: number; // GTFS-RT header.timestamp (Unix seconds) if parseable
 }
 
@@ -61,17 +61,22 @@ function sha256(buf: ArrayBuffer): string {
  * field 2 → sub-field 1 in the FeedHeader, but rather than hand-roll a
  * protobuf parser we just look for it with the bindings.
  */
-let decodeFeed: ((buf: Uint8Array) => { header?: { timestamp?: number | Long } }) | null = null;
+let decodeFeed:
+  | ((buf: Uint8Array) => { header?: { timestamp?: number | Long } })
+  | null = null;
 type Long = { toNumber(): number };
 
 async function loadDecoder(): Promise<void> {
   try {
     const { transit_realtime } = await import('gtfs-realtime-bindings');
-    decodeFeed = (buf: Uint8Array) => transit_realtime.FeedMessage.decode(buf) as unknown as {
-      header?: { timestamp?: number | Long };
-    };
+    decodeFeed = (buf: Uint8Array) =>
+      transit_realtime.FeedMessage.decode(buf) as unknown as {
+        header?: { timestamp?: number | Long };
+      };
   } catch {
-    console.warn('[warn] gtfs-realtime-bindings not available — feed timestamps will not be extracted');
+    console.warn(
+      '[warn] gtfs-realtime-bindings not available — feed timestamps will not be extracted'
+    );
   }
 }
 
@@ -87,7 +92,9 @@ function extractFeedTimestamp(buf: ArrayBuffer): number | undefined {
   }
 }
 
-async function fetchFeed(url: string): Promise<{ buf: ArrayBuffer } | { error: string }> {
+async function fetchFeed(
+  url: string
+): Promise<{ buf: ArrayBuffer } | { error: string }> {
   try {
     const res = await fetch(url, {
       headers: { Accept: 'application/x-protobuf' },
@@ -112,7 +119,8 @@ async function sampleFeed(log: FeedLog): Promise<void> {
   }
 
   const hash = sha256(result.buf);
-  const prevSample = log.samples.length > 0 ? log.samples[log.samples.length - 1] : null;
+  const prevSample =
+    log.samples.length > 0 ? log.samples[log.samples.length - 1] : null;
   const changed = prevSample ? hash !== prevSample.hash : true;
   const feedTimestamp = extractFeedTimestamp(result.buf);
 
@@ -126,7 +134,8 @@ async function sampleFeed(log: FeedLog): Promise<void> {
   log.samples.push(sample);
 
   if (changed && prevSample) {
-    const intervalSec = (sample.timestamp.getTime() - prevSample.timestamp.getTime()) / 1000;
+    const intervalSec =
+      (sample.timestamp.getTime() - prevSample.timestamp.getTime()) / 1000;
     // Walk back to find the last *change* timestamp (not just the last sample)
     let lastChangeTime = prevSample.timestamp;
     for (let i = log.samples.length - 2; i >= 0; i--) {
@@ -135,7 +144,8 @@ async function sampleFeed(log: FeedLog): Promise<void> {
         break;
       }
     }
-    const changeIntervalSec = (sample.timestamp.getTime() - lastChangeTime.getTime()) / 1000;
+    const changeIntervalSec =
+      (sample.timestamp.getTime() - lastChangeTime.getTime()) / 1000;
     log.changeIntervals.push(changeIntervalSec);
   }
 }
@@ -165,9 +175,12 @@ function analyzeAndPrint(log: FeedLog): void {
   const min = intervals[0];
   const max = intervals[intervals.length - 1];
   const mean = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-  const median = intervals.length % 2 === 0
-    ? (intervals[intervals.length / 2 - 1] + intervals[intervals.length / 2]) / 2
-    : intervals[Math.floor(intervals.length / 2)];
+  const median =
+    intervals.length % 2 === 0
+      ? (intervals[intervals.length / 2 - 1] +
+          intervals[intervals.length / 2]) /
+        2
+      : intervals[Math.floor(intervals.length / 2)];
   const stddev = Math.sqrt(
     intervals.reduce((sum, v) => sum + (v - mean) ** 2, 0) / intervals.length
   );
@@ -210,7 +223,8 @@ function analyzeAndPrint(log: FeedLog): void {
     feedIntervals.sort((a, b) => a - b);
     const fMin = feedIntervals[0];
     const fMax = feedIntervals[feedIntervals.length - 1];
-    const fMean = feedIntervals.reduce((a, b) => a + b, 0) / feedIntervals.length;
+    const fMean =
+      feedIntervals.reduce((a, b) => a + b, 0) / feedIntervals.length;
 
     console.log(`\n  Feed-internal header.timestamp intervals (seconds):`);
     console.log(`    Min:      ${fMin}`);
@@ -227,7 +241,9 @@ function analyzeAndPrint(log: FeedLog): void {
     const feedTs = s.feedTimestamp
       ? new Date(s.feedTimestamp * 1000).toISOString().substring(11, 19)
       : '??';
-    console.log(`    ${ts}  feedTs=${feedTs}  size=${s.byteLength} bytes  hash=…${s.hash.substring(0, 12)}`);
+    console.log(
+      `    ${ts}  feedTs=${feedTs}  size=${s.byteLength} bytes  hash=…${s.hash.substring(0, 12)}`
+    );
   }
 }
 
@@ -237,9 +253,15 @@ async function main(): Promise<void> {
   console.log('┌──────────────────────────────────────────────────────────┐');
   console.log('│  GTFS-RT Feed Update Interval Analyzer                  │');
   console.log('│                                                         │');
-  console.log(`│  Duration: ${String(DURATION_MIN).padEnd(4)} minutes                              │`);
-  console.log(`│  Polling:  every ${String(POLL_SEC).padEnd(3)} seconds                            │`);
-  console.log(`│  Expected samples: ~${String(Math.floor(DURATION_MS / POLL_MS)).padEnd(5)}                              │`);
+  console.log(
+    `│  Duration: ${String(DURATION_MIN).padEnd(4)} minutes                              │`
+  );
+  console.log(
+    `│  Polling:  every ${String(POLL_SEC).padEnd(3)} seconds                            │`
+  );
+  console.log(
+    `│  Expected samples: ~${String(Math.floor(DURATION_MS / POLL_MS)).padEnd(5)}                              │`
+  );
   console.log('└──────────────────────────────────────────────────────────┘');
   console.log();
 
@@ -300,11 +322,13 @@ async function main(): Promise<void> {
   console.log(`${'═'.repeat(60)}`);
   const vMean =
     vehicleLog.changeIntervals.length > 0
-      ? vehicleLog.changeIntervals.reduce((a, b) => a + b, 0) / vehicleLog.changeIntervals.length
+      ? vehicleLog.changeIntervals.reduce((a, b) => a + b, 0) /
+        vehicleLog.changeIntervals.length
       : 0;
   const tMean =
     tripLog.changeIntervals.length > 0
-      ? tripLog.changeIntervals.reduce((a, b) => a + b, 0) / tripLog.changeIntervals.length
+      ? tripLog.changeIntervals.reduce((a, b) => a + b, 0) /
+        tripLog.changeIntervals.length
       : 0;
 
   console.log(`  Vehicle feed avg update interval: ${vMean.toFixed(1)}s`);
@@ -314,7 +338,9 @@ async function main(): Promise<void> {
   if (vMean > 0) {
     const optimalPoll = Math.max(5, Math.floor(vMean * 0.8));
     console.log(`  Suggested server poll interval: ${optimalPoll}s`);
-    console.log(`    (80% of the average vehicle update interval, floored at 5s)`);
+    console.log(
+      `    (80% of the average vehicle update interval, floored at 5s)`
+    );
   }
 
   console.log();

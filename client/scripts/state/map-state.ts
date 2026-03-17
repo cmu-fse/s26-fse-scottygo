@@ -6,24 +6,27 @@
 import type { IRoute, IVehicle } from '../../../common/transit.interface';
 
 export interface IMapState {
-  selectedRouteId: string | null;      // Route filter (Rule R1 - single route)
-  selectedSystems: {                    // System filter (Rule R2 - PRT default ON)
+  selectedRouteId: string | null; // Route filter (Rule R1 - single route)
+  selectedSystems: {
+    // System filter (Rule R2 - PRT default ON)
     prt: boolean;
     cmu: boolean;
   };
-  selectedDate: Date | null;            // Calendar filter
-  selectedTime: {                       // Time filter
+  selectedDate: Date | null; // Calendar filter
+  selectedTime: {
+    // Time filter
     hour: number;
     minute: number;
     period: 'AM' | 'PM';
   } | null;
-  selectedDirections: {                 // Direction filter
+  selectedDirections: {
+    // Direction filter
     inbound: boolean;
     outbound: boolean;
   };
-  availableRoutes: IRoute[];           // All routes from backend
-  filteredRoutes: IRoute[];            // Routes after applying all filters
-  activeVehicles: IVehicle[];          // Current vehicles on selected route
+  availableRoutes: IRoute[]; // All routes from backend
+  filteredRoutes: IRoute[]; // Routes after applying all filters
+  activeVehicles: IVehicle[]; // Current vehicles on selected route
 }
 
 type StateChangeListener = (state: IMapState) => void;
@@ -70,7 +73,10 @@ export class MapStateManager {
   /**
    * Update a specific filter
    */
-  updateFilter<K extends keyof IMapState>(filterType: K, value: IMapState[K]): void {
+  updateFilter<K extends keyof IMapState>(
+    filterType: K,
+    value: IMapState[K]
+  ): void {
     this.state[filterType] = value;
     this.notifyListeners();
   }
@@ -107,7 +113,7 @@ export class MapStateManager {
     let filtered = [...this.state.availableRoutes];
 
     // Apply system filter
-    filtered = filtered.filter(route => {
+    filtered = filtered.filter((route) => {
       if (route.system === 'PRT') return this.state.selectedSystems.prt;
       if (route.system === 'CMU') return this.state.selectedSystems.cmu;
       return false;
@@ -115,7 +121,9 @@ export class MapStateManager {
 
     // Apply route filter (Rule R1: single route selection)
     if (this.state.selectedRouteId) {
-      filtered = filtered.filter(route => route.id === this.state.selectedRouteId);
+      filtered = filtered.filter(
+        (route) => route.id === this.state.selectedRouteId
+      );
     }
 
     this.state.filteredRoutes = filtered;
@@ -160,7 +168,7 @@ export class MapStateManager {
    * Notify all listeners of state change
    */
   private notifyListeners(): void {
-    this.listeners.forEach(listener => listener(this.getState()));
+    this.listeners.forEach((listener) => listener(this.getState()));
   }
 
   /**

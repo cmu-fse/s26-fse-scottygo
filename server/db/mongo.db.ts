@@ -1,7 +1,7 @@
 // This is the real database, using MongoDB and Mongoose
 // It can be initialized with a MongoDB URL pointing to a production or development/test database
 
-import { IDatabase } from './dac';
+import { IDatabase, IMemorySampleRecord } from './dac';
 import mongoose from 'mongoose';
 import { Schema, model } from 'mongoose';
 import {
@@ -54,6 +54,33 @@ TransitCacheSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 const MTransitCache = model<ITransitCache>('TransitCache', TransitCacheSchema);
 
+// ── Memory Monitor Schema ──────────────────────────────────────────────
+const MemorySampleSchema = new Schema<IMemorySampleRecord>({
+  timestamp: { type: Date, required: true, index: true },
+  reason: { type: String, required: true },
+  rssMb: { type: Number, required: true },
+  heapUsedMb: { type: Number, required: true },
+  heapTotalMb: { type: Number, required: true },
+  externalMb: { type: Number, required: true },
+  arrayBuffersMb: { type: Number, required: true },
+  uptimeSec: { type: Number, required: true },
+  peakRssMb: { type: Number, required: true },
+  peakHeapUsedMb: { type: Number, required: true },
+  warning: { type: Boolean, required: true },
+  critical: { type: Boolean, required: true }
+});
+
+// Retain memory samples for 7 days to bound database growth.
+MemorySampleSchema.index(
+  { timestamp: 1 },
+  { expireAfterSeconds: 7 * 24 * 60 * 60 }
+);
+
+const MMemorySample = model<IMemorySampleRecord>(
+  'MemorySample',
+  MemorySampleSchema
+);
+
 export class MongoDB implements IDatabase {
   public dbURL: string;
 
@@ -69,11 +96,19 @@ export class MongoDB implements IDatabase {
       this.db = mongoose.connection;
       // Add error event listener for ongoing issues
       this.db.on('error', (err) => {
-        console.error(`[MongoDB ${new Date().toISOString()}] Connection error:`, err);
+        console.error(
+          `[MongoDB ${new Date().toISOString()}] Connection error:`,
+          err
+        );
       });
-      console.log(`[MongoDB ${new Date().toISOString()}] Connected successfully`);
+      console.log(
+        `[MongoDB ${new Date().toISOString()}] Connected successfully`
+      );
     } catch (err) {
-      console.error(`[MongoDB ${new Date().toISOString()}] Failed to connect:`, err);
+      console.error(
+        `[MongoDB ${new Date().toISOString()}] Failed to connect:`,
+        err
+      );
       throw err; // Prevent app from starting if DB connection fails
     }
   }
@@ -82,7 +117,9 @@ export class MongoDB implements IDatabase {
     // Check if MongoDB is actually connected before trying to drop collections
     // readyState: 0=disconnected, 1=connected, 2=connecting, 3=disconnecting
     if (mongoose.connection.readyState !== 1) {
-      console.log(`[MongoDB ${new Date().toISOString()}] Not connected, reconnecting before init...`);
+      console.log(
+        `[MongoDB ${new Date().toISOString()}] Not connected, reconnecting before init...`
+      );
       await this.connect();
     }
 
@@ -227,7 +264,9 @@ export class MongoDB implements IDatabase {
     });
 
     if (existingAdmin) {
-      console.log(`[MongoDB ${new Date().toISOString()}] Default Administrator already exists`);
+      console.log(
+        `[MongoDB ${new Date().toISOString()}] Default Administrator already exists`
+      );
       return;
     }
 
@@ -287,5 +326,17 @@ export class MongoDB implements IDatabase {
     } else {
       await MTransitCache.deleteMany({});
     }
+  }
+
+  async saveMemorySample(sample: IMemorySampleRecord): Promise<void> {
+    await MMemorySample.create(sample);
+  }
+
+  async getRecentMemorySamples(limit: number): Promise<IMemorySampleRecord[]> {
+    const docs = await MMemorySample.find({})
+      .sort({ timestamp: -1 })
+      .limit(limit)
+      .lean();
+    return docs as IMemorySampleRecord[];
   }
 }

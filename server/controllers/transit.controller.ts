@@ -3,12 +3,13 @@
 
 import { Request, Response } from 'express';
 import Controller from './controller';
+import DAC from '../db/dac';
 import tripshotService from '../services/tripshot.service';
 import vehiclePositionsService from '../services/vehicle-positions.service';
 import tripUpdatesService from '../services/trip-updates.service';
+import memoryMonitorService from '../services/memory-monitor.service';
 import { TransitModel } from '../models/transit.model';
 import gtfsService from '../services/gtfs.service';
-import tripshotService from '../services/tripshot.service';
 import * as responses from '../../common/server.responses';
 import { IRoute, IVehicle } from '../../common/transit.interface';
 
@@ -19,13 +20,20 @@ export default class BusController extends Controller {
 
   public initializeRoutes(): void {
     this.router.get('/health', this.getHealth.bind(this));
+    this.router.get('/memory/samples', this.getMemorySamples.bind(this));
     this.router.get('/bulk', this.getBulkData.bind(this));
     this.router.get('/routes', this.getRoutes.bind(this));
-    this.router.post('/routes/available', this.filterRoutesByDateTime.bind(this));
+    this.router.post(
+      '/routes/available',
+      this.filterRoutesByDateTime.bind(this)
+    );
     this.router.get('/routes/:id', this.getPatterns.bind(this));
     this.router.get('/vehicles/:routeId', this.getVehicles.bind(this));
     this.router.get('/stops/:routeId', this.getStops.bind(this));
-    this.router.get('/stops/:stopId/predictions', this.getPredictions.bind(this));
+    this.router.get(
+      '/stops/:stopId/predictions',
+      this.getPredictions.bind(this)
+    );
     this.router.get('/detours/:routeId', this.getDetours.bind(this));
   }
 
@@ -36,9 +44,11 @@ export default class BusController extends Controller {
     const colorsAvailable = TransitModel.colorsAvailable;
 
     const status = {
+      memory: memoryMonitorService.getSummary(),
       vehiclePositions: {
         healthy: vehiclesHealthy,
-        lastFetched: vehiclePositionsService.getLastFetched()?.toISOString() ?? null,
+        lastFetched:
+          vehiclePositionsService.getLastFetched()?.toISOString() ?? null,
         consecutiveFailures: vehiclePositionsService.getConsecutiveFailures(),
         error: vehiclePositionsService.getLastError()
       },
@@ -55,6 +65,26 @@ export default class BusController extends Controller {
     };
 
     res.status(200).json(status);
+  }
+
+  // GET /transit/memory/samples?limit=120
+  private async getMemorySamples(req: Request, res: Response): Promise<void> {
+    const rawLimit = req.query.limit as string | undefined;
+    const parsedLimit = rawLimit ? Number.parseInt(rawLimit, 10) : 120;
+    const limit = Number.isFinite(parsedLimit)
+      ? Math.min(Math.max(parsedLimit, 1), 2000)
+      : 120;
+
+    try {
+      const samples = await DAC.db.getRecentMemorySamples(limit);
+      res.status(200).json({
+        name: 'MemorySamplesRetrieved',
+        message: `Found ${samples.length} memory samples`,
+        payload: samples
+      });
+    } catch (error: unknown) {
+      this.handleError(error, res);
+    }
   }
 
   // GET /transit/bulk — all routes, patterns, and stops in one response
@@ -91,15 +121,16 @@ export default class BusController extends Controller {
           const cmuRoutes = await tripshotService.getRoutes();
           routes.push(...cmuRoutes);
         } else {
-          console.warn(`[Tripshot ${new Date().toISOString()}] Service not configured, skipping CMU routes`);
+          console.warn(
+            `[Tripshot ${new Date().toISOString()}] Service not configured, skipping CMU routes`
+          );
         }
       }
 
       const successRes: responses.ISuccess = {
         name: 'RoutesRetrieved',
-        message: `Found ${routes.length} routes${usingFallback ? ' (using fallback data)' : ''}`,
-        payload: routes,
-        ...(usingFallback && { metadata: { usingFallback: true } })
+        message: `Found ${routes.length} routes`,
+        payload: routes
       };
       res.status(200).json(successRes);
     } catch (error: unknown) {
@@ -109,7 +140,10 @@ export default class BusController extends Controller {
 
   // POST /transit/routes/available
   // Body: { date: string (YYYY-MM-DD), time?: string (HH:MM) }
-  private async filterRoutesByDateTime(req: Request, res: Response): Promise<void> {
+  private async filterRoutesByDateTime(
+    req: Request,
+    res: Response
+  ): Promise<void> {
     const { date, time } = req.body as { date?: string; time?: string };
 
     if (!date) {
@@ -204,7 +238,9 @@ export default class BusController extends Controller {
       // Check if this is a CMU route
       if (routeId.startsWith('CMU-')) {
         if (tripshotService.isConfigured()) {
-          stops = await tripshotService.getStops(routeId, direction).catch(() => null);
+          stops = await tripshotService
+            .getStops(routeId, direction)
+            .catch(() => null);
         }
       } else {
         // PRT route — served from GTFS cache in MongoDB
@@ -295,8 +331,11 @@ export default class BusController extends Controller {
 
   private handleError(error: unknown, res: Response): void {
     // Log the actual error for debugging
-    console.error(`[Transit Controller ${new Date().toISOString()}] Error:`, error);
-    
+    console.error(
+      `[Transit Controller ${new Date().toISOString()}] Error:`,
+      error
+    );
+
     if (
       error &&
       typeof error === 'object' &&
@@ -307,23 +346,29 @@ export default class BusController extends Controller {
       const appError = error as responses.IAppError;
       const status =
         appError.type === 'ClientError'
-          ? appError.name === 'RouteNotFound' || appError.name === 'StopNotFound'
+          ? appError.name === 'RouteNotFound' ||
+            appError.name === 'StopNotFound'
             ? 404
             : 400
           : 500;
       res.status(status).json(appError);
       return;
     }
-    
+
     // Handle generic Error instances
     if (error instanceof Error) {
-      console.error(`[Transit Controller ${new Date().toISOString()}] Unexpected Error:`, error.message, error.stack);
+      console.error(
+        `[Transit Controller ${new Date().toISOString()}] Unexpected Error:`,
+        error.message,
+        error.stack
+      );
     }
-    
+
     const serverError: responses.IAppError = {
       type: 'ServerError',
       name: 'GetRequestFailure',
-      message: error instanceof Error ? error.message : 'An unexpected error occurred'
+      message:
+        error instanceof Error ? error.message : 'An unexpected error occurred'
     };
     res.status(500).json(serverError);
   }

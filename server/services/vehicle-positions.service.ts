@@ -148,9 +148,7 @@ class VehiclePositionsService {
       }
 
       const buffer = await response.arrayBuffer();
-      const feed = transit_realtime.FeedMessage.decode(
-        new Uint8Array(buffer)
-      );
+      const feed = transit_realtime.FeedMessage.decode(new Uint8Array(buffer));
 
       const byRoute = new Map<string, IVehicle[]>();
       const all: IVehicle[] = [];
@@ -163,11 +161,20 @@ class VehiclePositionsService {
 
         // Map GTFS-RT VehicleStopStatus enum to string
         let currentStatus: IVehicle['currentStatus'];
-        if (vp.currentStatus === transit_realtime.VehiclePosition.VehicleStopStatus.INCOMING_AT) {
+        if (
+          vp.currentStatus ===
+          transit_realtime.VehiclePosition.VehicleStopStatus.INCOMING_AT
+        ) {
           currentStatus = 'INCOMING_AT';
-        } else if (vp.currentStatus === transit_realtime.VehiclePosition.VehicleStopStatus.STOPPED_AT) {
+        } else if (
+          vp.currentStatus ===
+          transit_realtime.VehiclePosition.VehicleStopStatus.STOPPED_AT
+        ) {
           currentStatus = 'STOPPED_AT';
-        } else if (vp.currentStatus === transit_realtime.VehiclePosition.VehicleStopStatus.IN_TRANSIT_TO) {
+        } else if (
+          vp.currentStatus ===
+          transit_realtime.VehiclePosition.VehicleStopStatus.IN_TRANSIT_TO
+        ) {
           currentStatus = 'IN_TRANSIT_TO';
         }
 
@@ -219,7 +226,10 @@ class VehiclePositionsService {
     } catch (err) {
       this.consecutiveFailures++;
       this.lastError = err instanceof Error ? err.message : String(err);
-      console.error(`${tag()} Fetch failed (failures: ${this.consecutiveFailures}):`, err);
+      console.error(
+        `${tag()} Fetch failed (failures: ${this.consecutiveFailures}):`,
+        err
+      );
     }
   }
 }

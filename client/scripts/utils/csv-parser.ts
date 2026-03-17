@@ -15,23 +15,23 @@ export function parseCSV<T>(csvText: string): T[] {
   }
 
   // Extract headers from first line
-  const headers = lines[0].split(',').map(h => h.trim());
-  
+  const headers = lines[0].split(',').map((h) => h.trim());
+
   // Parse data rows
   const data: T[] = [];
   for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(',').map(v => v.trim());
+    const values = lines[i].split(',').map((v) => v.trim());
     const row: Record<string, string | number> = {};
-    
+
     headers.forEach((header, index) => {
       const value = values[index];
       // Try to parse as number, otherwise keep as string
       row[header] = isNaN(Number(value)) ? value : Number(value);
     });
-    
+
     data.push(row as T);
   }
-  
+
   return data;
 }
 

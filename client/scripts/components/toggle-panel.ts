@@ -42,9 +42,9 @@ export class TogglePanel extends HTMLElement implements ITogglePanelElement {
    */
   configure(config: ITogglePanelConfig): void {
     this.config = config;
-    
+
     // Initialize state
-    config.options.forEach(option => {
+    config.options.forEach((option) => {
       this.state.set(option.id, option.defaultChecked);
     });
 
@@ -60,7 +60,7 @@ export class TogglePanel extends HTMLElement implements ITogglePanelElement {
 
     const optionsHTML = this.config.options
       .map(
-        option => `
+        (option) => `
         <div class="filter-section">
           <h3 class="filter-label">${option.label}</h3>
           <label class="toggle-switch">
@@ -109,7 +109,7 @@ export class TogglePanel extends HTMLElement implements ITogglePanelElement {
     okBtn?.addEventListener('click', (e) => {
       e.stopPropagation();
       // Commit current toggle positions to state
-      this.config!.options.forEach(option => {
+      this.config!.options.forEach((option) => {
         const toggle = this.querySelector(`#${option.id}`) as HTMLInputElement;
         if (toggle) {
           this.state.set(option.id, toggle.checked);
@@ -172,7 +172,7 @@ export class TogglePanel extends HTMLElement implements ITogglePanelElement {
   private resetToggles(): void {
     if (!this.config) return;
 
-    this.config.options.forEach(option => {
+    this.config.options.forEach((option) => {
       const toggle = this.querySelector(`#${option.id}`) as HTMLInputElement;
       if (toggle) {
         toggle.checked = this.state.get(option.id) || false;

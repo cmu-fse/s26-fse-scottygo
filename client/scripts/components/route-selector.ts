@@ -21,7 +21,10 @@ export interface IRouteSelectorElement extends HTMLElement {
   setRoutes(routes: IRouteOption[]): void;
 }
 
-export class RouteSelectorPanel extends HTMLElement implements IRouteSelectorElement {
+export class RouteSelectorPanel
+  extends HTMLElement
+  implements IRouteSelectorElement
+{
   private routes: IRouteOption[] = [];
   private filteredRoutes: IRouteOption[] = [];
   private selectedRoute: string | null = null;
@@ -123,7 +126,7 @@ export class RouteSelectorPanel extends HTMLElement implements IRouteSelectorEle
     // Preserve display and pointer-events styles if panel is currently visible
     const displayStyle = this.isVisible ? 'block' : 'none';
     const pointerEvents = this.isVisible ? 'auto' : 'none';
-    
+
     this.innerHTML = `
       <div class="route-selector-panel panel" style="display: ${displayStyle}; pointer-events: ${pointerEvents};">
         <div class="route-search-wrapper">
@@ -134,7 +137,7 @@ export class RouteSelectorPanel extends HTMLElement implements IRouteSelectorEle
         <div class="route-list">
           ${this.filteredRoutes
             .map(
-              route => `
+              (route) => `
                 <button class="route-btn ${this.selectedRoute === route.id ? 'selected' : ''}" data-route="${route.id}">
                   ${route.name}
                 </button>
@@ -159,11 +162,13 @@ export class RouteSelectorPanel extends HTMLElement implements IRouteSelectorEle
     }
 
     this.attachEvents();
-    
+
     // Scroll to selected route if one exists
     if (this.selectedRoute) {
       requestAnimationFrame(() => {
-        const selectedBtn = this.querySelector(`.route-btn[data-route="${this.selectedRoute}"]`) as HTMLElement;
+        const selectedBtn = this.querySelector(
+          `.route-btn[data-route="${this.selectedRoute}"]`
+        ) as HTMLElement;
         if (selectedBtn) {
           selectedBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
@@ -179,8 +184,10 @@ export class RouteSelectorPanel extends HTMLElement implements IRouteSelectorEle
       const value = (e.target as HTMLInputElement).value.toLowerCase();
       const cursorPos = (e.target as HTMLInputElement).selectionStart;
       this.searchValue = value;
-      this.filteredRoutes = this.routes.filter(route =>
-        route.id.toLowerCase().includes(value) || route.name.toLowerCase().includes(value)
+      this.filteredRoutes = this.routes.filter(
+        (route) =>
+          route.id.toLowerCase().includes(value) ||
+          route.name.toLowerCase().includes(value)
       );
       // Save scroll position before re-render
       const routeList = this.querySelector('.route-list') as HTMLElement;
@@ -192,7 +199,9 @@ export class RouteSelectorPanel extends HTMLElement implements IRouteSelectorEle
         newRouteList.scrollTop = scrollTop;
       }
       // Restore focus and cursor position
-      const newInput = this.querySelector('.route-search-input') as HTMLInputElement;
+      const newInput = this.querySelector(
+        '.route-search-input'
+      ) as HTMLInputElement;
       if (newInput) {
         newInput.focus();
         newInput.setSelectionRange(cursorPos, cursorPos);
@@ -205,7 +214,7 @@ export class RouteSelectorPanel extends HTMLElement implements IRouteSelectorEle
         e.stopPropagation();
         const route = (e.currentTarget as HTMLElement).dataset.route;
         this.selectedRoute = route || null;
-        
+
         // Update selection without full re-render to preserve scroll position
         this.querySelectorAll('.route-btn').forEach((b) => {
           b.classList.remove('selected');

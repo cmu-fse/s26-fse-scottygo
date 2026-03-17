@@ -15,7 +15,6 @@ import { IAppError } from '../../common/server.responses';
 const TIMEOUT_MS = 5000; // R3: wait no longer than 5 seconds for TrueTime
 const RTPI_DATA_FEED = 'Port Authority Bus'; // required by TrueTime multi-feed endpoints
 
-
 // Raw TrueTime API response shapes (unexported — internal to this service)
 
 interface TrueTimeEnvelope<T> {
@@ -31,7 +30,6 @@ interface TrueTimeRoute {
   rtnm: string;
   rtclr?: string;
 }
-
 
 interface TrueTimeStop {
   stpid: string;
@@ -72,9 +70,9 @@ interface TrueTimeDetour {
           dir?: string;
         }
       | Array<{
-      rt?: string;
-      dir?: string;
-    }>;
+          rt?: string;
+          dir?: string;
+        }>;
   };
   startdt: string;
   enddt?: string;
@@ -110,7 +108,6 @@ function toUnixMs(tmstmp: string): number {
   const second = tmstmp.length > 15 ? parseInt(tmstmp.substring(15, 17)) : 0;
   return new Date(year, month, day, hour, minute, second).getTime();
 }
-
 
 // Service interface
 
@@ -217,7 +214,11 @@ class TrueTimeService implements ITrueTimeService {
     const data = await this.call<{
       stops?: TrueTimeStop[];
       error?: TrueTimeError[];
-    }>('getstops', { rt: routeId, dir: direction, rtpidatafeed: RTPI_DATA_FEED });
+    }>('getstops', {
+      rt: routeId,
+      dir: direction,
+      rtpidatafeed: RTPI_DATA_FEED
+    });
 
     if (!data.stops || data.stops.length === 0) {
       const errMsg = data.error?.[0]?.msg ?? '';
@@ -328,7 +329,9 @@ class TrueTimeService implements ITrueTimeService {
         description: d.desc,
         routeIds: rtdirs
           .map((rd) => rd.rt)
-          .filter((rt): rt is string => typeof rt === 'string' && rt.length > 0),
+          .filter(
+            (rt): rt is string => typeof rt === 'string' && rt.length > 0
+          ),
         startdt: toISOString(d.startdt),
         enddt: d.enddt ? toISOString(d.enddt) : ''
       };

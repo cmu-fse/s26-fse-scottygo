@@ -47,7 +47,15 @@ export interface IMapMarker {
   animatePosition(position: ILatLng, durationMs?: number): void;
   setIcon(icon: string): void;
   setVisible(visible: boolean): void;
-  setIcon(icon: string | { url: string; anchor: { x: number; y: number }; size: { width: number; height: number } }): void;
+  setIcon(
+    icon:
+      | string
+      | {
+          url: string;
+          anchor: { x: number; y: number };
+          size: { width: number; height: number };
+        }
+  ): void;
   onClick(callback: () => void): void;
   remove(): void;
 }
@@ -71,5 +79,10 @@ export interface IMapProvider {
   clearAll(): void;
   onMapClick(callback: (position: ILatLng) => void): void;
   onZoomChanged(callback: (zoom: number) => void): void;
-  fitBounds(bounds: { north: number; south: number; east: number; west: number }): void;
+  fitBounds(bounds: {
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+  }): void;
 }

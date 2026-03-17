@@ -1457,8 +1457,14 @@ body.dark .modal-message {
 }
 
 @keyframes detourSlideIn {
-  from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
 .detour-banner__header {
@@ -1540,8 +1546,14 @@ body.dark .detour-banner__close:hover {
 }
 
 @keyframes serviceBannerSlideDown {
-  from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
 .service-status-banner__content {
@@ -1651,8 +1663,14 @@ body.dark .service-status-banner__close:hover {
 }
 
 @keyframes mapPopupSlideUp {
-  from { opacity: 0; transform: translateX(-50%) translateY(16px); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
 /* ── Shared structural elements ─── */
@@ -1668,8 +1686,12 @@ body.dark .service-status-banner__close:hover {
   flex-shrink: 0;
 }
 
-.map-popup__icon--stop  { color: var(--primary); }
-.map-popup__icon--bus   { color: #4285F4; }
+.map-popup__icon--stop {
+  color: var(--primary);
+}
+.map-popup__icon--bus {
+  color: #4285f4;
+}
 
 .map-popup__title {
   font-size: 15px;
