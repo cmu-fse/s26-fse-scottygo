@@ -14,7 +14,7 @@ export class VehicleTracker {
   private static instance: VehicleTracker;
   private mapProvider: IMapProvider | null = null;
   private stateManager: MapStateManager;
-  
+
   private pollingInterval: number | null = null;
   private currentRouteId: string | null = null;
   private vehicleMarkers = new Map<string, IMapMarker>(); // vehicleId → marker
@@ -101,7 +101,10 @@ export class VehicleTracker {
 
       // Add time parameter if time filter is applied (Rule R3)
       if (state.selectedTime && state.selectedDate) {
-        const timeString = this.formatTimeForAPI(state.selectedDate, state.selectedTime);
+        const timeString = this.formatTimeForAPI(
+          state.selectedDate,
+          state.selectedTime
+        );
         url += `?tm=${encodeURIComponent(timeString)}`;
       }
 
@@ -114,7 +117,9 @@ export class VehicleTracker {
       if (response.status === 200 && response.data.name === 'VehiclesLocated') {
         // Check if data is from static cache (A2: PRT API Down)
         if (response.data.source === 'static' && !this.hasShownStaticToast) {
-          this.showToast('Real-time tracking unavailable. Showing scheduled times only.');
+          this.showToast(
+            'Real-time tracking unavailable. Showing scheduled times only.'
+          );
           this.hasShownStaticToast = true;
         }
 
@@ -138,7 +143,7 @@ export class VehicleTracker {
 
     const currentVehicleIds = new Set<string>();
 
-    vehicles.forEach(vehicle => {
+    vehicles.forEach((vehicle) => {
       currentVehicleIds.add(vehicle.vid);
 
       // Always update the stored data so popup shows fresh info
@@ -182,7 +187,7 @@ export class VehicleTracker {
       }
     });
 
-    markersToRemove.forEach(vid => {
+    markersToRemove.forEach((vid) => {
       this.vehicleMarkers.delete(vid);
       this.vehicleData.delete(vid);
     });
@@ -192,7 +197,7 @@ export class VehicleTracker {
    * Clear all vehicle markers from map
    */
   clearVehicles(): void {
-    this.vehicleMarkers.forEach(marker => marker.remove());
+    this.vehicleMarkers.forEach((marker) => marker.remove());
     this.vehicleMarkers.clear();
     this.vehicleData.clear();
     closeMapPopup();
@@ -204,7 +209,7 @@ export class VehicleTracker {
    */
   getVehiclePositions(): Array<{ lat: number; lng: number }> {
     const positions: Array<{ lat: number; lng: number }> = [];
-    this.vehicleData.forEach(vehicle => {
+    this.vehicleData.forEach((vehicle) => {
       positions.push({ lat: vehicle.lat, lng: vehicle.lon });
     });
     return positions;
@@ -226,16 +231,23 @@ export class VehicleTracker {
    * Create bus icon with heading rotation and directional triangle.
    * Returns icon data with proper anchor so bus center sits on the route.
    */
-  private createBusIcon(vehicle: IVehicle): { url: string; anchor: { x: number; y: number }; size: { width: number; height: number } } {
+  private createBusIcon(vehicle: IVehicle): {
+    url: string;
+    anchor: { x: number; y: number };
+    size: { width: number; height: number };
+  } {
     const color = vehicle.isDetoured ? '#FFA500' : '#FFB84D';
-    const scale = Math.max(0.5, Math.min(2.5, (this.currentZoom - 10) * 0.3 + 1));
+    const scale = Math.max(
+      0.5,
+      Math.min(2.5, (this.currentZoom - 10) * 0.3 + 1)
+    );
     const heading = vehicle.heading || 0;
 
     // ViewBox dimensions — bus centered with triangle attached below
     const vbW = 40;
     const vbH = 32;
-    const cx = vbW / 2;  // center x
-    const cy = 12;       // bus vertical center (where route coordinate should anchor)
+    const cx = vbW / 2; // center x
+    const cy = 12; // bus vertical center (where route coordinate should anchor)
 
     const svg = `
       <svg xmlns="http://www.w3.org/2000/svg" width="${Math.round(vbW * scale)}" height="${Math.round(vbH * scale)}" viewBox="0 0 ${vbW} ${vbH}">
@@ -278,7 +290,10 @@ export class VehicleTracker {
   /**
    * Format date and time for API (YYYYMMDD HH:MM)
    */
-  private formatTimeForAPI(date: Date, time: { hour: number; minute: number; period: 'AM' | 'PM' }): string {
+  private formatTimeForAPI(
+    date: Date,
+    time: { hour: number; minute: number; period: 'AM' | 'PM' }
+  ): string {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
@@ -383,7 +398,11 @@ export class VehicleTracker {
     // Last update
     const lastUpdate = new Date(vehicle.lastUpdate);
     const secsAgo = Math.round((Date.now() - lastUpdate.getTime()) / 1000);
-    this.addDetailRow(details, 'Updated', secsAgo < 60 ? `${secsAgo}s ago` : `${Math.round(secsAgo / 60)}m ago`);
+    this.addDetailRow(
+      details,
+      'Updated',
+      secsAgo < 60 ? `${secsAgo}s ago` : `${Math.round(secsAgo / 60)}m ago`
+    );
 
     popup.appendChild(details);
 
@@ -409,7 +428,11 @@ export class VehicleTracker {
   /**
    * Add a key-value detail row to the popup.
    */
-  private addDetailRow(container: HTMLElement, label: string, value: string): void {
+  private addDetailRow(
+    container: HTMLElement,
+    label: string,
+    value: string
+  ): void {
     const row = document.createElement('div');
     row.className = 'map-popup__row';
 
@@ -431,10 +454,14 @@ export class VehicleTracker {
    */
   private formatStatus(status: string): string {
     switch (status) {
-      case 'INCOMING_AT': return 'Arriving at stop';
-      case 'STOPPED_AT': return 'Stopped at stop';
-      case 'IN_TRANSIT_TO': return 'In transit to next stop';
-      default: return status;
+      case 'INCOMING_AT':
+        return 'Arriving at stop';
+      case 'STOPPED_AT':
+        return 'Stopped at stop';
+      case 'IN_TRANSIT_TO':
+        return 'In transit to next stop';
+      default:
+        return status;
     }
   }
 

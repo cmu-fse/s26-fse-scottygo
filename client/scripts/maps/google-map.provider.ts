@@ -62,8 +62,14 @@ export class GoogleMapProvider implements IMapProvider {
     if (options.icon && options.iconAnchor && options.iconSize) {
       iconOption = {
         url: options.icon,
-        scaledSize: new google.maps.Size(options.iconSize.width, options.iconSize.height),
-        anchor: new google.maps.Point(options.iconAnchor.x, options.iconAnchor.y)
+        scaledSize: new google.maps.Size(
+          options.iconSize.width,
+          options.iconSize.height
+        ),
+        anchor: new google.maps.Point(
+          options.iconAnchor.x,
+          options.iconAnchor.y
+        )
       };
     }
 
@@ -82,7 +88,10 @@ export class GoogleMapProvider implements IMapProvider {
       setPosition: (pos: ILatLng) => marker.setPosition(pos),
       animatePosition: (pos: ILatLng, durationMs = 1000) => {
         const start = marker.getPosition();
-        if (!start) { marker.setPosition(pos); return; }
+        if (!start) {
+          marker.setPosition(pos);
+          return;
+        }
         const startLat = start.lat();
         const startLng = start.lng();
         const dLat = pos.lat - startLat;
@@ -90,7 +99,8 @@ export class GoogleMapProvider implements IMapProvider {
         // Skip animation for tiny moves or teleports (> ~5 km)
         if (Math.abs(dLat) < 0.00001 && Math.abs(dLng) < 0.00001) return;
         if (Math.abs(dLat) > 0.05 || Math.abs(dLng) > 0.05) {
-          marker.setPosition(pos); return;
+          marker.setPosition(pos);
+          return;
         }
         const t0 = performance.now();
         const step = (now: number) => {
@@ -107,7 +117,15 @@ export class GoogleMapProvider implements IMapProvider {
         requestAnimationFrame(step);
       },
       setVisible: (visible: boolean) => marker.setVisible(visible),
-      setIcon: (icon: string | { url: string; anchor: { x: number; y: number }; size: { width: number; height: number } }) => {
+      setIcon: (
+        icon:
+          | string
+          | {
+              url: string;
+              anchor: { x: number; y: number };
+              size: { width: number; height: number };
+            }
+      ) => {
         if (typeof icon === 'string') {
           marker.setIcon(icon);
         } else {
@@ -178,7 +196,12 @@ export class GoogleMapProvider implements IMapProvider {
     });
   }
 
-  fitBounds(bounds: { north: number; south: number; east: number; west: number }): void {
+  fitBounds(bounds: {
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+  }): void {
     const googleBounds = new google.maps.LatLngBounds(
       { lat: bounds.south, lng: bounds.west },
       { lat: bounds.north, lng: bounds.east }

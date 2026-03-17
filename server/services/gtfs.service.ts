@@ -67,7 +67,9 @@ class GTFSService {
    * Called once at server startup — non-blocking (fire-and-forget).
    */
   async load(): Promise<void> {
-    console.log(`[GTFS ${new Date().toISOString()}] Downloading feed from PRT...`);
+    console.log(
+      `[GTFS ${new Date().toISOString()}] Downloading feed from PRT...`
+    );
     const res = await fetch(GTFS_URL);
     if (!res.ok) {
       throw new Error(`[GTFS] Failed to download feed: HTTP ${res.status}`);
@@ -106,7 +108,10 @@ class GTFSService {
         id: r.route_id,
         name: r.route_short_name || r.route_long_name,
         system: 'PRT',
-        color: (r.route_color && r.route_color.toUpperCase() !== 'FFFFFF') ? `#${r.route_color}` : '#1e90ff',
+        color:
+          r.route_color && r.route_color.toUpperCase() !== 'FFFFFF'
+            ? `#${r.route_color}`
+            : '#1e90ff',
         directions: ['INBOUND', 'OUTBOUND'],
         activeStatus: true,
         operatingDays: []
@@ -166,7 +171,10 @@ class GTFSService {
     >[]) {
       this.tripService.set(t.trip_id, t.service_id);
       this.tripRoute.set(t.trip_id, t.route_id);
-      this.tripDirection.set(t.trip_id, t.direction_id === '0' ? 'OUTBOUND' : 'INBOUND');
+      this.tripDirection.set(
+        t.trip_id,
+        t.direction_id === '0' ? 'OUTBOUND' : 'INBOUND'
+      );
 
       const patternKey = `${t.route_id}:${t.shape_id}`;
       if (t.shape_id && !seenPatterns.has(patternKey)) {
@@ -196,7 +204,9 @@ class GTFSService {
     }
 
     // --- Build calendar exceptions ---
-    console.log(`[GTFS ${new Date().toISOString()}] Parsing calendar_dates.txt...`);
+    console.log(
+      `[GTFS ${new Date().toISOString()}] Parsing calendar_dates.txt...`
+    );
     for (const d of parse(readEntry('calendar_dates.txt'), opts) as Record<
       string,
       string
@@ -240,7 +250,9 @@ class GTFSService {
     // --- Build trip time ranges and route→stops by STREAMING stop_times ---
     // Stream-parsing avoids holding the entire parsed output array in memory,
     // and using a Buffer (not string) avoids the extra string allocation.
-    console.log(`[GTFS ${new Date().toISOString()}] Parsing stop_times.txt (streaming to save memory)...`);
+    console.log(
+      `[GTFS ${new Date().toISOString()}] Parsing stop_times.txt (streaming to save memory)...`
+    );
     const routeStopIds = new Map<string, Set<string>>();
     const routeDirStopIds = new Map<string, Set<string>>(); // "routeId:DIR" → stop IDs
     await new Promise<void>((resolve, reject) => {

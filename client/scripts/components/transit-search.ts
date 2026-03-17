@@ -17,12 +17,16 @@ export class TransitSearch extends HTMLElement {
     `;
 
     // Add event listeners
-    const searchInput = this.querySelector('#transit-search-input') as HTMLInputElement;
+    const searchInput = this.querySelector(
+      '#transit-search-input'
+    ) as HTMLInputElement;
     const layersBtn = this.querySelector('#layers-btn') as HTMLButtonElement;
 
     searchInput?.addEventListener('input', (e) => {
       const query = (e.target as HTMLInputElement).value;
-      this.dispatchEvent(new CustomEvent('search', { detail: { query }, bubbles: true }));
+      this.dispatchEvent(
+        new CustomEvent('search', { detail: { query }, bubbles: true })
+      );
     });
 
     layersBtn?.addEventListener('click', () => {

@@ -5,7 +5,14 @@
  */
 
 import axios, { AxiosResponse } from 'axios';
-import type { IRoute, IStop, IPattern, IBulkTransitData, IDetour, IPrediction } from '../../../common/transit.interface';
+import type {
+  IRoute,
+  IStop,
+  IPattern,
+  IBulkTransitData,
+  IDetour,
+  IPrediction
+} from '../../../common/transit.interface';
 import { MapStateManager } from '../state/map-state';
 import { RouteRenderer, type RouteData } from '../renderers/route-renderer';
 import { MAP_POPUP_ID, closeMapPopup } from '../utils/map-popup';
@@ -155,7 +162,10 @@ export class FilterController {
         validateStatus: () => true
       });
 
-      if (response.status === 200 && response.data.name === 'BulkDataRetrieved') {
+      if (
+        response.status === 200 &&
+        response.data.name === 'BulkDataRetrieved'
+      ) {
         const bulk: IBulkTransitData = response.data.payload;
 
         // Populate local caches
@@ -893,8 +903,7 @@ export class FilterController {
 
         const mins = document.createElement('span');
         mins.className = 'map-popup__minutes';
-        mins.textContent =
-          p.minutes <= 0 ? 'NOW' : `${p.minutes} min`;
+        mins.textContent = p.minutes <= 0 ? 'NOW' : `${p.minutes} min`;
 
         const meta = document.createElement('span');
         meta.className = 'map-popup__meta';
@@ -972,15 +981,25 @@ export class FilterController {
       if (response.status !== 200) return;
 
       const health = response.data as {
-        vehiclePositions: { healthy: boolean; consecutiveFailures: number; error: string | null };
-        tripUpdates: { healthy: boolean; consecutiveFailures: number; error: string | null };
+        vehiclePositions: {
+          healthy: boolean;
+          consecutiveFailures: number;
+          error: string | null;
+        };
+        tripUpdates: {
+          healthy: boolean;
+          consecutiveFailures: number;
+          error: string | null;
+        };
         trueTimeColors: { available: boolean };
         overall: boolean;
       };
 
       // If colors just became available, re-fetch routes to get real colors
       if (health.trueTimeColors.available && !this.colorsWereAvailable) {
-        console.log('[FilterController] TrueTime colors now available — refreshing routes');
+        console.log(
+          '[FilterController] TrueTime colors now available — refreshing routes'
+        );
         this.refreshRouteColors();
       }
       this.colorsWereAvailable = health.trueTimeColors.available;
@@ -1020,7 +1039,8 @@ export class FilterController {
         validateStatus: () => true
       });
 
-      if (response.status !== 200 || response.data.name !== 'RoutesRetrieved') return;
+      if (response.status !== 200 || response.data.name !== 'RoutesRetrieved')
+        return;
 
       const freshRoutes: IRoute[] = response.data.payload || [];
 
@@ -1036,7 +1056,11 @@ export class FilterController {
         const route = freshRoutes.find((r) => r.id === state.selectedRouteId);
         const patterns = this.patternCache.get(state.selectedRouteId);
         if (route && patterns) {
-          this.routeRenderer.renderRouteGeometry(route.id, patterns, route.color);
+          this.routeRenderer.renderRouteGeometry(
+            route.id,
+            patterns,
+            route.color
+          );
         }
       }
 

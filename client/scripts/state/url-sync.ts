@@ -39,7 +39,7 @@ export class URLSyncManager {
   private parseURL(): Partial<IMapState> {
     const hash = window.location.hash;
     const params = new URLSearchParams(hash.split('?')[1] || '');
-    
+
     const state: Partial<IMapState> = {};
 
     // Route filter
@@ -72,11 +72,11 @@ export class URLSyncManager {
     if (timeStr && timeStr.length === 4) {
       const hour24 = parseInt(timeStr.substring(0, 2));
       const minute = parseInt(timeStr.substring(2, 4));
-      
+
       // Convert to 12-hour format
       const period: 'AM' | 'PM' = hour24 >= 12 ? 'PM' : 'AM';
       const hour = hour24 % 12 || 12;
-      
+
       state.selectedTime = { hour, minute, period };
     }
 
@@ -108,7 +108,10 @@ export class URLSyncManager {
     const systems: string[] = [];
     if (state.selectedSystems.prt) systems.push('PRT');
     if (state.selectedSystems.cmu) systems.push('CMU');
-    if (systems.length > 0 && !(state.selectedSystems.prt && !state.selectedSystems.cmu)) {
+    if (
+      systems.length > 0 &&
+      !(state.selectedSystems.prt && !state.selectedSystems.cmu)
+    ) {
       // Don't add if it's the default (PRT only)
       params.set('s', systems.join(','));
     }
@@ -124,7 +127,12 @@ export class URLSyncManager {
     // Time filter
     if (state.selectedTime) {
       const { hour, minute, period } = state.selectedTime;
-      const hour24 = period === 'PM' && hour !== 12 ? hour + 12 : hour === 12 && period === 'AM' ? 0 : hour;
+      const hour24 =
+        period === 'PM' && hour !== 12
+          ? hour + 12
+          : hour === 12 && period === 'AM'
+            ? 0
+            : hour;
       const timeStr = `${String(hour24).padStart(2, '0')}${String(minute).padStart(2, '0')}`;
       params.set('t', timeStr);
     }

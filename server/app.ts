@@ -5,6 +5,7 @@ import Controller from './controllers/controller';
 import gtfsService from './services/gtfs.service';
 import vehiclePositionsService from './services/vehicle-positions.service';
 import tripUpdatesService from './services/trip-updates.service';
+import memoryMonitorService from './services/memory-monitor.service';
 import { TransitModel } from './models/transit.model';
 import { JWT_KEY as secretKey, STAGE } from './env';
 import { Server as SocketServer, Socket } from 'socket.io';
@@ -62,50 +63,71 @@ class App {
 
   private configureApp(initOnStart: boolean) {
     DAC.db = this.db;
+    memoryMonitorService.start();
+    memoryMonitorService.capture('configureApp.start');
 
     // Load GTFS static schedule data (needed before cache refresh)
     const gtfsReady = gtfsService.load().catch((err) => {
-      console.error(`[GTFS ${new Date().toISOString()}] Failed to load feed:`, err);
+      console.error(
+        `[GTFS ${new Date().toISOString()}] Failed to load feed:`,
+        err
+      );
     });
 
     DAC.db.connect().then(async () => {
+      memoryMonitorService.enablePersistence();
+      memoryMonitorService.capture('db.connected');
       if (initOnStart) {
         await this.db.init();
+        memoryMonitorService.capture('db.init.complete');
         // I set initOnStart to false if STAGE is 'PROD' in serve.ts so no risk of deleting PROD DB
       }
       // Seed default admin user if it doesn't exist
       // This runs in both PROD and non-PROD to ensure default admin exists
       await this.db.seedDefaultAdmin();
+      memoryMonitorService.capture('seedDefaultAdmin.complete');
 
       // Wait for GTFS to finish loading before populating the cache
       await gtfsReady;
+      memoryMonitorService.capture('gtfs.load.complete');
 
       // Populate the transit cache from GTFS data + one TrueTime call for colors.
       // Await completion so GTFS parsing temporaries can be GC'd before
       // GTFS-RT polling adds more allocations — prevents startup peak OOM.
       try {
         await TransitModel.refreshAllCaches();
+        memoryMonitorService.capture('transit.refreshAllCaches.complete');
       } catch (err) {
-        console.error(`[TransitModel ${new Date().toISOString()}] Initial cache refresh failed:`, err);
+        console.error(
+          `[TransitModel ${new Date().toISOString()}] Initial cache refresh failed:`,
+          err
+        );
       }
 
       // Force GC to reclaim GTFS parsing temporaries (~250 MB) before
       // GTFS-RT polling allocates more — keeps peak RSS under 512 MB.
       if (global.gc) {
         global.gc();
-        console.log(`[Server ${new Date().toISOString()}] Forced GC after cache refresh`);
+        memoryMonitorService.capture('post-startup-gc');
+        console.log(
+          `[Server ${new Date().toISOString()}] Forced GC after cache refresh`
+        );
       }
 
       // Start polling GTFS-RT feeds every 30 s (in-memory)
       // Delayed until after cache refresh so V8 can GC startup temporaries first.
       vehiclePositionsService.start();
       tripUpdatesService.start();
+      memoryMonitorService.capture('realtime-pollers.started');
 
       // Schedule a daily cache refresh (every 24 h).
       const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
       setInterval(() => {
         TransitModel.refreshAllCaches().catch((err) =>
-          console.error(`[TransitModel ${new Date().toISOString()}] Scheduled cache refresh failed:`, err)
+          console.error(
+            `[TransitModel ${new Date().toISOString()}] Scheduled cache refresh failed:`,
+            err
+          )
         );
       }, TWENTY_FOUR_HOURS);
     });
@@ -251,7 +273,9 @@ class App {
               `[Socket ${new Date().toISOString()}] User ${socketUser.username} subscribed to ${roomName}`
             );
           } catch (error) {
-            console.error(`[Socket ${new Date().toISOString()}] Error in subscribeAccount: ${error}`);
+            console.error(
+              `[Socket ${new Date().toISOString()}] Error in subscribeAccount: ${error}`
+            );
           }
         });
 
@@ -268,7 +292,9 @@ class App {
       try {
         this.server.listen(this.port, () => {
           // must listen on http server, not express app, for socket.io to work
-          console.log(`⚡️[Server ${new Date().toISOString()}] Running at ${this.url} ...`);
+          console.log(
+            `⚡️[Server ${new Date().toISOString()}] Running at ${this.url} ...`
+          );
           resolve(this.server);
         });
       } catch (err) {

@@ -30,7 +30,7 @@ export class TimePickerPanel extends HTMLElement implements ITimePickerElement {
     const now = new Date();
     const currentHour = now.getHours();
     this.minute = now.getMinutes();
-    
+
     // Convert to 12-hour format
     if (currentHour === 0) {
       this.hour = 12;
@@ -111,7 +111,7 @@ export class TimePickerPanel extends HTMLElement implements ITimePickerElement {
     // Preserve display and pointer-events styles if panel is currently visible
     const displayStyle = this.isVisible ? 'block' : 'none';
     const pointerEvents = this.isVisible ? 'auto' : 'none';
-    
+
     this.innerHTML = `
       <div class="time-picker-panel panel" style="display: ${displayStyle}; pointer-events: ${pointerEvents};">
         <h3 class="panel-title">Select Time</h3>
@@ -189,7 +189,7 @@ export class TimePickerPanel extends HTMLElement implements ITimePickerElement {
       (e.target as HTMLInputElement).value = value.toString();
       this.updateClock();
     });
-    
+
     hourInput?.addEventListener('blur', (e) => {
       (e.target as HTMLInputElement).value = this.hour.toString();
     });
@@ -204,7 +204,7 @@ export class TimePickerPanel extends HTMLElement implements ITimePickerElement {
       this.minute = value;
       (e.target as HTMLInputElement).value = this.format(value);
     });
-    
+
     minuteInput?.addEventListener('blur', (e) => {
       (e.target as HTMLInputElement).value = this.format(this.minute);
     });
@@ -224,7 +224,9 @@ export class TimePickerPanel extends HTMLElement implements ITimePickerElement {
     this.querySelectorAll('[data-period]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        this.period = (e.currentTarget as HTMLElement).dataset.period as 'AM' | 'PM';
+        this.period = (e.currentTarget as HTMLElement).dataset.period as
+          | 'AM'
+          | 'PM';
         this.updatePeriod();
       });
     });

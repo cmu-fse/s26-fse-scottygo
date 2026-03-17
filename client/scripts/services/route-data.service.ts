@@ -36,11 +36,11 @@ export interface IRouteData {
 
 // Route color mapping
 export const ROUTE_COLORS: { [key: string]: string } = {
-  'CMU_Shuttle': '#C41230', // CMU red
-  'Route_A': '#0000A0',      // Dark blue
-  'Route_B': '#00A000',      // Green
-  'Route_C': '#FF8C00',      // Dark orange
-  'Route_D': '#8B008B',      // Dark magenta
+  CMU_Shuttle: '#C41230', // CMU red
+  Route_A: '#0000A0', // Dark blue
+  Route_B: '#00A000', // Green
+  Route_C: '#FF8C00', // Dark orange
+  Route_D: '#8B008B' // Dark magenta
 };
 
 /**
@@ -68,7 +68,7 @@ export class RouteDataService {
   async loadRouteData(): Promise<IRouteData> {
     try {
       console.log('Loading route data from CSV files...');
-      
+
       const [stops, shape, segments] = await Promise.all([
         fetchCSV<IStop>('/assets/stops.csv'),
         fetchCSV<IShapePoint>('/assets/shape.csv'),
@@ -76,8 +76,10 @@ export class RouteDataService {
       ]);
 
       this.routeData = { stops, shape, segments };
-      console.log(`Loaded ${stops.length} stops, ${shape.length} shape points, ${segments.length} segments`);
-      
+      console.log(
+        `Loaded ${stops.length} stops, ${shape.length} shape points, ${segments.length} segments`
+      );
+
       return this.routeData;
     } catch (error) {
       console.error('Failed to load route data:', error);
@@ -97,7 +99,7 @@ export class RouteDataService {
    */
   getStopsAsLatLng(): Array<{ lat: number; lng: number }> {
     if (!this.routeData) return [];
-    return this.routeData.stops.map(stop => ({
+    return this.routeData.stops.map((stop) => ({
       lat: stop.lat,
       lng: stop.lng
     }));
@@ -108,7 +110,7 @@ export class RouteDataService {
    */
   getShapeAsLatLng(): Array<{ lat: number; lng: number }> {
     if (!this.routeData) return [];
-    return this.routeData.shape.map(point => ({
+    return this.routeData.shape.map((point) => ({
       lat: point.lat,
       lng: point.lng
     }));
@@ -117,11 +119,16 @@ export class RouteDataService {
   /**
    * Get route bounds for map centering
    */
-  getRouteBounds(): { north: number; south: number; east: number; west: number } | null {
+  getRouteBounds(): {
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+  } | null {
     if (!this.routeData || this.routeData.shape.length === 0) return null;
 
-    const lats = this.routeData.shape.map(p => p.lat);
-    const lngs = this.routeData.shape.map(p => p.lng);
+    const lats = this.routeData.shape.map((p) => p.lat);
+    const lngs = this.routeData.shape.map((p) => p.lng);
 
     return {
       north: Math.max(...lats),

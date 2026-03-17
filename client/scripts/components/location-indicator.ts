@@ -24,10 +24,12 @@ export class LocationIndicator extends HTMLElement {
       dot.style.display = 'block';
       this.isVisible = true;
       // Position will be managed by map provider based on lat/lng
-      this.dispatchEvent(new CustomEvent('locationShown', { 
-        detail: { lat, lng }, 
-        bubbles: true 
-      }));
+      this.dispatchEvent(
+        new CustomEvent('locationShown', {
+          detail: { lat, lng },
+          bubbles: true
+        })
+      );
     }
   }
 

@@ -31,7 +31,7 @@ export class DarkToggle extends HTMLElement {
   private toggleTheme(): void {
     this.isDark = !this.isDark;
     document.body.classList.toggle('dark');
-    
+
     // Update icon
     const icon = this.querySelector('.material-icons-outlined');
     if (icon) {
@@ -42,10 +42,12 @@ export class DarkToggle extends HTMLElement {
     localStorage.setItem('theme', this.isDark ? 'dark' : 'light');
 
     // Dispatch event for map theme changes
-    this.dispatchEvent(new CustomEvent('themeChanged', { 
-      detail: { isDark: this.isDark }, 
-      bubbles: true 
-    }));
+    this.dispatchEvent(
+      new CustomEvent('themeChanged', {
+        detail: { isDark: this.isDark },
+        bubbles: true
+      })
+    );
   }
 }
 

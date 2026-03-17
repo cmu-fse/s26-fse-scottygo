@@ -82,12 +82,16 @@ export class TransitModel {
     const CACHE_KEY = 'routes';
     const cached = await readCache<IRoute[]>(CACHE_KEY);
     if (cached) {
-      console.log(`[TransitModel ${new Date().toISOString()}] Routes served from cache`);
+      console.log(
+        `[TransitModel ${new Date().toISOString()}] Routes served from cache`
+      );
       return cached;
     }
 
     // Cache miss — build routes from GTFS & color them
-    console.log(`[TransitModel ${new Date().toISOString()}] Routes cache miss — building from GTFS`);
+    console.log(
+      `[TransitModel ${new Date().toISOString()}] Routes cache miss — building from GTFS`
+    );
     const routes = await TransitModel.buildColoredRoutes();
     if (routes.length > 0) {
       await writeCache(CACHE_KEY, 'routes', routes);
@@ -104,7 +108,9 @@ export class TransitModel {
     const CACHE_KEY = `patterns:${routeId}`;
     const cached = await readCache<IPattern[]>(CACHE_KEY);
     if (cached) {
-      console.log(`[TransitModel ${new Date().toISOString()}] Patterns for ${routeId} served from cache`);
+      console.log(
+        `[TransitModel ${new Date().toISOString()}] Patterns for ${routeId} served from cache`
+      );
       return cached;
     }
 
@@ -176,7 +182,9 @@ export class TransitModel {
 
     const cached = await readCache<IDetour[]>(CACHE_KEY);
     if (cached) {
-      console.log(`[TransitModel ${new Date().toISOString()}] Detours (${CACHE_KEY}) served from cache`);
+      console.log(
+        `[TransitModel ${new Date().toISOString()}] Detours (${CACHE_KEY}) served from cache`
+      );
       return TransitModel.filterDetoursByRouteIds(cached, routeIds);
     }
 
@@ -187,11 +195,16 @@ export class TransitModel {
     try {
       const detours = await trueTimeService.getDetours();
       await writeCache(CACHE_KEY, 'detours', detours);
-      console.log(`[TransitModel ${new Date().toISOString()}] Cached ${detours.length} detours`);
+      console.log(
+        `[TransitModel ${new Date().toISOString()}] Cached ${detours.length} detours`
+      );
 
       return TransitModel.filterDetoursByRouteIds(detours, routeIds);
     } catch (err) {
-      console.warn(`[TransitModel ${new Date().toISOString()}] Failed to cache detours:`, err);
+      console.warn(
+        `[TransitModel ${new Date().toISOString()}] Failed to cache detours:`,
+        err
+      );
       return [];
     }
   }
@@ -250,7 +263,9 @@ export class TransitModel {
    * After this, every client request is served entirely from MongoDB.
    */
   static async refreshAllCaches(): Promise<void> {
-    console.log(`[TransitModel ${new Date().toISOString()}] ── Starting full cache refresh ──`);
+    console.log(
+      `[TransitModel ${new Date().toISOString()}] ── Starting full cache refresh ──`
+    );
 
     if (!gtfsService.isLoaded()) {
       console.warn(
@@ -265,7 +280,9 @@ export class TransitModel {
       if (routes.length > 0) {
         await writeCache('routes', 'routes', routes);
       }
-      console.log(`[TransitModel ${new Date().toISOString()}] Cached ${routes.length} routes`);
+      console.log(
+        `[TransitModel ${new Date().toISOString()}] Cached ${routes.length} routes`
+      );
 
       // 2. Cache patterns for every route
       for (const route of routes) {
@@ -274,7 +291,9 @@ export class TransitModel {
           await writeCache(`patterns:${route.id}`, 'patterns', patterns);
         }
       }
-      console.log(`[TransitModel ${new Date().toISOString()}] Cached patterns for all routes`);
+      console.log(
+        `[TransitModel ${new Date().toISOString()}] Cached patterns for all routes`
+      );
 
       // 3. Cache stops for every route × direction
       for (const route of routes) {
@@ -285,20 +304,32 @@ export class TransitModel {
           }
         }
       }
-      console.log(`[TransitModel ${new Date().toISOString()}] Cached stops for all routes`);
+      console.log(
+        `[TransitModel ${new Date().toISOString()}] Cached stops for all routes`
+      );
 
       // 4. Cache detours (all routes at once)
       try {
         const detours = await trueTimeService.getDetours();
         await writeCache('detours:all', 'detours', detours);
-        console.log(`[TransitModel ${new Date().toISOString()}] Cached ${detours.length} detours`);
+        console.log(
+          `[TransitModel ${new Date().toISOString()}] Cached ${detours.length} detours`
+        );
       } catch (err) {
-        console.warn(`[TransitModel ${new Date().toISOString()}] Failed to cache detours:`, err);
+        console.warn(
+          `[TransitModel ${new Date().toISOString()}] Failed to cache detours:`,
+          err
+        );
       }
 
-      console.log(`[TransitModel ${new Date().toISOString()}] ── Cache refresh complete ──`);
+      console.log(
+        `[TransitModel ${new Date().toISOString()}] ── Cache refresh complete ──`
+      );
     } catch (err) {
-      console.error(`[TransitModel ${new Date().toISOString()}] Cache refresh failed:`, err);
+      console.error(
+        `[TransitModel ${new Date().toISOString()}] Cache refresh failed:`,
+        err
+      );
     }
   }
 

@@ -17,8 +17,7 @@
 import { transit_realtime } from 'gtfs-realtime-bindings';
 import { IPrediction } from '../../common/transit.interface';
 
-const GTFSRT_TRIPS_URL =
-  'https://truetime.portauthority.org/gtfsrt-bus/trips';
+const GTFSRT_TRIPS_URL = 'https://truetime.portauthority.org/gtfsrt-bus/trips';
 
 /** How often we re-fetch the feed (milliseconds). */
 const POLL_INTERVAL_MS = 30_000; // 30 seconds
@@ -143,9 +142,7 @@ class TripUpdatesService {
       }
 
       const buffer = await response.arrayBuffer();
-      const feed = transit_realtime.FeedMessage.decode(
-        new Uint8Array(buffer)
-      );
+      const feed = transit_realtime.FeedMessage.decode(new Uint8Array(buffer));
 
       const nowSec = Math.floor(Date.now() / 1000);
       const byStop = new Map<string, IPrediction[]>();
@@ -220,7 +217,10 @@ class TripUpdatesService {
     } catch (err) {
       this.consecutiveFailures++;
       this.lastError = err instanceof Error ? err.message : String(err);
-      console.error(`${tag()} Fetch failed (failures: ${this.consecutiveFailures}):`, err);
+      console.error(
+        `${tag()} Fetch failed (failures: ${this.consecutiveFailures}):`,
+        err
+      );
     }
   }
 }
