@@ -49,6 +49,12 @@ class VehiclePositionsService {
   /** Polling interval handle, if active. */
   private intervalId: ReturnType<typeof setInterval> | null = null;
 
+  /** True while a feed fetch/decode cycle is in progress. */
+  private fetchInProgress = false;
+
+  /** Whether an extra poll should run immediately after the current one finishes. */
+  private pendingPollTick = false;
+
   /** Timestamp of the last successful fetch. */
   private lastFetched: Date | null = null;
 
@@ -109,10 +115,10 @@ class VehiclePositionsService {
     );
 
     // Immediate first fetch
-    this.fetchAndStore();
+    this.pollTick();
 
     this.intervalId = setInterval(() => {
-      this.fetchAndStore();
+      this.pollTick();
     }, POLL_INTERVAL_MS);
   }
 
@@ -127,12 +133,26 @@ class VehiclePositionsService {
 
   // ── Internal ─────────────────────────────────────────────────────────
 
+  /** Run one poll cycle, skipping if a previous cycle is still in progress. */
+  private pollTick(): void {
+    if (this.fetchInProgress) {
+      this.pendingPollTick = true;
+      console.warn(
+        `${tag()} Skipping poll tick: previous fetch still in progress`
+      );
+      return;
+    }
+
+    this.fetchAndStore();
+  }
+
   /**
    * Fetch the GTFS-RT binary feed, decode it, and rebuild the in-memory
    * index.  Errors are logged but never thrown — the old data remains
    * available until the next successful fetch.
    */
   private async fetchAndStore(): Promise<void> {
+    this.fetchInProgress = true;
     try {
       const response = await fetch(GTFSRT_VEHICLE_URL, {
         headers: { Accept: 'application/x-protobuf' }
@@ -230,6 +250,12 @@ class VehiclePositionsService {
         `${tag()} Fetch failed (failures: ${this.consecutiveFailures}):`,
         err
       );
+    } finally {
+      this.fetchInProgress = false;
+      if (this.pendingPollTick) {
+        this.pendingPollTick = false;
+        this.fetchAndStore();
+      }
     }
   }
 }

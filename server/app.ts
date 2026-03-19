@@ -35,6 +35,9 @@ class App {
 
   public io: SocketServer;
 
+  private dailyRefreshIntervalId: ReturnType<typeof setInterval> | null = null;
+  private isShuttingDown = false;
+
   constructor(
     controllers: Controller[],
     params: {
@@ -75,20 +78,32 @@ class App {
     });
 
     DAC.db.connect().then(async () => {
+      if (this.isShuttingDown) {
+        return;
+      }
       memoryMonitorService.enablePersistence();
       memoryMonitorService.capture('db.connected');
       if (initOnStart) {
         await this.db.init();
+        if (this.isShuttingDown) {
+          return;
+        }
         memoryMonitorService.capture('db.init.complete');
         // I set initOnStart to false if STAGE is 'PROD' in serve.ts so no risk of deleting PROD DB
       }
       // Seed default admin user if it doesn't exist
       // This runs in both PROD and non-PROD to ensure default admin exists
       await this.db.seedDefaultAdmin();
+      if (this.isShuttingDown) {
+        return;
+      }
       memoryMonitorService.capture('seedDefaultAdmin.complete');
 
       // Wait for GTFS to finish loading before populating the cache
       await gtfsReady;
+      if (this.isShuttingDown) {
+        return;
+      }
       memoryMonitorService.capture('gtfs.load.complete');
 
       // Populate the transit cache from GTFS data + one TrueTime call for colors.
@@ -96,6 +111,9 @@ class App {
       // GTFS-RT polling adds more allocations — prevents startup peak OOM.
       try {
         await TransitModel.refreshAllCaches();
+        if (this.isShuttingDown) {
+          return;
+        }
         memoryMonitorService.capture('transit.refreshAllCaches.complete');
       } catch (err) {
         console.error(
@@ -118,22 +136,55 @@ class App {
       // Delayed until after cache refresh so V8 can GC startup temporaries first.
       vehiclePositionsService.start();
       tripUpdatesService.start();
+      if (this.isShuttingDown) {
+        vehiclePositionsService.stop();
+        tripUpdatesService.stop();
+        return;
+      }
       memoryMonitorService.capture('realtime-pollers.started');
 
       // Schedule a daily cache refresh (every 24 h).
       const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
-      setInterval(() => {
-        TransitModel.refreshAllCaches().catch((err) =>
+      this.dailyRefreshIntervalId = setInterval(async () => {
+        memoryMonitorService.capture(
+          'transit.refreshAllCaches.scheduled.start'
+        );
+        try {
+          await TransitModel.refreshAllCaches();
+          memoryMonitorService.capture(
+            'transit.refreshAllCaches.scheduled.complete'
+          );
+          if (global.gc) {
+            global.gc();
+            memoryMonitorService.capture(
+              'transit.refreshAllCaches.scheduled.post-gc'
+            );
+          }
+        } catch (err) {
           console.error(
             `[TransitModel ${new Date().toISOString()}] Scheduled cache refresh failed:`,
             err
-          )
-        );
+          );
+          memoryMonitorService.capture(
+            'transit.refreshAllCaches.scheduled.failed'
+          );
+        }
       }, TWENTY_FOUR_HOURS);
+
+      // Do not keep the Node.js event loop alive solely for this long timer.
+      this.dailyRefreshIntervalId.unref?.();
     });
   }
 
   private configureMiddlewares() {
+    // Trust reverse-proxy headers (X-Forwarded-*) in hosted environments.
+    this.app.set('trust proxy', true);
+
+    // Avoid noisy 404s in browser dev tools for favicon requests.
+    this.app.get('/favicon.ico', (_req: Request, res: Response) => {
+      res.status(204).end();
+    });
+
     // SECURITY: Enforce HTTPS in production - throw hard error, never redirect non-SSL to SSL
     // This prevents poorly configured clients from leaking data over unencrypted connections
     this.app.use(this.enforceHttps);
@@ -171,11 +222,42 @@ class App {
       return next();
     }
 
-    // Check the protocol - in production behind a proxy, check X-Forwarded-Proto
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+    // Allow local loopback HTTP for local diagnostics even when STAGE=PROD.
+    // This preserves strict HTTPS behavior for non-local traffic.
+    const host = (req.headers.host ?? '').toLowerCase();
+    const hostname = (req.hostname ?? '').toLowerCase();
+    const ip = (req.ip ?? '').toLowerCase();
+    const isLoopback =
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '::1' ||
+      host.startsWith('localhost:') ||
+      host.startsWith('127.0.0.1:') ||
+      host.startsWith('[::1]:') ||
+      ip === '127.0.0.1' ||
+      ip === '::1' ||
+      ip === '::ffff:127.0.0.1';
+
+    if (isLoopback) {
+      return next();
+    }
+
+    // Check protocol safely behind proxies. Some providers send a comma-separated
+    // chain like "https,http"; treat any HTTPS value as secure.
+    const forwardedProtoHeader = req.headers['x-forwarded-proto'];
+    const forwardedProtoRaw = Array.isArray(forwardedProtoHeader)
+      ? forwardedProtoHeader.join(',')
+      : (forwardedProtoHeader ?? '').toString();
+    const forwardedProtoValues = forwardedProtoRaw
+      .split(',')
+      .map((p) => p.trim().toLowerCase())
+      .filter(Boolean);
+    const protocol = (req.protocol || 'http').toLowerCase();
+    const isHttps =
+      protocol === 'https' || forwardedProtoValues.includes('https');
 
     // If the original request was not HTTPS, throw a hard error
-    if (protocol !== 'https') {
+    if (!isHttps) {
       console.error(
         `[Security ${new Date().toISOString()}] Blocked non-HTTPS request to ${req.method} ${req.path} from ${req.ip}`
       );
@@ -220,6 +302,17 @@ class App {
   // listen for incoming requests
   public async listen(): Promise<HttpServer> {
     return new Promise<HttpServer>((resolve, reject) => {
+      this.server.once('close', () => {
+        this.isShuttingDown = true;
+        memoryMonitorService.stop();
+        vehiclePositionsService.stop();
+        tripUpdatesService.stop();
+        if (this.dailyRefreshIntervalId) {
+          clearInterval(this.dailyRefreshIntervalId);
+          this.dailyRefreshIntervalId = null;
+        }
+      });
+
       this.io.on('connection', (socket: Socket) => {
         console.log(
           `⚡️[Server ${new Date().toISOString()}] A client connected to the socket server with id ${socket.id}`

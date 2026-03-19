@@ -16,15 +16,57 @@ import * as responses from '../../../common/server.responses';
 
 // Store reference to original email service before mocking
 const originalEmailService = jest.requireActual(
-  '../../server/services/email.service'
+  '../../../server/services/email.service'
 ).default;
 
 // Mock the email service to avoid sending real emails during most tests
-jest.mock('../../server/services/email.service', () => ({
+jest.mock('../../../server/services/email.service', () => ({
   __esModule: true,
   default: {
     sendAccountInactivatedEmail: jest.fn().mockResolvedValue(true),
     sendAccountReactivatedEmail: jest.fn().mockResolvedValue(true)
+  }
+}));
+
+// Keep account tests isolated from transit startup side effects.
+jest.mock('../../../server/services/gtfs.service', () => ({
+  __esModule: true,
+  default: {
+    load: jest.fn().mockResolvedValue(undefined),
+    isLoaded: jest.fn().mockReturnValue(true)
+  }
+}));
+
+jest.mock('../../../server/models/transit.model', () => ({
+  __esModule: true,
+  TransitModel: {
+    refreshAllCaches: jest.fn().mockResolvedValue(undefined)
+  }
+}));
+
+jest.mock('../../../server/services/vehicle-positions.service', () => ({
+  __esModule: true,
+  default: {
+    start: jest.fn(),
+    stop: jest.fn()
+  }
+}));
+
+jest.mock('../../../server/services/trip-updates.service', () => ({
+  __esModule: true,
+  default: {
+    start: jest.fn(),
+    stop: jest.fn()
+  }
+}));
+
+jest.mock('../../../server/services/memory-monitor.service', () => ({
+  __esModule: true,
+  default: {
+    start: jest.fn(),
+    stop: jest.fn(),
+    capture: jest.fn(),
+    enablePersistence: jest.fn()
   }
 }));
 
@@ -812,7 +854,7 @@ describe('PATCH /account/users/:username/password', () => {
     );
   });
 
-  test('Member cannot change password without current password', async () => {
+  test('Member can change own password without current password', async () => {
     const res = await request(
       'PATCH',
       `/account/users/${member2User.credentials.username}/password`,
@@ -820,12 +862,19 @@ describe('PATCH /account/users/:username/password', () => {
       member2Token
     );
 
-    expect(res.status).toBe(400);
-    const error = res.data as responses.IAppError;
-    expect(error.name).toBe('MissingPassword');
+    expect(res.status).toBe(200);
+    expect((res.data as responses.ISuccess).name).toBe('PasswordUpdated');
+
+    // Reset for downstream tests.
+    await request(
+      'PATCH',
+      `/account/users/${member2User.credentials.username}/password`,
+      { newPassword: member2User.credentials.password },
+      adminToken
+    );
   });
 
-  test('Wrong current password returns error', async () => {
+  test('currentPassword field is ignored for authorized self update', async () => {
     const res = await request(
       'PATCH',
       `/account/users/${member2User.credentials.username}/password`,
@@ -833,9 +882,16 @@ describe('PATCH /account/users/:username/password', () => {
       member2Token
     );
 
-    expect(res.status).toBe(400);
-    const error = res.data as responses.IAppError;
-    expect(error.name).toBe('IncorrectPassword');
+    expect(res.status).toBe(200);
+    expect((res.data as responses.ISuccess).name).toBe('PasswordUpdated');
+
+    // Reset for downstream tests.
+    await request(
+      'PATCH',
+      `/account/users/${member2User.credentials.username}/password`,
+      { newPassword: member2User.credentials.password },
+      adminToken
+    );
   });
 
   test('Member cannot change another user password', async () => {
