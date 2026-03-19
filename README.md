@@ -4,6 +4,8 @@
 
 ## Repo Artifacts
 
+- Quick link: [Memory Monitoring Runbook](docs/MemoryMonitoringRunbook.md)
+
 ## Selected Technology
 
 HTML, CSS : this is the tech stack everyone on the team is comfortable with for frontend TS, Express Js: class standards Websocket, Socket.IO: live data streaming MongoDB: database we are all familiar with and provides great schema flexibility Render: deploying the application Parcel: building the packages Google Map API: map and stop visualization Pittsburgh Open Transit True Time API: real-time live data of bus status CMU Shuttle Tripshot data: XHR Data packets containing live shuttle updates
@@ -52,3 +54,7 @@ HTML, CSS : this is the tech stack everyone on the team is comfortable with for 
 
 1. This repo has main-branch protection: PR and approval are necessary for changes to the main branch.
 2. This repo must remain private at all times. Sharing or publishing it outside your project team or making any clone of it publicly available is strictly prohibited by course policies. Violations are subject to the course and CMU Academic Integrity Policy.
+
+## Operational Runbooks
+
+- Memory monitoring and dashboard workflow: [docs/MemoryMonitoringRunbook.md](docs/MemoryMonitoringRunbook.md)

@@ -124,21 +124,22 @@ const sampleDetours: IDetour[] = [
   }
 ];
 
-// Mock TrueTime service
-jest.mock('../../server/services/truetime.service', () => ({
+// Mock TransitModel (controller uses this for route/pattern/stop/detour data)
+jest.mock('../../../server/models/transit.model', () => ({
   __esModule: true,
-  default: {
+  TransitModel: {
+    refreshAllCaches: jest.fn().mockResolvedValue(undefined),
     getRoutes: jest.fn(),
     getPatterns: jest.fn(),
     getStops: jest.fn(),
-    getVehicles: jest.fn(),
-    getPredictions: jest.fn(),
-    getDetours: jest.fn()
+    getDetours: jest.fn(),
+    getAllTransitData: jest.fn(),
+    colorsAvailable: true
   }
 }));
 
 // Mock GTFS service
-jest.mock('../../server/services/gtfs.service', () => ({
+jest.mock('../../../server/services/gtfs.service', () => ({
   __esModule: true,
   default: {
     load: jest.fn().mockResolvedValue(undefined),
@@ -146,16 +147,92 @@ jest.mock('../../server/services/gtfs.service', () => ({
     getRoutes: jest.fn(),
     getPatterns: jest.fn(),
     getStops: jest.fn(),
+    getStopsByDirection: jest.fn(),
     filterRoutesByDate: jest.fn(),
     filterRoutesByDateTime: jest.fn()
   }
 }));
 
-import trueTimeService from '../../../server/services/truetime.service';
-import gtfsService from '../../../server/services/gtfs.service';
+jest.mock('../../../server/services/vehicle-positions.service', () => ({
+  __esModule: true,
+  default: {
+    start: jest.fn(),
+    stop: jest.fn(),
+    getVehicles: jest.fn(),
+    isHealthy: jest.fn().mockReturnValue(true),
+    getLastFetched: jest.fn().mockReturnValue(new Date()),
+    getConsecutiveFailures: jest.fn().mockReturnValue(0),
+    getLastError: jest.fn().mockReturnValue(null)
+  }
+}));
 
-const mockTrueTime = trueTimeService as jest.Mocked<typeof trueTimeService>;
+jest.mock('../../../server/services/trip-updates.service', () => ({
+  __esModule: true,
+  default: {
+    start: jest.fn(),
+    stop: jest.fn(),
+    getPredictions: jest.fn(),
+    isHealthy: jest.fn().mockReturnValue(true),
+    getLastFetched: jest.fn().mockReturnValue(new Date()),
+    getConsecutiveFailures: jest.fn().mockReturnValue(0),
+    getLastError: jest.fn().mockReturnValue(null)
+  }
+}));
+
+jest.mock('../../../server/services/tripshot.service', () => ({
+  __esModule: true,
+  default: {
+    isConfigured: jest.fn().mockReturnValue(false),
+    getRoutes: jest.fn().mockResolvedValue([]),
+    getPatterns: jest.fn().mockResolvedValue([]),
+    getStops: jest.fn().mockResolvedValue([]),
+    getVehicles: jest.fn().mockResolvedValue([])
+  }
+}));
+
+jest.mock('../../../server/services/memory-monitor.service', () => ({
+  __esModule: true,
+  default: {
+    start: jest.fn(),
+    stop: jest.fn(),
+    capture: jest.fn(),
+    enablePersistence: jest.fn(),
+    getSummary: jest.fn().mockReturnValue({
+      latest: {
+        timestamp: new Date().toISOString(),
+        rssMb: 128,
+        heapUsedMb: 64,
+        heapTotalMb: 96,
+        externalMb: 10,
+        arrayBuffersMb: 4,
+        uptimeSec: 1
+      },
+      peakRssMb: 128,
+      peakHeapUsedMb: 64,
+      recentSamples: [],
+      rssDelta5mMb: 0,
+      heapUsedDelta5mMb: 0,
+      rssSlopeMbPerMin: 0,
+      heapUsedSlopeMbPerMin: 0,
+      warning: false,
+      critical: false
+    })
+  }
+}));
+
+import gtfsService from '../../../server/services/gtfs.service';
+import { TransitModel } from '../../../server/models/transit.model';
+import vehiclePositionsService from '../../../server/services/vehicle-positions.service';
+import tripUpdatesService from '../../../server/services/trip-updates.service';
+
 const mockGtfs = gtfsService as jest.Mocked<typeof gtfsService>;
+const mockTransitModel = TransitModel as jest.Mocked<typeof TransitModel>;
+const mockVehiclePositions = vehiclePositionsService as jest.Mocked<
+  typeof vehiclePositionsService
+>;
+const mockTripUpdates = tripUpdatesService as jest.Mocked<
+  typeof tripUpdatesService
+>;
 
 // ---------------------------------------------------------------------------
 // Test setup
@@ -273,7 +350,7 @@ beforeEach(() => {
 
 describe('GET /transit/routes', () => {
   test('returns all routes (Basic Flow step 4)', async () => {
-    mockTrueTime.getRoutes.mockResolvedValue(sampleRoutes);
+    mockTransitModel.getRoutes.mockResolvedValue(sampleRoutes);
 
     const res = await request('GET', '/transit/routes');
 
@@ -287,7 +364,7 @@ describe('GET /transit/routes', () => {
   });
 
   test('filters by system=PRT (Basic Flow step 4, Rule R2 default)', async () => {
-    mockTrueTime.getRoutes.mockResolvedValue(sampleRoutes);
+    mockTransitModel.getRoutes.mockResolvedValue(sampleRoutes);
 
     const res = await request('GET', '/transit/routes?system=PRT');
 
@@ -298,7 +375,7 @@ describe('GET /transit/routes', () => {
   });
 
   test('returns empty array when no routes exist', async () => {
-    mockTrueTime.getRoutes.mockResolvedValue([]);
+    mockTransitModel.getRoutes.mockResolvedValue([]);
 
     const res = await request('GET', '/transit/routes');
 
@@ -314,7 +391,7 @@ describe('GET /transit/routes', () => {
       name: 'UpstreamError',
       message: 'TrueTime API request timed out (>5 s)'
     };
-    mockTrueTime.getRoutes.mockRejectedValue(err);
+    mockTransitModel.getRoutes.mockRejectedValue(err);
 
     const res = await request('GET', '/transit/routes');
 
@@ -324,7 +401,7 @@ describe('GET /transit/routes', () => {
   });
 
   test('route objects have required IRoute fields', async () => {
-    mockTrueTime.getRoutes.mockResolvedValue(sampleRoutes);
+    mockTransitModel.getRoutes.mockResolvedValue(sampleRoutes);
 
     const res = await request('GET', '/transit/routes');
     const routes = (res.data as responses.ISuccess).payload as IRoute[];
@@ -427,7 +504,7 @@ describe('POST /transit/routes/available', () => {
 
 describe('GET /transit/routes/:id', () => {
   test('returns route patterns with INBOUND and OUTBOUND (basic flow)', async () => {
-    mockTrueTime.getPatterns.mockResolvedValue(samplePatterns);
+    mockTransitModel.getPatterns.mockResolvedValue(samplePatterns);
 
     const res = await request('GET', '/transit/routes/P1');
 
@@ -442,7 +519,7 @@ describe('GET /transit/routes/:id', () => {
   });
 
   test('pattern path contains lat/lng coordinates', async () => {
-    mockTrueTime.getPatterns.mockResolvedValue(samplePatterns);
+    mockTransitModel.getPatterns.mockResolvedValue(samplePatterns);
 
     const res = await request('GET', '/transit/routes/P1');
     const patterns = (res.data as responses.ISuccess).payload as IPattern[];
@@ -458,32 +535,26 @@ describe('GET /transit/routes/:id', () => {
     });
   });
 
-  test('falls back to GTFS when TrueTime fails (A2 fallback)', async () => {
-    mockTrueTime.getPatterns.mockRejectedValue(new Error('API down'));
-    mockGtfs.isLoaded.mockReturnValue(true);
-    mockGtfs.getPatterns.mockReturnValue(samplePatterns);
+  test('returns 500 when route pattern lookup throws', async () => {
+    mockTransitModel.getPatterns.mockRejectedValue(new Error('API down'));
 
     const res = await request('GET', '/transit/routes/P1');
 
-    expect(res.status).toBe(200);
-    const success = res.data as responses.ISuccess;
-    expect(success.name).toBe('PathGenerated');
-    expect(mockGtfs.getPatterns).toHaveBeenCalledWith('P1');
+    expect(res.status).toBe(500);
+    expect(mockGtfs.getPatterns).not.toHaveBeenCalled();
   });
 
-  test('falls back to GTFS when TrueTime returns empty', async () => {
-    mockTrueTime.getPatterns.mockResolvedValue([]);
-    mockGtfs.isLoaded.mockReturnValue(true);
-    mockGtfs.getPatterns.mockReturnValue(samplePatterns);
+  test('returns 404 when route pattern lookup is empty', async () => {
+    mockTransitModel.getPatterns.mockResolvedValue([]);
 
     const res = await request('GET', '/transit/routes/P1');
 
-    expect(res.status).toBe(200);
-    expect(mockGtfs.getPatterns).toHaveBeenCalledWith('P1');
+    expect(res.status).toBe(404);
+    expect(mockGtfs.getPatterns).not.toHaveBeenCalled();
   });
 
   test('returns 404 when route not found in either source', async () => {
-    mockTrueTime.getPatterns.mockResolvedValue([]);
+    mockTransitModel.getPatterns.mockResolvedValue([]);
     mockGtfs.isLoaded.mockReturnValue(true);
     mockGtfs.getPatterns.mockReturnValue([]);
 
@@ -495,7 +566,7 @@ describe('GET /transit/routes/:id', () => {
   });
 
   test('returns 404 when GTFS not loaded and TrueTime returns nothing', async () => {
-    mockTrueTime.getPatterns.mockResolvedValue([]);
+    mockTransitModel.getPatterns.mockResolvedValue([]);
     mockGtfs.isLoaded.mockReturnValue(false);
 
     const res = await request('GET', '/transit/routes/NOEXIST');
@@ -512,7 +583,7 @@ describe('GET /transit/routes/:id', () => {
 
 describe('GET /transit/vehicles/:routeId', () => {
   test('returns live vehicle positions for a route', async () => {
-    mockTrueTime.getVehicles.mockResolvedValue(sampleVehicles);
+    mockVehiclePositions.getVehicles.mockReturnValue(sampleVehicles);
 
     const res = await request('GET', '/transit/vehicles/P1');
 
@@ -527,7 +598,7 @@ describe('GET /transit/vehicles/:routeId', () => {
   });
 
   test('vehicle objects have all IVehicle fields', async () => {
-    mockTrueTime.getVehicles.mockResolvedValue(sampleVehicles);
+    mockVehiclePositions.getVehicles.mockReturnValue(sampleVehicles);
 
     const res = await request('GET', '/transit/vehicles/P1');
     const vehicles = (res.data as responses.ISuccess).payload as IVehicle[];
@@ -544,7 +615,7 @@ describe('GET /transit/vehicles/:routeId', () => {
   });
 
   test('returns empty array when no vehicles active (A7 no service)', async () => {
-    mockTrueTime.getVehicles.mockResolvedValue([]);
+    mockVehiclePositions.getVehicles.mockReturnValue([]);
 
     const res = await request('GET', '/transit/vehicles/P1');
 
@@ -560,7 +631,9 @@ describe('GET /transit/vehicles/:routeId', () => {
       name: 'UpstreamError',
       message: 'TrueTime API request timed out (>5 s)'
     };
-    mockTrueTime.getVehicles.mockRejectedValue(err);
+    mockVehiclePositions.getVehicles.mockImplementation(() => {
+      throw err;
+    });
 
     const res = await request('GET', '/transit/vehicles/P1');
 
@@ -570,7 +643,7 @@ describe('GET /transit/vehicles/:routeId', () => {
   });
 
   test('only returns vehicles for the requested route (Rule R1)', async () => {
-    mockTrueTime.getVehicles.mockResolvedValue(sampleVehicles);
+    mockVehiclePositions.getVehicles.mockReturnValue(sampleVehicles);
 
     const res = await request('GET', '/transit/vehicles/P1');
     const vehicles = (res.data as responses.ISuccess).payload as IVehicle[];
@@ -587,7 +660,7 @@ describe('GET /transit/vehicles/:routeId', () => {
 
 describe('GET /transit/stops/:routeId', () => {
   test('returns stops for a route with direction filter (Basic Flow step 11)', async () => {
-    mockTrueTime.getStops.mockResolvedValue(sampleStops);
+    mockTransitModel.getStops.mockResolvedValue(sampleStops);
 
     const res = await request('GET', '/transit/stops/G2?dir=INBOUND');
 
@@ -609,7 +682,7 @@ describe('GET /transit/stops/:routeId', () => {
   });
 
   test('stop objects have all IStop fields', async () => {
-    mockTrueTime.getStops.mockResolvedValue(sampleStops);
+    mockTransitModel.getStops.mockResolvedValue(sampleStops);
 
     const res = await request('GET', '/transit/stops/P1?dir=OUTBOUND');
     const stops = (res.data as responses.ISuccess).payload as IStop[];
@@ -623,30 +696,16 @@ describe('GET /transit/stops/:routeId', () => {
     expect(typeof stop.lon).toBe('number');
   });
 
-  test('falls back to GTFS when TrueTime fails (A2 fallback)', async () => {
-    mockTrueTime.getStops.mockRejectedValue(new Error('API down'));
-    mockGtfs.isLoaded.mockReturnValue(true);
-    mockGtfs.getStops.mockReturnValue(sampleStops);
+  test('returns 404 when route has no stops in cache', async () => {
+    mockTransitModel.getStops.mockResolvedValue([]);
 
     const res = await request('GET', '/transit/stops/P1?dir=INBOUND');
 
-    expect(res.status).toBe(200);
-    expect(mockGtfs.getStops).toHaveBeenCalledWith('P1');
-  });
-
-  test('falls back to GTFS when TrueTime returns empty', async () => {
-    mockTrueTime.getStops.mockResolvedValue([]);
-    mockGtfs.isLoaded.mockReturnValue(true);
-    mockGtfs.getStops.mockReturnValue(sampleStops);
-
-    const res = await request('GET', '/transit/stops/P1?dir=INBOUND');
-
-    expect(res.status).toBe(200);
-    expect(mockGtfs.getStops).toHaveBeenCalledWith('P1');
+    expect(res.status).toBe(404);
   });
 
   test('returns 404 when route has no stops in either source', async () => {
-    mockTrueTime.getStops.mockResolvedValue([]);
+    mockTransitModel.getStops.mockResolvedValue([]);
     mockGtfs.isLoaded.mockReturnValue(true);
     mockGtfs.getStops.mockReturnValue([]);
 
@@ -664,7 +723,7 @@ describe('GET /transit/stops/:routeId', () => {
 
 describe('GET /transit/stops/:stopId/predictions', () => {
   test('returns predictions for a valid stop', async () => {
-    mockTrueTime.getPredictions.mockResolvedValue(samplePredictions);
+    mockTripUpdates.getPredictions.mockReturnValue(samplePredictions);
 
     const res = await request('GET', '/transit/stops/7079/predictions');
 
@@ -678,7 +737,7 @@ describe('GET /transit/stops/:stopId/predictions', () => {
   });
 
   test('prediction objects have all IPrediction fields', async () => {
-    mockTrueTime.getPredictions.mockResolvedValue(samplePredictions);
+    mockTripUpdates.getPredictions.mockReturnValue(samplePredictions);
 
     const res = await request('GET', '/transit/stops/7079/predictions');
     const predictions = (res.data as responses.ISuccess)
@@ -694,7 +753,7 @@ describe('GET /transit/stops/:stopId/predictions', () => {
   });
 
   test('returns empty array when no predictions available', async () => {
-    mockTrueTime.getPredictions.mockResolvedValue([]);
+    mockTripUpdates.getPredictions.mockReturnValue([]);
 
     const res = await request('GET', '/transit/stops/7079/predictions');
 
@@ -710,7 +769,9 @@ describe('GET /transit/stops/:stopId/predictions', () => {
       name: 'StopNotFound',
       message: 'Stop 99999 not found'
     };
-    mockTrueTime.getPredictions.mockRejectedValue(err);
+    mockTripUpdates.getPredictions.mockImplementation(() => {
+      throw err;
+    });
 
     const res = await request('GET', '/transit/stops/99999/predictions');
 
@@ -725,7 +786,9 @@ describe('GET /transit/stops/:stopId/predictions', () => {
       name: 'UpstreamError',
       message: 'TrueTime API returned HTTP 503'
     };
-    mockTrueTime.getPredictions.mockRejectedValue(err);
+    mockTripUpdates.getPredictions.mockImplementation(() => {
+      throw err;
+    });
 
     const res = await request('GET', '/transit/stops/7079/predictions');
 
@@ -741,7 +804,7 @@ describe('GET /transit/stops/:stopId/predictions', () => {
 
 describe('GET /transit/detours/:routeId', () => {
   test('returns detours for a route', async () => {
-    mockTrueTime.getDetours.mockResolvedValue(sampleDetours);
+    mockTransitModel.getDetours.mockResolvedValue(sampleDetours);
 
     const res = await request('GET', '/transit/detours/P1');
 
@@ -754,7 +817,7 @@ describe('GET /transit/detours/:routeId', () => {
   });
 
   test('detour objects have all IDetour fields', async () => {
-    mockTrueTime.getDetours.mockResolvedValue(sampleDetours);
+    mockTransitModel.getDetours.mockResolvedValue(sampleDetours);
 
     const res = await request('GET', '/transit/detours/P1');
     const detours = (res.data as responses.ISuccess).payload as IDetour[];
@@ -767,7 +830,7 @@ describe('GET /transit/detours/:routeId', () => {
   });
 
   test('returns empty array when no active detours', async () => {
-    mockTrueTime.getDetours.mockResolvedValue([]);
+    mockTransitModel.getDetours.mockResolvedValue([]);
 
     const res = await request('GET', '/transit/detours/P1');
 
@@ -783,7 +846,7 @@ describe('GET /transit/detours/:routeId', () => {
       name: 'UpstreamError',
       message: 'TrueTime API returned HTTP 500'
     };
-    mockTrueTime.getDetours.mockRejectedValue(err);
+    mockTransitModel.getDetours.mockRejectedValue(err);
 
     const res = await request('GET', '/transit/detours/P1');
 
@@ -842,7 +905,7 @@ describe('GET /map/config', () => {
 
 describe('Response format consistency', () => {
   test('success responses have name & payload fields', async () => {
-    mockTrueTime.getRoutes.mockResolvedValue(sampleRoutes);
+    mockTransitModel.getRoutes.mockResolvedValue(sampleRoutes);
     const res = await request('GET', '/transit/routes');
 
     expect(res.status).toBe(200);
@@ -858,7 +921,7 @@ describe('Response format consistency', () => {
       name: 'UpstreamError',
       message: 'TrueTime API request timed out'
     };
-    mockTrueTime.getRoutes.mockRejectedValue(err);
+    mockTransitModel.getRoutes.mockRejectedValue(err);
 
     const res = await request('GET', '/transit/routes');
     const error = res.data as responses.IAppError;
@@ -874,34 +937,30 @@ describe('Response format consistency', () => {
 // ============================================================================
 
 describe('A2 Fallback: TrueTime down → GTFS static data', () => {
-  test('routes/:id falls back to GTFS patterns on TrueTime timeout', async () => {
-    mockTrueTime.getPatterns.mockRejectedValue(
+  test('routes/:id returns 500 when cache fetch throws timeout', async () => {
+    mockTransitModel.getPatterns.mockRejectedValue(
       Object.assign(new Error('timeout'), { name: 'AbortError' })
     );
-    mockGtfs.isLoaded.mockReturnValue(true);
-    mockGtfs.getPatterns.mockReturnValue(samplePatterns);
 
     const res = await request('GET', '/transit/routes/P1');
 
-    expect(res.status).toBe(200);
-    expect(mockGtfs.getPatterns).toHaveBeenCalledWith('P1');
+    expect(res.status).toBe(500);
+    expect(mockGtfs.getPatterns).not.toHaveBeenCalled();
   });
 
-  test('stops/:routeId falls back to GTFS stops on TrueTime timeout', async () => {
-    mockTrueTime.getStops.mockRejectedValue(
+  test('stops/:routeId returns 500 when cache fetch throws timeout', async () => {
+    mockTransitModel.getStops.mockRejectedValue(
       Object.assign(new Error('timeout'), { name: 'AbortError' })
     );
-    mockGtfs.isLoaded.mockReturnValue(true);
-    mockGtfs.getStops.mockReturnValue(sampleStops);
 
     const res = await request('GET', '/transit/stops/P1?dir=INBOUND');
 
-    expect(res.status).toBe(200);
-    expect(mockGtfs.getStops).toHaveBeenCalledWith('P1');
+    expect(res.status).toBe(500);
+    expect(mockGtfs.getStops).not.toHaveBeenCalled();
   });
 
   test('GTFS fallback not used when GTFS is not loaded', async () => {
-    mockTrueTime.getPatterns.mockResolvedValue([]);
+    mockTransitModel.getPatterns.mockResolvedValue([]);
     mockGtfs.isLoaded.mockReturnValue(false);
 
     const res = await request('GET', '/transit/routes/P1');

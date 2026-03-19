@@ -56,7 +56,7 @@ const MTransitCache = model<ITransitCache>('TransitCache', TransitCacheSchema);
 
 // ── Memory Monitor Schema ──────────────────────────────────────────────
 const MemorySampleSchema = new Schema<IMemorySampleRecord>({
-  timestamp: { type: Date, required: true, index: true },
+  timestamp: { type: Date, required: true },
   reason: { type: String, required: true },
   rssMb: { type: Number, required: true },
   heapUsedMb: { type: Number, required: true },
