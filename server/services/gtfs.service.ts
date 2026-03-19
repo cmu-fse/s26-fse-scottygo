@@ -5,6 +5,11 @@
 import AdmZip from 'adm-zip';
 import { parse } from 'csv-parse/sync';
 import { parse as createCsvParser } from 'csv-parse';
+import { writeFile, unlink } from 'fs/promises';
+import { tmpdir } from 'os';
+import { join } from 'path';
+import { randomUUID } from 'crypto';
+import { spawn } from 'child_process';
 import { IRoute, IPattern, IStop } from '../../common/transit.interface';
 import { IAppError } from '../../common/server.responses';
 
@@ -75,21 +80,21 @@ class GTFSService {
       throw new Error(`[GTFS] Failed to download feed: HTTP ${res.status}`);
     }
 
-    // Use `let` so we can release the zip once all entries are extracted.
+    // Persist the zip to disk so we can stream stop_times.txt without loading
+    // the entire decompressed file into memory.
+    const zipPath = join(tmpdir(), `scottygo-gtfs-${randomUUID()}.zip`);
     let zipBuffer: Buffer | null = Buffer.from(await res.arrayBuffer());
-    let zip: AdmZip | null = new AdmZip(zipBuffer);
+    await writeFile(zipPath, zipBuffer);
+    zipBuffer = null;
+
+    // Open from file path (not in-memory buffer) to keep peak memory lower.
+    let zip: AdmZip | null = new AdmZip(zipPath);
 
     const readEntry = (name: string): string => {
       const entry = zip!.getEntry(name);
       if (!entry) throw new Error(`[GTFS] Missing file in zip: ${name}`);
       return entry.getData().toString('utf8');
     };
-    const readEntryBuffer = (name: string): Buffer => {
-      const entry = zip!.getEntry(name);
-      if (!entry) throw new Error(`[GTFS] Missing file in zip: ${name}`);
-      return entry.getData();
-    };
-
     const opts = { columns: true as const, skip_empty_lines: true };
 
     // ---- Parse and process each file, then let its raw array be GC'd ----
@@ -222,11 +227,8 @@ class GTFSService {
       else if (d.exception_type === '2') ex.removed.add(d.service_id);
     }
 
-    // --- Extract stop_times as raw Buffer, then release the zip ---
-    // Using Buffer (not string) avoids the V8 string conversion overhead.
-    let stopTimesBuffer: Buffer | null = readEntryBuffer('stop_times.txt');
-    zip = null; // free ~30 MB
-    zipBuffer = null;
+    // Release the zip handle before processing the huge stop_times.txt stream.
+    zip = null;
 
     // --- Compute operatingDays per route by joining trips → services → calendar days ---
     const routeActiveDays = new Map<string, Set<number>>();
@@ -248,53 +250,80 @@ class GTFSService {
     }
 
     // --- Build trip time ranges and route→stops by STREAMING stop_times ---
-    // Stream-parsing avoids holding the entire parsed output array in memory,
-    // and using a Buffer (not string) avoids the extra string allocation.
+    // Stream-parsing from `unzip -p` avoids holding stop_times.txt in memory.
     console.log(
       `[GTFS ${new Date().toISOString()}] Parsing stop_times.txt (streaming to save memory)...`
     );
     const routeStopIds = new Map<string, Set<string>>();
     const routeDirStopIds = new Map<string, Set<string>>(); // "routeId:DIR" → stop IDs
-    await new Promise<void>((resolve, reject) => {
-      const parser = createCsvParser({ columns: true, skip_empty_lines: true });
-      parser.on('readable', () => {
-        let st: Record<string, string>;
-        while ((st = parser.read()) !== null) {
-          const minutes = timeToMinutes(st.departure_time);
-          const existing = this.tripTimeRange.get(st.trip_id);
-          if (!existing) {
-            this.tripTimeRange.set(st.trip_id, {
-              first: minutes,
-              last: minutes
-            });
-          } else {
-            if (minutes < existing.first) existing.first = minutes;
-            if (minutes > existing.last) existing.last = minutes;
-          }
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const parser = createCsvParser({
+          columns: true,
+          skip_empty_lines: true
+        });
+        const unzipProc = spawn('unzip', ['-p', zipPath, 'stop_times.txt']);
+        let unzipErr = '';
 
-          const routeId = this.tripRoute.get(st.trip_id);
-          if (routeId && st.stop_id) {
-            if (!routeStopIds.has(routeId))
-              routeStopIds.set(routeId, new Set());
-            routeStopIds.get(routeId)!.add(st.stop_id);
+        unzipProc.stderr.setEncoding('utf8');
+        unzipProc.stderr.on('data', (chunk: string) => {
+          unzipErr += chunk;
+        });
 
-            // Also track stops per route+direction
-            const dir = this.tripDirection.get(st.trip_id);
-            if (dir) {
-              const dirKey = `${routeId}:${dir}`;
-              if (!routeDirStopIds.has(dirKey))
-                routeDirStopIds.set(dirKey, new Set());
-              routeDirStopIds.get(dirKey)!.add(st.stop_id);
+        parser.on('readable', () => {
+          let st: Record<string, string>;
+          while ((st = parser.read()) !== null) {
+            const minutes = timeToMinutes(st.departure_time);
+            const existing = this.tripTimeRange.get(st.trip_id);
+            if (!existing) {
+              this.tripTimeRange.set(st.trip_id, {
+                first: minutes,
+                last: minutes
+              });
+            } else {
+              if (minutes < existing.first) existing.first = minutes;
+              if (minutes > existing.last) existing.last = minutes;
+            }
+
+            const routeId = this.tripRoute.get(st.trip_id);
+            if (routeId && st.stop_id) {
+              if (!routeStopIds.has(routeId)) {
+                routeStopIds.set(routeId, new Set());
+              }
+              routeStopIds.get(routeId)!.add(st.stop_id);
+
+              // Also track stops per route+direction
+              const dir = this.tripDirection.get(st.trip_id);
+              if (dir) {
+                const dirKey = `${routeId}:${dir}`;
+                if (!routeDirStopIds.has(dirKey)) {
+                  routeDirStopIds.set(dirKey, new Set());
+                }
+                routeDirStopIds.get(dirKey)!.add(st.stop_id);
+              }
             }
           }
-        }
+        });
+
+        parser.on('end', resolve);
+        parser.on('error', (err) => reject(err));
+
+        unzipProc.on('error', (err) => reject(err));
+        unzipProc.on('close', (code) => {
+          if (code !== 0) {
+            reject(
+              new Error(
+                `[GTFS] unzip stop_times.txt failed (code ${code}): ${unzipErr.trim()}`
+              )
+            );
+          }
+        });
+
+        unzipProc.stdout.pipe(parser);
       });
-      parser.on('end', resolve);
-      parser.on('error', reject);
-      parser.write(stopTimesBuffer);
-      stopTimesBuffer = null; // free ~20-40 MB during streaming
-      parser.end();
-    });
+    } finally {
+      await unlink(zipPath).catch(() => undefined);
+    }
 
     // Resolve stop IDs to IStop objects for each route
     for (const [routeId, stopIds] of routeStopIds) {
