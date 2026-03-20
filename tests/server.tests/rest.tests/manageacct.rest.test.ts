@@ -78,7 +78,16 @@ const mockEmailService = emailService as jest.Mocked<typeof emailService>;
 const TEST_PORT = 8181;
 const TEST_URL = `http://localhost:${TEST_PORT}`;
 const TEST_DB_URL =
-  process.env.DB_URL ?? 'mongodb://localhost:27017/scottygo_test';
+  process.env.TEST_DB_URL ??
+  (process.env.DB_URL && process.env.DEV_DB
+    ? `${process.env.DB_URL}${process.env.DEV_DB}`
+    : '');
+
+if (!TEST_DB_URL) {
+  throw new Error(
+    'Missing DB_URL/DEV_DB (or TEST_DB_URL override). Refusing to run DB-writing tests without explicit DEV database configuration.'
+  );
+}
 
 // Test user data - use EMAIL_USER from env for the one real email test (sends to sender)
 import { EMAIL_USER } from '../../../server/env';

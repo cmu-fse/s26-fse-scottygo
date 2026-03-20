@@ -411,9 +411,13 @@ describe('Initial-Administrator Rule (R2)', () => {
     // privilegeLevel "Administrator", and status "Active" when no admin exists
     const savedUsers: IUserAccount[] = [];
     const mockDb = createMockDb({
-      findUserAccountByUsername: jest.fn().mockImplementation((username: string) => {
-        return Promise.resolve(savedUsers.find(u => u.credentials.username === username) || null);
-      }),
+      findUserAccountByUsername: jest
+        .fn()
+        .mockImplementation((username: string) => {
+          return Promise.resolve(
+            savedUsers.find((u) => u.credentials.username === username) || null
+          );
+        }),
       saveUser: jest.fn().mockImplementation((user: IUserAccount) => {
         savedUsers.push(user);
         return Promise.resolve(user);
@@ -553,7 +557,7 @@ describe('Member Action of User Profile Rule (R3)', () => {
     expect(payload.email).toBe('newemail@andrew.cmu.edu');
   });
 
-  test("(negative) Member cannot change their own privilege level", async () => {
+  test('(negative) Member cannot change their own privilege level', async () => {
     jest.spyOn(User, 'getUserAccountById').mockResolvedValue(memberAccount);
 
     // Restore io mock

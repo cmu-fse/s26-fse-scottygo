@@ -42,7 +42,16 @@ import { IConfig } from '../../../common/map.interface';
 const TEST_PORT = 8383;
 const TEST_URL = `http://localhost:${TEST_PORT}`;
 const TEST_DB_URL =
-  process.env.DB_URL ?? 'mongodb://localhost:27017/scottygo_e2e_test';
+  process.env.TEST_DB_URL ??
+  (process.env.DB_URL && process.env.DEV_DB
+    ? `${process.env.DB_URL}${process.env.DEV_DB}`
+    : '');
+
+if (!TEST_DB_URL) {
+  throw new Error(
+    'Missing DB_URL/DEV_DB (or TEST_DB_URL override). Refusing to run DB-writing tests without explicit DEV database configuration.'
+  );
+}
 
 let app: App;
 let server: HttpServer;
