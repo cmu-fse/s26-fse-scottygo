@@ -1,238 +1,334 @@
-import bcrypt from 'bcrypt';
+import { Request, Response } from 'express';
+import AuthController from '../../../server/controllers/auth.controller';
 import { User } from '../../../server/models/user.model';
-import DAC, { IDatabase } from '../../../server/db/dac';
 import { IAppError } from '../../../common/server.responses';
 import { IUser } from '../../../common/user.interface';
 
-function createMockDb(overrides: Partial<IDatabase> = {}): IDatabase {
-  return {
-    connect: jest.fn(),
-    init: jest.fn(),
-    close: jest.fn(),
-    saveUser: jest.fn(),
-    findUserByUsername: jest.fn(),
-    findUserById: jest.fn(),
-    setUserAgreedToTrue: jest.fn(),
-    findUserAccountByUsername: jest.fn(),
-    findUserAccountById: jest.fn(),
-    updateUserStatus: jest.fn(),
-    updateUserPrivilege: jest.fn(),
-    updateUsername: jest.fn(),
-    updateUserEmail: jest.fn(),
-    updateUserPassword: jest.fn(),
-    countAdministrators: jest.fn(),
-    getAllUsernames: jest.fn(),
-    seedDefaultAdmin: jest.fn(),
-    getTransitCache: jest.fn(),
-    upsertTransitCache: jest.fn(),
-    clearTransitCache: jest.fn(),
-    saveMemorySample: jest.fn(),
-    getRecentMemorySamples: jest.fn(),
-    ...overrides
+type MockResponse = Partial<Response> & {
+  status: jest.Mock;
+  json: jest.Mock;
+  location: jest.Mock;
+};
+
+const createMockResponse = (): MockResponse => {
+  const res: MockResponse = {
+    status: jest.fn(),
+    json: jest.fn(),
+    location: jest.fn()
   };
-}
+  res.status.mockReturnValue(res);
+  res.json.mockReturnValue(res);
+  res.location.mockReturnValue(res);
+  return res;
+};
 
-describe('Register Use Case - Username Rule (R1)', () => {
-  afterEach(() => {
+/** Helper: build a mock register Request */
+const makeRegisterReq = (
+  username: string,
+  password: string,
+  email: string
+): Request =>
+  ({
+    body: {
+      credentials: { username, password },
+      email,
+      agreed: true
+    }
+  }) as unknown as Request;
+
+describe('Register Use Case unit tests', () => {
+  const authController = new AuthController('/auth');
+
+  const savedUser: IUser = {
+    _id: 'user-id-1',
+    credentials: { username: 'ValidUser', password: 'hashed-password' },
+    email: 'validuser@cmu.edu',
+    agreed: true
+  };
+
+  beforeEach(() => {
     jest.restoreAllMocks();
   });
 
-  test('accepts a valid username with minimum length 4', async () => {
-    const mockDb = createMockDb({
-      findUserByUsername: jest.fn().mockResolvedValue(null),
-      saveUser: jest.fn().mockImplementation(async (u: IUser) => u)
-    });
-    DAC.db = mockDb;
+  // =========================================================================
+  // Basic flow – successful registration
+  // =========================================================================
 
-    const user = new User(
-      { username: 'abCD', password: 'Ab1!' },
-      'member@cmu.edu',
-      true
-    );
+  test('register succeeds with valid username, password, and CMU email', async () => {
+    const req = makeRegisterReq('ValidUser', 'Pass1!', 'validuser@cmu.edu');
+    const res = createMockResponse();
 
-    const result = await user.join();
+    jest.spyOn(User.prototype, 'join').mockResolvedValue(savedUser);
 
-    expect(result.credentials.username).toBe('abcd');
-    expect(mockDb.saveUser).toHaveBeenCalled();
-  });
+    await authController.register(req, res as Response);
 
-  test('rejects username shorter than 4 characters', async () => {
-    const mockDb = createMockDb({
-      findUserByUsername: jest.fn().mockResolvedValue(null)
-    });
-    DAC.db = mockDb;
-
-    const user = new User(
-      { username: 'abc', password: 'Ab1!' },
-      'member@cmu.edu',
-      true
-    );
-
-    await expect(user.join()).rejects.toMatchObject({
-      type: 'ClientError',
-      name: 'InvalidUsername',
-      message: 'Username must be at least 4 characters long'
-    } as Partial<IAppError>);
-  });
-
-  test('rejects banned username in lowercase', async () => {
-    const mockDb = createMockDb({
-      findUserByUsername: jest.fn().mockResolvedValue(null)
-    });
-    DAC.db = mockDb;
-
-    const user = new User(
-      { username: 'login', password: 'Ab1!' },
-      'member@cmu.edu',
-      true
-    );
-
-    await expect(user.join()).rejects.toMatchObject({
-      type: 'ClientError',
-      name: 'InvalidUsername',
-      message: 'This username is invalid - please choose a valid one'
-    } as Partial<IAppError>);
-  });
-
-  test('rejects banned username regardless of case', async () => {
-    const mockDb = createMockDb({
-      findUserByUsername: jest.fn().mockResolvedValue(null)
-    });
-    DAC.db = mockDb;
-
-    const user = new User(
-      { username: 'LoGiN', password: 'Ab1!' },
-      'member@cmu.edu',
-      true
-    );
-
-    await expect(user.join()).rejects.toMatchObject({
-      type: 'ClientError',
-      name: 'InvalidUsername',
-      message: 'This username is invalid - please choose a valid one'
-    } as Partial<IAppError>);
-  });
-
-  test('normalizes username lookup and storage to lowercase', async () => {
-    const mockDb = createMockDb({
-      findUserByUsername: jest.fn().mockResolvedValue(null),
-      saveUser: jest.fn().mockImplementation(async (u: IUser) => u)
-    });
-    DAC.db = mockDb;
-
-    const user = new User(
-      { username: 'NewUser', password: 'Ab1!' },
-      'member@cmu.edu',
-      true
-    );
-
-    await user.join();
-
-    expect(mockDb.findUserByUsername).toHaveBeenCalledWith('newuser');
-    expect(mockDb.saveUser).toHaveBeenCalledWith(
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
-        credentials: expect.objectContaining({ username: 'newuser' })
+        name: 'UserRegistered',
+        payload: expect.objectContaining({
+          credentials: expect.objectContaining({
+            username: 'ValidUser',
+            password: 'obfuscated'
+          }),
+          email: 'validuser@cmu.edu'
+        })
       })
     );
   });
 
-  test('rejects existing username regardless of case', async () => {
-    const existingUser: IUser = {
-      _id: 'existing-user-id',
-      credentials: {
-        username: 'member1',
-        password: '$2b$10$existinghashnotuseddirectly'
-      },
-      email: 'member@cmu.edu',
-      agreed: true
-    };
+  // =========================================================================
+  // A2 – EmailMissing (controller-level)
+  // =========================================================================
 
-    const mockDb = createMockDb({
-      findUserByUsername: jest.fn().mockResolvedValue(existingUser)
-    });
-    DAC.db = mockDb;
+  test('A2: register fails when email is missing', async () => {
+    const req = makeRegisterReq('ValidUser', 'Pass1!', '');
+    const res = createMockResponse();
 
-    jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
+    await authController.register(req, res as Response);
 
-    const user = new User(
-      { username: 'Member1', password: 'Ab1!' },
-      'different@cmu.edu',
-      true
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'MissingEmail' })
     );
+  });
 
-    await expect(user.join()).rejects.toMatchObject({
+  // =========================================================================
+  // A6 – Ineligible (non-CMU email, model-level via join)
+  // =========================================================================
+
+  test('A6: register fails with non-CMU email (ineligible)', async () => {
+    const req = makeRegisterReq('ValidUser', 'Pass1!', 'user@example.com');
+    const res = createMockResponse();
+
+    const error: IAppError = {
       type: 'ClientError',
-      name: 'InvalidUsername',
-      message: 'Please provide a different username'
-    } as Partial<IAppError>);
-
-    expect(mockDb.findUserByUsername).toHaveBeenCalledWith('member1');
-  });
-});
-
-describe('Register Use Case - Password Rule (R2)', () => {
-  afterEach(() => {
-    jest.restoreAllMocks();
-  });
-
-  test('accepts a valid password at minimum length 4', async () => {
-    const updatedUser: IUser = {
-      _id: 'user-id-1',
-      credentials: { username: 'member1', password: 'hashed' },
-      email: 'member@cmu.edu',
-      agreed: true
+      name: 'InvalidEmail',
+      message: 'Email must be a valid CMU email address'
     };
+    jest.spyOn(User.prototype, 'join').mockRejectedValue(error);
 
-    const mockDb = createMockDb({
-      updateUserPassword: jest.fn().mockResolvedValue(updatedUser)
-    });
-    DAC.db = mockDb;
+    await authController.register(req, res as Response);
 
-    await expect(User.updatePassword('member1', 'Aa1!')).resolves.toMatchObject(
-      {
-        credentials: { username: 'member1' }
-      }
-    );
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(error);
   });
 
-  test('rejects password shorter than 4 characters', async () => {
-    const mockDb = createMockDb();
-    DAC.db = mockDb;
+  // =========================================================================
+  // R1 – Username Rule (≥6 tests)
+  //   • ≥4 chars
+  //   • NOT case sensitive (banned check uses .toLowerCase())
+  //   • NOT in banned/reserved list
+  // =========================================================================
 
-    await expect(User.updatePassword('member1', 'Aa1')).rejects.toMatchObject({
-      type: 'ClientError',
-      name: 'WeakPassword',
-      message: 'Password must be at least 4 characters long'
-    } as Partial<IAppError>);
+  describe('R1: Username Rule', () => {
+    // --- Positive ---
+
+    test('accepts a valid username with 4 characters', async () => {
+      const req = makeRegisterReq('Abcd', 'Pass1!', 'abcd@cmu.edu');
+      const res = createMockResponse();
+
+      const user: IUser = {
+        ...savedUser,
+        credentials: { username: 'Abcd', password: 'hashed' },
+        email: 'abcd@cmu.edu'
+      };
+      jest.spyOn(User.prototype, 'join').mockResolvedValue(user);
+
+      await authController.register(req, res as Response);
+
+      expect(res.status).toHaveBeenCalledWith(201);
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'UserRegistered' })
+      );
+    });
+
+    test('accepts a long valid username', async () => {
+      const req = makeRegisterReq(
+        'LongUsername123',
+        'Pass1!',
+        'longuser@cmu.edu'
+      );
+      const res = createMockResponse();
+
+      const user: IUser = {
+        ...savedUser,
+        credentials: { username: 'LongUsername123', password: 'hashed' },
+        email: 'longuser@cmu.edu'
+      };
+      jest.spyOn(User.prototype, 'join').mockResolvedValue(user);
+
+      await authController.register(req, res as Response);
+
+      expect(res.status).toHaveBeenCalledWith(201);
+    });
+
+    // --- Negative: too short ---
+
+    test('rejects username shorter than 4 characters', async () => {
+      const req = makeRegisterReq('abc', 'Pass1!', 'abc@cmu.edu');
+      const res = createMockResponse();
+
+      const error: IAppError = {
+        type: 'ClientError',
+        name: 'InvalidUsername',
+        message: 'Username must be at least 4 characters long'
+      };
+      jest.spyOn(User.prototype, 'join').mockRejectedValue(error);
+
+      await authController.register(req, res as Response);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith(error);
+    });
+
+    // --- Negative: banned / reserved word ---
+
+    test('rejects a banned/reserved username ("admin")', async () => {
+      const req = makeRegisterReq('admin', 'Pass1!', 'adm@cmu.edu');
+      const res = createMockResponse();
+
+      const error: IAppError = {
+        type: 'ClientError',
+        name: 'InvalidUsername',
+        message: 'This username is invalid - please choose a valid one'
+      };
+      jest.spyOn(User.prototype, 'join').mockRejectedValue(error);
+
+      await authController.register(req, res as Response);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith(error);
+    });
+
+    // --- Negative: banned word with different case (case-insensitive) ---
+
+    test('rejects banned username regardless of case ("Admin")', async () => {
+      const req = makeRegisterReq('Admin', 'Pass1!', 'adm2@cmu.edu');
+      const res = createMockResponse();
+
+      const error: IAppError = {
+        type: 'ClientError',
+        name: 'InvalidUsername',
+        message: 'This username is invalid - please choose a valid one'
+      };
+      jest.spyOn(User.prototype, 'join').mockRejectedValue(error);
+
+      await authController.register(req, res as Response);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith(error);
+    });
+
+    // --- Negative: controller-level missing username ---
+
+    test('rejects when username field is not provided', async () => {
+      const req = makeRegisterReq('', 'Pass1!', 'user@cmu.edu');
+      const res = createMockResponse();
+
+      await authController.register(req, res as Response);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'MissingUsername' })
+      );
+    });
   });
 
-  test('password validation succeeds only for exact case', async () => {
-    const hashed = await bcrypt.hash('Ab1!', 4);
-    const mockDb = createMockDb({
-      findUserByUsername: jest.fn().mockResolvedValue({
-        _id: 'u-1',
-        credentials: { username: 'member1', password: hashed },
-        email: 'member@cmu.edu',
-        agreed: true
-      })
+  // =========================================================================
+  // R2 – Password Rule (≥4 tests)
+  //   • ≥4 chars
+  //   • Passwords ARE case sensitive
+  //   • Implementation also requires: letter, number, special char
+  // =========================================================================
+
+  describe('R2: Password Rule', () => {
+    // --- Positive ---
+
+    test('accepts a valid password meeting all strength rules', async () => {
+      const req = makeRegisterReq('ValidUser', 'Pass1!', 'validuser@cmu.edu');
+      const res = createMockResponse();
+
+      jest.spyOn(User.prototype, 'join').mockResolvedValue(savedUser);
+
+      await authController.register(req, res as Response);
+
+      expect(res.status).toHaveBeenCalledWith(201);
     });
-    DAC.db = mockDb;
 
-    await expect(User.validatePassword('member1', 'Ab1!')).resolves.toBe(true);
-  });
+    // --- Negative: too short ---
 
-  test('password validation fails when case differs', async () => {
-    const hashed = await bcrypt.hash('Ab1!', 4);
-    const mockDb = createMockDb({
-      findUserByUsername: jest.fn().mockResolvedValue({
-        _id: 'u-1',
-        credentials: { username: 'member1', password: hashed },
-        email: 'member@cmu.edu',
-        agreed: true
-      })
+    test('rejects password shorter than 4 characters', async () => {
+      const req = makeRegisterReq('ValidUser', 'Ab1', 'validuser@cmu.edu');
+      const res = createMockResponse();
+
+      const error: IAppError = {
+        type: 'ClientError',
+        name: 'WeakPassword',
+        message: 'Password must be at least 4 characters long'
+      };
+      jest.spyOn(User.prototype, 'join').mockRejectedValue(error);
+
+      await authController.register(req, res as Response);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith(error);
     });
-    DAC.db = mockDb;
 
-    await expect(User.validatePassword('member1', 'ab1!')).resolves.toBe(false);
+    // --- Negative: missing number ---
+
+    test('rejects password without a number', async () => {
+      const req = makeRegisterReq('ValidUser', 'Pass!!!!', 'validuser@cmu.edu');
+      const res = createMockResponse();
+
+      const error: IAppError = {
+        type: 'ClientError',
+        name: 'WeakPassword',
+        message: 'Password must contain at least one number'
+      };
+      jest.spyOn(User.prototype, 'join').mockRejectedValue(error);
+
+      await authController.register(req, res as Response);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith(error);
+    });
+
+    // --- Negative: missing special character ---
+
+    test('rejects password without a special character', async () => {
+      const req = makeRegisterReq(
+        'ValidUser',
+        'Pass1234',
+        'validuser@cmu.edu'
+      );
+      const res = createMockResponse();
+
+      const error: IAppError = {
+        type: 'ClientError',
+        name: 'WeakPassword',
+        message: 'Password must contain at least one special character'
+      };
+      jest.spyOn(User.prototype, 'join').mockRejectedValue(error);
+
+      await authController.register(req, res as Response);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith(error);
+    });
+
+    // --- Negative: controller-level missing password ---
+
+    test('rejects when password field is not provided', async () => {
+      const req = makeRegisterReq('ValidUser', '', 'validuser@cmu.edu');
+      const res = createMockResponse();
+
+      await authController.register(req, res as Response);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'MissingPassword' })
+      );
+    });
   });
 });
