@@ -17,7 +17,7 @@ import { IUserAccount, IPrivilegeLevel } from '../../../common/user.interface';
 import * as responses from '../../../common/server.responses';
 
 // Mock external services that are irrelevant to account management
-jest.mock('../../server/services/email.service', () => ({
+jest.mock('../../../server/services/email.service', () => ({
   __esModule: true,
   default: {
     sendAccountInactivatedEmail: jest.fn().mockResolvedValue(true),
@@ -25,7 +25,7 @@ jest.mock('../../server/services/email.service', () => ({
   }
 }));
 
-jest.mock('../../server/services/gtfs.service', () => ({
+jest.mock('../../../server/services/gtfs.service', () => ({
   __esModule: true,
   default: {
     load: jest.fn().mockResolvedValue(undefined),
@@ -33,24 +33,24 @@ jest.mock('../../server/services/gtfs.service', () => ({
   }
 }));
 
-jest.mock('../../server/models/transit.model', () => ({
+jest.mock('../../../server/models/transit.model', () => ({
   __esModule: true,
   TransitModel: {
     refreshAllCaches: jest.fn().mockResolvedValue(undefined)
   }
 }));
 
-jest.mock('../../server/services/vehicle-positions.service', () => ({
+jest.mock('../../../server/services/vehicle-positions.service', () => ({
   __esModule: true,
   default: { start: jest.fn(), stop: jest.fn() }
 }));
 
-jest.mock('../../server/services/trip-updates.service', () => ({
+jest.mock('../../../server/services/trip-updates.service', () => ({
   __esModule: true,
   default: { start: jest.fn(), stop: jest.fn() }
 }));
 
-jest.mock('../../server/services/memory-monitor.service', () => ({
+jest.mock('../../../server/services/memory-monitor.service', () => ({
   __esModule: true,
   default: {
     start: jest.fn(),
