@@ -8,7 +8,8 @@ The use case is initiated by a Member. The supporting actors include GTFS-RT Ale
 Brief Description  
 The use case allows a logged-in user to subscribe to transit routes, submit crowd-sourced bus reports, and receive live notifications derived from those reports. The feature spans three pages: the **Map Page** (subscribe to routes and report on buses), the **Subscribe Page** (manage up to 10 route subscriptions), and the **Notification Page** (search and view live notifications and GTFS-RT alerts). The system uses the **Observer Pattern**: subscribers are observers of route-level notification topics, and the server publishes notification messages constructed from user-submitted bus reports.
 
-Assumptions  
+Assumptions
+
 - The Member is logged into the app.
 - The Member has already selected a route on the Map Page (TUC1/TUC2 basic flow completed).
 
