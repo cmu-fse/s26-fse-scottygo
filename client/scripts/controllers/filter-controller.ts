@@ -347,7 +347,6 @@ export class FilterController {
       // Clear all existing routes
       this.routeRenderer.clearAllRoutes();
       this.vehicleTracker.stopPolling();
-      this.clearDetourBanner();
 
       // Fetch route geometry
       const geometry = await this.fetchRouteGeometry(routeId);
@@ -368,7 +367,7 @@ export class FilterController {
       await this.applyDirectionFilter();
 
       // Fetch and display detours for this route
-      this.fetchAndShowDetours(routeId);
+      await this.fetchAndShowDetours(routeId);
 
       // Start vehicle polling for this route
       this.vehicleTracker.startPolling(routeId);
@@ -385,71 +384,29 @@ export class FilterController {
    */
   private async fetchAndShowDetours(routeId: string): Promise<void> {
     try {
-      const response: AxiosResponse = await axios.get(
-        `/transit/detours/${routeId}`,
+      const geometryRes = await axios.get(
+        `/transit/detours/${routeId}/geometry`,
         {
           headers: { Authorization: `Bearer ${this.token}` },
           validateStatus: () => true
         }
       );
 
+      let geometryDetours: IDetour[] = [];
       if (
-        response.status === 200 &&
-        response.data.name === 'DetoursRetrieved'
+        geometryRes.status === 200 &&
+        geometryRes.data.name === 'DetoursRetrieved'
       ) {
-        const detours: IDetour[] = response.data.payload || [];
-        if (detours.length > 0) {
-          this.showDetourBanner(routeId, detours);
-        }
+        geometryDetours = geometryRes.data.payload || [];
+      }
+
+      this.routeRenderer.clearDetourPolylines(routeId);
+      if (geometryDetours.some((d) => (d.geometry?.length ?? 0) > 0)) {
+        this.routeRenderer.renderDetourGeometry(routeId, geometryDetours);
       }
     } catch (error) {
       console.error('Error fetching detours:', error);
-    }
-  }
-
-  /**
-   * Render the detour banner with detour details.
-   */
-  private showDetourBanner(routeId: string, detours: IDetour[]): void {
-    const banner = document.getElementById('detour-banner');
-    if (!banner) return;
-
-    const heading = document.createElement('div');
-    heading.className = 'detour-banner__header';
-    heading.innerHTML = `
-      <span class="material-icons-outlined detour-banner__icon">warning</span>
-      <strong>${detours.length} active detour${detours.length > 1 ? 's' : ''} on route ${routeId}</strong>
-      <button class="detour-banner__close" aria-label="Dismiss">&times;</button>
-    `;
-
-    const list = document.createElement('ul');
-    list.className = 'detour-banner__list';
-    for (const d of detours) {
-      const li = document.createElement('li');
-      li.textContent = d.description;
-      list.appendChild(li);
-    }
-
-    banner.innerHTML = '';
-    banner.appendChild(heading);
-    banner.appendChild(list);
-    banner.hidden = false;
-
-    // Dismiss button
-    const closeBtn = banner.querySelector('.detour-banner__close');
-    if (closeBtn) {
-      closeBtn.addEventListener('click', () => this.clearDetourBanner());
-    }
-  }
-
-  /**
-   * Hide and clear the detour banner.
-   */
-  private clearDetourBanner(): void {
-    const banner = document.getElementById('detour-banner');
-    if (banner) {
-      banner.hidden = true;
-      banner.innerHTML = '';
+      this.routeRenderer.clearDetourPolylines(routeId);
     }
   }
 

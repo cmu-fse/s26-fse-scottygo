@@ -13,6 +13,7 @@ import {
   IStop,
   IPattern,
   IDetour,
+  IDetourGeometry,
   ITransitCache,
   IBulkTransitData
 } from '../../common/transit.interface';
@@ -207,6 +208,55 @@ export class TransitModel {
       );
       return [];
     }
+  }
+
+  /**
+   * Return detours augmented with geometry for a single route.
+   * Geometry is sourced from TrueTime getpatterns (dtrid/dtrpt fields).
+   */
+  static async getDetoursWithGeometry(routeId: string): Promise<IDetour[]> {
+    const [detours, geometry] = await Promise.all([
+      TransitModel.getDetours([routeId]),
+      trueTimeService.getDetourGeometry(routeId).catch((err) => {
+        console.warn(
+          `[TransitModel ${new Date().toISOString()}] Failed to fetch detour geometry for ${routeId}:`,
+          err
+        );
+        return [] as IDetourGeometry[];
+      })
+    ]);
+
+    if (geometry.length === 0) {
+      return detours;
+    }
+
+    const geometryByDetourId = new Map<string, IDetourGeometry[]>();
+    for (const geom of geometry) {
+      const list = geometryByDetourId.get(geom.detourId) ?? [];
+      list.push(geom);
+      geometryByDetourId.set(geom.detourId, list);
+    }
+
+    const merged = detours.map((detour) => ({
+      ...detour,
+      geometry: geometryByDetourId.get(detour.id) ?? []
+    }));
+
+    // Include geometry-only detours if metadata endpoint omitted route linkage.
+    for (const [detourId, geom] of geometryByDetourId.entries()) {
+      if (!merged.some((d) => d.id === detourId)) {
+        merged.push({
+          id: detourId,
+          description: 'Detour active',
+          startdt: '',
+          enddt: '',
+          routeIds: [routeId],
+          geometry: geom
+        });
+      }
+    }
+
+    return merged;
   }
 
   // -------------------------------------------------------------------

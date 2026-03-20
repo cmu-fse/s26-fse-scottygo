@@ -53,6 +53,17 @@ export interface IDetour {
   enddt: string; // End date and time (ISO string)
   /** Route IDs impacted by this detour, e.g. ["61C", "71A"] */
   routeIds?: string[];
+  /** Optional geometry details for rendering detour overlays on the map */
+  geometry?: IDetourGeometry[];
+}
+
+export interface IDetourGeometry {
+  detourId: string;
+  direction: string;
+  /** Active detour path currently in effect */
+  detourPath: { lat: number; lng: number }[];
+  /** Original path replaced by this detour (when provided by upstream) */
+  originalPath?: { lat: number; lng: number }[];
 }
 
 export interface IPattern {

@@ -44,6 +44,10 @@ export default class BusController extends Controller {
       '/stops/:stopId/predictions',
       this.getPredictions.bind(this)
     );
+    this.router.get(
+      '/detours/:routeId/geometry',
+      this.getDetourGeometry.bind(this)
+    );
     this.router.get('/detours/:routeId', this.getDetours.bind(this));
   }
 
@@ -1125,6 +1129,24 @@ export default class BusController extends Controller {
         name: 'DetoursRetrieved',
         message: `Found ${detours.length} detours for route ${routeId}`,
         payload: detours
+      };
+      res.status(200).json(successRes);
+    } catch (error: unknown) {
+      this.handleError(error, res);
+    }
+  }
+
+  // GET /transit/detours/:routeId/geometry
+  private async getDetourGeometry(req: Request, res: Response): Promise<void> {
+    const { routeId } = req.params;
+    try {
+      const detours = await TransitModel.getDetoursWithGeometry(routeId);
+      const withGeometry = detours.filter((d) => (d.geometry?.length ?? 0) > 0);
+
+      const successRes: responses.ISuccess = {
+        name: 'DetoursRetrieved',
+        message: `Found geometry for ${withGeometry.length} detours on route ${routeId}`,
+        payload: withGeometry
       };
       res.status(200).json(successRes);
     } catch (error: unknown) {

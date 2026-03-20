@@ -8,7 +8,8 @@ import {
   IStop,
   IPrediction,
   IDetour,
-  IPattern
+  IPattern,
+  IDetourGeometry
 } from '../../common/transit.interface';
 import { IAppError } from '../../common/server.responses';
 
@@ -89,6 +90,8 @@ interface TrueTimePattern {
   pid: string;
   rtdir: string;
   pt: TrueTimePoint[];
+  dtrid?: string;
+  dtrpt?: TrueTimePoint | TrueTimePoint[];
 }
 
 // Date helpers
@@ -114,6 +117,7 @@ function toUnixMs(tmstmp: string): number {
 export interface ITrueTimeService {
   getRoutes(): Promise<IRoute[]>;
   getPatterns(routeId: string): Promise<IPattern[]>;
+  getDetourGeometry(routeId: string): Promise<IDetourGeometry[]>;
   getStops(routeId: string, direction: string): Promise<IStop[]>;
   getVehicles(routeId: string): Promise<IVehicle[]>;
   getPredictions(stopId: string): Promise<IPrediction[]>;
@@ -207,6 +211,43 @@ class TrueTimeService implements ITrueTimeService {
       direction: pattern.rtdir,
       path: pattern.pt.map((p) => ({ lat: p.lat, lng: p.lon }))
     }));
+  }
+
+  /**
+   * Retrieve detour-specific geometry from detoured patterns.
+   *
+   * TrueTime getpatterns marks detoured patterns with dtrid and may include
+   * dtrpt as the original path that is temporarily replaced.
+   */
+  async getDetourGeometry(routeId: string): Promise<IDetourGeometry[]> {
+    const data = await this.call<{
+      ptr?: TrueTimePattern[];
+      error?: TrueTimeError[];
+    }>('getpatterns', { rt: routeId, rtpidatafeed: RTPI_DATA_FEED });
+
+    if (!data.ptr || data.ptr.length === 0) {
+      return [];
+    }
+
+    const normalizePoints = (
+      points?: TrueTimePoint | TrueTimePoint[]
+    ): TrueTimePoint[] => {
+      if (!points) return [];
+      return Array.isArray(points) ? points : [points];
+    };
+
+    return data.ptr
+      .filter((pattern) => typeof pattern.dtrid === 'string' && !!pattern.dtrid)
+      .map((pattern) => {
+        const dtrpt = normalizePoints(pattern.dtrpt);
+
+        return {
+          detourId: pattern.dtrid as string,
+          direction: pattern.rtdir,
+          detourPath: pattern.pt.map((p) => ({ lat: p.lat, lng: p.lon })),
+          originalPath: dtrpt.map((p) => ({ lat: p.lat, lng: p.lon }))
+        };
+      });
   }
 
   /** Retrieve stops for a route in a specific direction (INBOUND or OUTBOUND). */

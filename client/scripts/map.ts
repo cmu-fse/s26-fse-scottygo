@@ -224,7 +224,17 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
   const config = await getMapConfig();
   if (config) {
     const container = document.getElementById('map') as HTMLElement;
-    await mapProvider.initialize(container, config);
+
+    try {
+      await mapProvider.initialize(container, config);
+    } catch (error) {
+      console.error('Failed to initialize Google Maps:', error);
+      showModal(
+        'Map Unavailable',
+        'Unable to load Google Maps. Please check your internet connection and try again.'
+      );
+      return;
+    }
 
     // Initialize all components
     routeRenderer.initialize(mapProvider);
@@ -264,6 +274,10 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
     requestUserLocation();
   } else {
     console.error('Map could not be initialized: config unavailable');
+    showModal(
+      'Map Configuration Error',
+      'Map configuration is unavailable. Please check your internet connection and try again.'
+    );
   }
 
   console.log('Map page loaded');

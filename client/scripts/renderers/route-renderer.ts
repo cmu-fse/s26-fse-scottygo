@@ -8,7 +8,7 @@ import type {
   IMapPolyline,
   IMapMarker
 } from '../../../common/map.interface';
-import type { IRoute, IStop } from '../../../common/transit.interface';
+import type { IRoute, IStop, IDetour } from '../../../common/transit.interface';
 
 // GeoJSON type definitions
 interface GeoJSONGeometry {
@@ -44,6 +44,7 @@ export class RouteRenderer {
 
   // Store references to map elements
   private routePolylines = new Map<string, IMapPolyline[]>(); // routeId_direction → polylines
+  private detourPolylines = new Map<string, IMapPolyline[]>(); // routeId_direction → detour overlays
   private stopMarkers = new Map<string, IMapMarker[]>(); // routeId_direction → markers
   private routeColors = new Map<string, string>(); // routeId → color
 
@@ -54,6 +55,85 @@ export class RouteRenderer {
       RouteRenderer.instance = new RouteRenderer();
     }
     return RouteRenderer.instance;
+  }
+
+  /**
+   * Render detour overlays for a route.
+   *
+   * Draw only the impacted detour segments (non-overlapping portions) so
+   * the base route remains visible and only the rerouted section is highlighted.
+   */
+  renderDetourGeometry(routeId: string, detours: IDetour[]): void {
+    if (!this.mapProvider) {
+      console.error('Map provider not initialized');
+      return;
+    }
+
+    this.clearDetourPolylines(routeId);
+
+    for (const detour of detours) {
+      for (const geometry of detour.geometry ?? []) {
+        const directionKey = `${routeId}_${geometry.direction}`;
+
+        const impactedSegments = this.extractImpactedSegments(
+          geometry.detourPath,
+          geometry.originalPath ?? []
+        );
+
+        for (const segment of impactedSegments) {
+          const activePolyline = this.mapProvider.addPolyline({
+            path: segment,
+            color: '#ff2d20',
+            weight: 6,
+            opacity: 0.95
+          });
+
+          if (!this.detourPolylines.has(directionKey)) {
+            this.detourPolylines.set(directionKey, []);
+          }
+          this.detourPolylines.get(directionKey)!.push(activePolyline);
+        }
+      }
+    }
+  }
+
+  /**
+   * Return only detour-path segments that diverge from the original path.
+   * Falls back to the full detour path when no original path is available.
+   */
+  private extractImpactedSegments(
+    detourPath: Array<{ lat: number; lng: number }>,
+    originalPath: Array<{ lat: number; lng: number }>
+  ): Array<Array<{ lat: number; lng: number }>> {
+    if (detourPath.length < 2) return [];
+    if (originalPath.length < 2) return [detourPath];
+
+    const toleranceDeg = 0.00025; // ~25m, enough to avoid noise around shared geometry
+    const segments: Array<Array<{ lat: number; lng: number }>> = [];
+    let current: Array<{ lat: number; lng: number }> = [];
+
+    for (const point of detourPath) {
+      const isShared = originalPath.some(
+        (orig) =>
+          Math.abs(point.lat - orig.lat) <= toleranceDeg &&
+          Math.abs(point.lng - orig.lng) <= toleranceDeg
+      );
+
+      if (!isShared) {
+        current.push(point);
+      } else if (current.length > 0) {
+        if (current.length > 1) {
+          segments.push(current);
+        }
+        current = [];
+      }
+    }
+
+    if (current.length > 1) {
+      segments.push(current);
+    }
+
+    return segments.length > 0 ? segments : [detourPath];
   }
 
   /**
@@ -276,6 +356,11 @@ export class RouteRenderer {
     if (polylines) {
       polylines.forEach((polyline) => polyline.setVisible(false));
     }
+
+    const detourPolylines = this.detourPolylines.get(key);
+    if (detourPolylines) {
+      detourPolylines.forEach((polyline) => polyline.setVisible(false));
+    }
   }
 
   /**
@@ -286,6 +371,11 @@ export class RouteRenderer {
     const polylines = this.routePolylines.get(key);
     if (polylines) {
       polylines.forEach((polyline) => polyline.setVisible(true));
+    }
+
+    const detourPolylines = this.detourPolylines.get(key);
+    if (detourPolylines) {
+      detourPolylines.forEach((polyline) => polyline.setVisible(true));
     }
   }
 
@@ -334,6 +424,28 @@ export class RouteRenderer {
       polylines.forEach((polyline) => polyline.remove());
       this.routePolylines.delete(routeId);
     }
+
+    this.clearDetourPolylines(routeId);
+  }
+
+  /**
+   * Clear detour polylines (remove from map)
+   */
+  clearDetourPolylines(routeId: string): void {
+    const inboundKey = `${routeId}_INBOUND`;
+    const outboundKey = `${routeId}_OUTBOUND`;
+
+    const inboundPolylines = this.detourPolylines.get(inboundKey);
+    if (inboundPolylines) {
+      inboundPolylines.forEach((polyline) => polyline.remove());
+      this.detourPolylines.delete(inboundKey);
+    }
+
+    const outboundPolylines = this.detourPolylines.get(outboundKey);
+    if (outboundPolylines) {
+      outboundPolylines.forEach((polyline) => polyline.remove());
+      this.detourPolylines.delete(outboundKey);
+    }
   }
 
   /**
@@ -356,6 +468,11 @@ export class RouteRenderer {
       polylines.forEach((polyline) => polyline.remove());
     });
     this.routePolylines.clear();
+
+    this.detourPolylines.forEach((polylines) => {
+      polylines.forEach((polyline) => polyline.remove());
+    });
+    this.detourPolylines.clear();
 
     // Clear all stop markers
     this.stopMarkers.forEach((markers) => {
