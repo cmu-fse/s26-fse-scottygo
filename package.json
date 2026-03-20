@@ -30,7 +30,8 @@
     "test:unit": "npm-run-all test:unit:loginlogout test:unit:manageacct",
     "test:integration:manageacct": "jest ./tests/server.tests/integration.tests/manageacct.integration.test.ts --runInBand --detectOpenHandles --coverageDirectory=.coverage/integration-manageacct",
     "test:integration:loginlogout": "jest ./tests/server.tests/integration.tests/loginlogout.integration.test.ts --runInBand --detectOpenHandles --coverageDirectory=.coverage/integration-loginlogout",
-    "test:integration": "npm-run-all test:integration:manageacct test:integration:loginlogout",
+    "test:integration": "npm-run-all test:integration:manageacct test:integration:loginlogout test:integration:register",
+    "test:integration:register": "jest ./tests/server.tests/integration.tests/register.integration.test.ts --runInBand --detectOpenHandles --coverageDirectory=.coverage/integration-register",
     "test:server": "npm-run-all --continue-on-error test:unit test:integration test:rest",
     "later": "echo \"Some future command...\" && exit 1"
   },
