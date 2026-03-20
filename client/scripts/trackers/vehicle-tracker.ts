@@ -20,6 +20,7 @@ export class VehicleTracker {
   private vehicleMarkers = new Map<string, IMapMarker>(); // vehicleId → marker
   private vehicleData = new Map<string, IVehicle>(); // vehicleId → vehicle data for icon rebuilds
   private hasShownStaticToast = false;
+  private hasShownNoVehiclesToast = false;
   private currentZoom = 14;
 
   private constructor() {
@@ -61,6 +62,7 @@ export class VehicleTracker {
 
     this.currentRouteId = routeId;
     this.hasShownStaticToast = false;
+    this.hasShownNoVehiclesToast = false;
 
     // Initial fetch
     this.updateVehiclePositions();
@@ -87,6 +89,7 @@ export class VehicleTracker {
     this.clearVehicles();
     this.currentRouteId = null;
     this.hasShownStaticToast = false;
+    this.hasShownNoVehiclesToast = false;
   }
 
   /**
@@ -124,6 +127,16 @@ export class VehicleTracker {
         }
 
         const vehicles: IVehicle[] = response.data.payload || [];
+
+        if (vehicles.length === 0) {
+          if (!this.hasShownNoVehiclesToast) {
+            this.showToast('No active buses found for this route');
+            this.hasShownNoVehiclesToast = true;
+          }
+        } else {
+          this.hasShownNoVehiclesToast = false;
+        }
+
         this.stateManager.setActiveVehicles(vehicles);
         this.renderVehicles(vehicles);
       } else {

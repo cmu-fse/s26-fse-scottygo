@@ -14,11 +14,11 @@ The Member is logged into the app.
 Flow of Events
 
 Basic Flow  
-1\. The use case starts when the Member selects one or more bus routes from the filter.  
+1\. The use case starts when the Member selects a bus route from the filter.  
 – 2\. The app queries the database for current route status and vehicle locations.  
 3\. The app checks the timestamp of the current route status and the saved vehicle locations data.  
 – 4\. If the data is stale or missing, the app calls the PRT API to update the data.  
-5\. The app requests real-time route coordinates and current vehicle locations from the PRT API for the selected route.  
+5\. The app requests real-time route coordinates and current vehicle locations from cached GTFS data in the server for the selected route.  
 6\. The app sends the route coordinates and bus location to the Google Maps API to render the map interface.  
 7\. The app displays the map with the route overlay and moving bus icons.  
 8\. The app updates the bus location marker at regular intervals (every 30 seconds) until the user exits the view. The UC ends here.
