@@ -10,10 +10,7 @@ import AccountController from '../../../server/controllers/account.controller';
 import Controller from '../../../server/controllers/controller';
 import jwt from 'jsonwebtoken';
 import { JWT_KEY as secretKey } from '../../../server/env';
-import {
-  IUserAccount,
-  ITokenPayload
-} from '../../../common/user.interface';
+import { IUserAccount, ITokenPayload } from '../../../common/user.interface';
 import { IAppError, ISuccess } from '../../../common/server.responses';
 
 // ============================================================================
@@ -247,7 +244,9 @@ describe('Privilege Rule (R4)', () => {
       privilegeLevel: 'Member'
     };
     const mockDb = createMockDb({
-      findUserAccountByUsername: jest.fn().mockResolvedValue(coordinatorAccount),
+      findUserAccountByUsername: jest
+        .fn()
+        .mockResolvedValue(coordinatorAccount),
       updateUserPrivilege: jest.fn().mockResolvedValue(demotedAccount)
     });
     DAC.db = mockDb;
@@ -276,9 +275,15 @@ describe('Administrator Action of User Profile Rule (R3)', () => {
     jest.restoreAllMocks();
   });
 
-  test('Administrator can change another user\'s account status', async () => {
-    const inactiveMember: IUserAccount = { ...memberAccount, status: 'Inactive' };
-    const reactivatedMember: IUserAccount = { ...memberAccount, status: 'Active' };
+  test("Administrator can change another user's account status", async () => {
+    const inactiveMember: IUserAccount = {
+      ...memberAccount,
+      status: 'Inactive'
+    };
+    const reactivatedMember: IUserAccount = {
+      ...memberAccount,
+      status: 'Active'
+    };
 
     // Mock getUserAccountById (for authenticateToken → getRequestingUserAccount)
     // and the model methods
@@ -287,8 +292,12 @@ describe('Administrator Action of User Profile Rule (R3)', () => {
     jest.spyOn(User, 'updateStatus').mockResolvedValue(reactivatedMember);
 
     // Mock EmailService to avoid real email sends
-    const EmailService = (await import('../../../server/services/email.service')).default;
-    jest.spyOn(EmailService, 'sendAccountReactivatedEmail').mockResolvedValue(true);
+    const EmailService = (
+      await import('../../../server/services/email.service')
+    ).default;
+    jest
+      .spyOn(EmailService, 'sendAccountReactivatedEmail')
+      .mockResolvedValue(true);
 
     const req = createAuthenticatedRequest(
       adminAccount,
@@ -306,7 +315,7 @@ describe('Administrator Action of User Profile Rule (R3)', () => {
     expect(payload.status).toBe('Active');
   });
 
-  test('Administrator can change another user\'s privilege level', async () => {
+  test("Administrator can change another user's privilege level", async () => {
     const promotedMember: IUserAccount = {
       ...memberAccount,
       privilegeLevel: 'Coordinator'
@@ -331,7 +340,7 @@ describe('Administrator Action of User Profile Rule (R3)', () => {
     expect(payload.privilegeLevel).toBe('Coordinator');
   });
 
-  test('Administrator can change another user\'s password', async () => {
+  test("Administrator can change another user's password", async () => {
     const updatedMember: IUserAccount = { ...memberAccount };
 
     jest.spyOn(User, 'getUserAccountById').mockResolvedValue(adminAccount);
@@ -351,7 +360,7 @@ describe('Administrator Action of User Profile Rule (R3)', () => {
     expect(responseBody.name).toBe('PasswordUpdated');
   });
 
-  test('(negative) Administrator cannot change another user\'s username', async () => {
+  test("(negative) Administrator cannot change another user's username", async () => {
     jest.spyOn(User, 'getUserAccountById').mockResolvedValue(adminAccount);
 
     const req = createAuthenticatedRequest(
@@ -369,7 +378,7 @@ describe('Administrator Action of User Profile Rule (R3)', () => {
     expect(responseBody.message).toContain('your own username');
   });
 
-  test('(negative) Administrator cannot change another user\'s email', async () => {
+  test("(negative) Administrator cannot change another user's email", async () => {
     jest.spyOn(User, 'getUserAccountById').mockResolvedValue(adminAccount);
 
     const req = createAuthenticatedRequest(
