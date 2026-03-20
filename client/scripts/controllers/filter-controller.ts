@@ -703,6 +703,12 @@ export class FilterController {
       return this.patternCache.get(routeId) as unknown as RouteData;
     }
 
+    // Bulk data was loaded but this route has no patterns — no geometry available
+    if (this.bulkLoaded) {
+      console.debug(`Route ${routeId} has no geometry in bulk data — skipping`);
+      return null;
+    }
+
     const response: AxiosResponse = await axios.get(
       `/transit/routes/${routeId}`,
       {
