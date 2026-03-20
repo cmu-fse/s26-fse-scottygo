@@ -1,0 +1,129 @@
+// REST manual tests for TUC 2: Track Bus in Real-Time (TrackBus)
+// Base URL: http://localhost:8080
+//
+// Notes:
+// 1) Assumption from UC: Member is logged in.
+// 2) Most /transit endpoints are public, but /map/config requires auth.
+// 3) Replace placeholder tokens/route IDs where needed.
+
+// ============================================================================
+// BASIC FLOW (TUC2)
+// ============================================================================
+
+// Step 1: Member selects a route from filter.
+// Expected: 200 OK, RoutesRetrieved
+GET http://localhost:8080/transit/routes?system=PRT
+###
+
+// Pick a routeId from the previous response (example: P1).
+// Step 2/5: App requests route coordinates/patterns for selected route.
+// Expected: 200 OK, PathGenerated
+GET http://localhost:8080/transit/routes/P1
+###
+
+// Step 2/5: App requests current vehicle locations for selected route.
+// Expected: 200 OK, VehiclesLocated
+GET http://localhost:8080/transit/vehicles/P1
+###
+
+// Optional: Fetch stops to support map stop interactions.
+// Expected: 200 OK, StopsRetrieved
+GET http://localhost:8080/transit/stops/P1?dir=INBOUND
+###
+
+// Optional: Fetch predictions for a known stop (replace stopId as needed).
+// Expected: 200 OK, PredictionsRetrieved
+GET http://localhost:8080/transit/stops/7079/predictions
+###
+
+// Step 8 + Rule R2/R4 (30s refresh + freshness):
+// Run this request twice with ~30 seconds between runs.
+// Expected: both calls 200; payload may change; timestamps should be recent.
+GET http://localhost:8080/transit/vehicles/P1
+###
+
+// Wait ~30 seconds, then run again and compare:
+// - vehicle lat/lon and/or heading may update
+// - lastUpdate should not be stale beyond refresh expectations
+GET http://localhost:8080/transit/vehicles/P1
+###
+
+// ============================================================================
+// RULE VALIDATION
+// ============================================================================
+
+// R1 Selected Routes: only vehicles for selected route should be returned.
+// Expected: every payload item has routeId == P1
+GET http://localhost:8080/transit/vehicles/P1
+###
+
+// Optional cross-check against a different route (example G2).
+// Expected: payload routeIds should be G2 only.
+GET http://localhost:8080/transit/vehicles/G2
+###
+
+// ============================================================================
+// ALTERNATIVE FLOWS
+// ============================================================================
+
+// A1 Reroute: route has active detour event.
+// Expected: 200 OK, DetoursRetrieved. If payload not empty, route is detoured.
+GET http://localhost:8080/transit/detours/P1
+###
+
+// A1 Reroute geometry: detour path data used for map rendering.
+// Expected: 200 OK, DetoursRetrieved; payload geometry may include detourPath/originalPath.
+GET http://localhost:8080/transit/detours/P1/geometry
+###
+
+// A2 No Data Available: no active vehicles for route.
+// Expected: 200 OK, VehiclesLocated with [] payload for inactive/unknown route.
+GET http://localhost:8080/transit/vehicles/NO_ACTIVE_ROUTE
+###
+
+// A3 API Connection Failure (Google Maps):
+// Server-side HTTP check here is map config availability; map rendering failure is client-side.
+// Expected: 401 MissingToken when auth missing (confirms frontend would fail map bootstrap).
+GET http://localhost:8080/map/config
+###
+
+// A4 System Busy / Upstream unavailable:
+// Check health endpoint for degraded upstream status.
+// Expected: 200 with status object; if upstream down/rate-limited, overall can become false.
+GET http://localhost:8080/transit/health
+###
+
+// A5 TrueTime substitution with CMU Shuttle (Tripshot):
+// 1) Get CMU routes.
+// Expected: 200 OK, RoutesRetrieved (payload includes route IDs like CMU-*) when configured.
+GET http://localhost:8080/transit/routes?system=CMU
+###
+
+// 2) Replace <CMU_ROUTE_ID> with an ID from previous response.
+// Expected: 200 OK, VehiclesLocated
+GET http://localhost:8080/transit/vehicles/<CMU_ROUTE_ID>
+###
+
+// 3) Replace <CMU_ROUTE_ID> and direction.
+// Expected: 200 OK, StopsRetrieved (or 404 if no configured data for route/direction).
+GET http://localhost:8080/transit/stops/<CMU_ROUTE_ID>?dir=OUTBOUND
+###
+
+// ============================================================================
+// ERROR HANDLING CHECKS (useful for manual robustness checks)
+// ============================================================================
+
+// Missing required query parameter dir.
+// Expected: 400 MissingParameter
+GET http://localhost:8080/transit/stops/P1
+###
+
+// Unknown route patterns.
+// Expected: 404 RouteNotFound
+GET http://localhost:8080/transit/routes/INVALID_ROUTE
+###
+
+// Unknown stop predictions.
+// Expected: 404 StopNotFound OR 200 with [] depending upstream feed state.
+GET http://localhost:8080/transit/stops/99999/predictions
+###

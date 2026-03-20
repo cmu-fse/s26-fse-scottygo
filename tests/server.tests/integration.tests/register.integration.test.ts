@@ -97,17 +97,14 @@ async function request(
 
 beforeAll(async () => {
   const db = new MongoDB(TEST_DB_URL);
-  app = new App(
-    [new HomeController('/'), new AuthController('/auth')],
-    {
-      clientDir: './.dist/client',
-      db,
-      port: TEST_PORT,
-      host: 'localhost',
-      url: TEST_URL,
-      initOnStart: true
-    }
-  );
+  app = new App([new HomeController('/'), new AuthController('/auth')], {
+    clientDir: './.dist/client',
+    db,
+    port: TEST_PORT,
+    host: 'localhost',
+    url: TEST_URL,
+    initOnStart: true
+  });
 
   server = await app.listen();
   await new Promise((resolve) => setTimeout(resolve, 1000));
