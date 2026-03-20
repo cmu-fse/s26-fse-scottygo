@@ -89,6 +89,7 @@ This section covers the authentication endpoints, including user registration, l
   - **password** (string, required): Plaintext password.
 
 **Server-side checks (in order):**
+
 1. Validates credentials against the database (username lookup + bcrypt password comparison).
 2. Checks account status — if `Inactive`, returns **403** with `InactiveAccount` error.
 3. Checks agreement — if `agreed` is false, returns **401** with `UnauthorizedRequest` error.
@@ -225,11 +226,11 @@ User accounts have an `IAccountStatus` field (`Active` or `Inactive`).
 
 ### **Success**
 
-| HTTP Code | Name | Endpoint |
-| :-- | :-- | :-- |
-| 201 | UserRegistered | POST /auth/users |
-| 200 | UserAuthenticated | POST /auth/tokens/:username |
-| 200 | UserAgreed | PATCH /auth/users/:username |
+| HTTP Code | Name              | Endpoint                    |
+| :-------- | :---------------- | :-------------------------- |
+| 201       | UserRegistered    | POST /auth/users            |
+| 200       | UserAuthenticated | POST /auth/tokens/:username |
+| 200       | UserAgreed        | PATCH /auth/users/:username |
 
 ### **Client Errors**
 
@@ -250,7 +251,7 @@ User accounts have an `IAccountStatus` field (`Active` or `Inactive`).
 
 ### **Server Errors**
 
-| HTTP Code | Name | Condition |
-| :-- | :-- | :-- |
-| 500 | MongoDBError | Unexpected database or server error |
-| 500 | PatchRequestFailure | Failed to update user agreed status |
+| HTTP Code | Name                | Condition                           |
+| :-------- | :------------------ | :---------------------------------- |
+| 500       | MongoDBError        | Unexpected database or server error |
+| 500       | PatchRequestFailure | Failed to update user agreed status |
