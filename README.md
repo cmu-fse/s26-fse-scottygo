@@ -1,10 +1,8 @@
 [![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/kBX3QIYX) [![Open in Codespaces](https://classroom.github.com/assets/launch-codespace-2972f46106e565e64193e422d61a12cf1da4916b45550586e14ef0a7c637dd04.svg)](https://classroom.github.com/open-in-codespaces?assignment_repo_id=22281680)
 
 # UPDATE NOTE
-Sigrid is now enabled for this repo.
-You have new GitHub Actions workflow files.
-Accept your Sigrid invitation and review the analysis of your repo. 
-Visit Sigrid at https://sigrid-says.com/cmusvfse
+
+Sigrid is now enabled for this repo. You have new GitHub Actions workflow files. Accept your Sigrid invitation and review the analysis of your repo. Visit Sigrid at https://sigrid-says.com/cmusvfse
 
 # 18652 Team Project Repo
 
@@ -64,4 +62,3 @@ HTML, CSS : this is the tech stack everyone on the team is comfortable with for 
 ## Operational Runbooks
 
 - Memory monitoring and dashboard workflow: [docs/MemoryMonitoringRunbook.md](docs/MemoryMonitoringRunbook.md)
-

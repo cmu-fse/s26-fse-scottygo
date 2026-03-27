@@ -251,9 +251,7 @@ async function request(
   return { status: response.status, data };
 }
 
-async function setupUser(
-  userData: typeof testUser
-): Promise<string> {
+async function setupUser(userData: typeof testUser): Promise<string> {
   await request('POST', '/auth/users', {
     credentials: userData.credentials,
     email: userData.email,
@@ -570,5 +568,4 @@ describe('TUC 1: Visualize Routes — Integration Tests', () => {
       '08:30'
     );
   });
-
 });
