@@ -2,7 +2,7 @@ name: sigrid-publish
 on:
   push:
     branches:
-      - "main"
+      - 'main'
 
 jobs:
   sigridci:
@@ -13,8 +13,8 @@ jobs:
         with:
           fetch-depth: 0
       - name: Download Sigrid CI
-        run: "git clone https://github.com/Software-Improvement-Group/sigridci.git sigridci"
-      - name: "Run Sigrid CI" 
+        run: 'git clone https://github.com/Software-Improvement-Group/sigridci.git sigridci'
+      - name: 'Run Sigrid CI'
         env:
-          SIGRID_CI_TOKEN: "${{ secrets.ZIANG_SIG_TOKEN }}"
-        run: "./sigridci/sigridci/sigridci.py --customer cmusvfse --system s26-fse-scottygo --source . --publish" 
+          SIGRID_CI_TOKEN: '${{ secrets.ZIANG_SIG_TOKEN }}'
+        run: './sigridci/sigridci/sigridci.py --customer cmusvfse --system s26-fse-scottygo --source . --publish'

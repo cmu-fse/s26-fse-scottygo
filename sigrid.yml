@@ -1,22 +1,23 @@
 exclude:
-  # Add more folders / files as regular expression to exclude files for sigird analysis. 
-  - "^testing(/|$)"      # Excludes the entire testing/ folder
-  - "^common(/|$)"       # Excludes the entire common/ folder
-  - "^\\.vscode(/|$)"    # Excludes the entire .vscode/ folder
-  - "^jest-cache(/|$)"   # Excludes all jest testing caches
-  - "^logs(/|$)"         # Excludes all log files
-  - ".*\\.json$"         # Excludes all JSON files
+  # Add more folders / files as regular expression to exclude files for sigird analysis.
+  - '^testing(/|$)' # Excludes the entire testing/ folder
+  - '^common(/|$)' # Excludes the entire common/ folder
+  - "^\\.vscode(/|$)" # Excludes the entire .vscode/ folder
+  - '^jest-cache(/|$)' # Excludes all jest testing caches
+  - '^logs(/|$)' # Excludes all log files
+  - ".*\\.json$" # Excludes all JSON files
   - "^\\.devcontainer(/|$)"
   - "^\\.github(/|$)"
-  - "^docs(/|$)"
-  - "^assets(/|$)"
-  - "^node_modules(/|$)"
-  - "^tools(/|$)"
-  - "^tests(/|$)"
-  
+  - '^docs(/|$)'
+  - '^assets(/|$)'
+  - '^node_modules(/|$)'
+  - '^tools(/|$)'
+  - '^tests(/|$)'
+  - '^trials(/|$)' # Excludes experimental/demo files
+
 languages:
   - name: TypeScript
-dependencychecker: 
-  blocklist: ["NONE"]
+dependencychecker:
+  blocklist: ['NONE']
 thirdpartyfindings:
   enabled: true

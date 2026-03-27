@@ -38,13 +38,10 @@ Assumptions
    - **Step 1 — How crowded is the bus?** (multiple choice: Empty / Few Seats Taken / Standing Room / Packed) with a **Skip** button.
    - **Step 2 — Is priority seating available?** (multiple choice: Yes / No / Not Sure) with a **Skip** button.
    - **Step 3 — Condition of the bus?** (multiple choice: Clean / Average / Dirty) with a **Skip** button.
-   - **Step 4 — Additional comments** (optional free-text, max 200 characters) with a **Skip** button.
-   A progress indicator (e.g., "Step 2 of 4") is displayed. The Member may navigate back to previous steps to change answers. After the last step (or after skipping all), the app displays a **Submit** button.
+   - **Step 4 — Additional comments** (optional free-text, max 200 characters) with a **Skip** button. A progress indicator (e.g., "Step 2 of 4") is displayed. The Member may navigate back to previous steps to change answers. After the last step (or after skipping all), the app displays a **Submit** button.
 9. The Member clicks **Submit** (at least one question must be answered or the report is discarded; see A5).
 10. The app sends the report to the server.
-11. The server checks whether the reported status differs from the **last known status** for this bus. If any field (crowdedness, priority seating, or condition) has changed:
-    a. If the report includes a free-text comment, the server sends the comment to an **LLM moderation service** to filter inappropriate content. If the comment is flagged, it is excluded from the notification and the reporter is warned (see A16).
-    b. The server constructs a live notification message reflecting only the **changed fields** and publishes it to all observers (subscribers) of the bus's route.
+11. The server checks whether the reported status differs from the **last known status** for this bus. If any field (crowdedness, priority seating, or condition) has changed: a. If the report includes a free-text comment, the server sends the comment to an **LLM moderation service** to filter inappropriate content. If the comment is flagged, it is excluded from the notification and the reporter is warned (see A16). b. The server constructs a live notification message reflecting only the **changed fields** and publishes it to all observers (subscribers) of the bus's route.
 12. The app displays a confirmation toast: _"Report submitted. Thank you!"_ The basic flow ends.
 
 ### Basic Flow — Manage Subscriptions (Subscribe Page)
