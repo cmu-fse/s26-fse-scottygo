@@ -157,7 +157,7 @@ export class TransitModel {
   // -------------------------------------------------------------------
 
   /** Filter a detour list by route IDs using detour.routeIds metadata. */
-  private static filterDetoursByRouteIds(
+  static filterDetoursByRouteIds(
     detours: IDetour[],
     routeIds?: string[]
   ): IDetour[] {
