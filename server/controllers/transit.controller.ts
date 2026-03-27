@@ -13,6 +13,23 @@ import gtfsService from '../services/gtfs.service';
 import * as responses from '../../common/server.responses';
 import { IRoute, IVehicle } from '../../common/transit.interface';
 
+/**
+ * Parse and clamp a numeric query-string value.
+ * Returns `defaultLimit` when the input is undefined or not a finite number.
+ * The result is always clamped to [1, maxLimit].
+ */
+export function parseLimit(
+  rawLimit: string | undefined,
+  defaultLimit: number,
+  maxLimit: number
+): number {
+  const parsed = rawLimit ? Number.parseInt(rawLimit, 10) : defaultLimit;
+  if (!Number.isFinite(parsed)) {
+    return defaultLimit;
+  }
+  return Math.min(Math.max(parsed, 1), maxLimit);
+}
+
 export default class BusController extends Controller {
   private static readonly MEMORY_LIMIT_DEFAULT = 120;
 
@@ -889,11 +906,7 @@ export default class BusController extends Controller {
     defaultLimit: number,
     maxLimit: number
   ): number {
-    const parsed = rawLimit ? Number.parseInt(rawLimit, 10) : defaultLimit;
-    if (!Number.isFinite(parsed)) {
-      return defaultLimit;
-    }
-    return Math.min(Math.max(parsed, 1), maxLimit);
+    return parseLimit(rawLimit, defaultLimit, maxLimit);
   }
 
   // GET /transit/bulk — all routes, patterns, and stops in one response
