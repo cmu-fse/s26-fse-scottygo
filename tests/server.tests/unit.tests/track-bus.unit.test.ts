@@ -17,7 +17,11 @@ import BusController, {
 import trueTimeService from '../../../server/services/truetime.service';
 import vehiclePositionsService from '../../../server/services/vehicle-positions.service';
 import tripshotService from '../../../server/services/tripshot.service';
-import { IDetour, IDetourGeometry, IVehicle } from '../../../common/transit.interface';
+import {
+  IDetour,
+  IDetourGeometry,
+  IVehicle
+} from '../../../common/transit.interface';
 import { IAppError } from '../../../common/server.responses';
 
 type MockResponse = Partial<Response> & {
@@ -220,8 +224,11 @@ describe('TUC2 – Track Bus in Real-Time unit tests', () => {
 
   describe('handleError', () => {
     const callHandleError = (error: unknown, res: MockResponse) =>
-      (controller as unknown as { handleError: (e: unknown, r: Response) => void })
-        .handleError(error, res as unknown as Response);
+      (
+        controller as unknown as {
+          handleError: (e: unknown, r: Response) => void;
+        }
+      ).handleError(error, res as unknown as Response);
 
     test('maps RouteNotFound IAppError to 404', () => {
       const res = createMockResponse();
@@ -286,11 +293,14 @@ describe('TUC2 – Track Bus in Real-Time unit tests', () => {
 
   describe('getVehicles dispatch', () => {
     const callGetVehicles = (routeId: string, res: MockResponse) =>
-      (controller as unknown as { getVehicles: (r: Request, s: Response) => Promise<void> })
-        .getVehicles(
-          { params: { routeId } } as unknown as Request,
-          res as unknown as Response
-        );
+      (
+        controller as unknown as {
+          getVehicles: (r: Request, s: Response) => Promise<void>;
+        }
+      ).getVehicles(
+        { params: { routeId } } as unknown as Request,
+        res as unknown as Response
+      );
 
     test('dispatches to tripshot service for CMU-prefixed route', async () => {
       const cmuVehicles: IVehicle[] = [
@@ -307,9 +317,7 @@ describe('TUC2 – Track Bus in Real-Time unit tests', () => {
       ];
 
       jest.spyOn(tripshotService, 'isConfigured').mockReturnValue(true);
-      jest
-        .spyOn(tripshotService, 'getVehicles')
-        .mockResolvedValue(cmuVehicles);
+      jest.spyOn(tripshotService, 'getVehicles').mockResolvedValue(cmuVehicles);
       const vpSpy = jest.spyOn(vehiclePositionsService, 'getVehicles');
 
       const res = createMockResponse();
