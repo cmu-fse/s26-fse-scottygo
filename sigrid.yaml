@@ -11,9 +11,9 @@ exclude:
   - '^docs(/|$)'
   - '^assets(/|$)'
   - '^node_modules(/|$)'
-  - '^tools(/|$)'
-  - '^tests(/|$)'
-  - '^trials(/|$)' # Excludes experimental/demo files
+  - '.*/tools/.*'
+  - '.*/tests/.*'
+  - '.*/trials/.*' # Excludes experimental/demo files
 
 languages:
   - name: TypeScript
