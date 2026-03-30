@@ -1,5 +1,19 @@
-// Controller serving the athentication page and handling user registration and login
-// Note that controllers don't access the DB direcly, only through the models
+// ============================================================================
+// CODE REVIEW SCOPE: auth.controller.ts (~308 lines)
+// This controller handles user registration, login, and Terms of Service agreement.
+// It is paired with map.controller.ts for a combined ~436-line review.
+//
+// KEY AREAS FOR REVIEWERS:
+// 1. Duplicated error-handling catch blocks (Sigrid HIGH severity)
+// 2. Duplicated password obfuscation pattern
+// 3. Input validation completeness
+// 4. Token creation and security
+// ============================================================================
+
+// FIX #1: Corrected typo "athentication" → "authentication"
+// FIX #2: Corrected typo "direcly" → "directly"
+// Controller serving the authentication page and handling user registration and login
+// Note that controllers don't access the DB directly, only through the models
 
 import { ILogin, IUser, ITokenPayload } from '../../common/user.interface';
 import { User } from '../models/user.model';
@@ -18,6 +32,8 @@ export default class AuthController extends Controller {
     super(path);
   }
 
+  // REVIEW: Routes follow RESTful conventions.
+  // POST /users → register, POST /tokens/:username → login, PATCH /users/:username → agreed
   public initializeRoutes(): void {
     this.router.get('/', this.authPage.bind(this));
     this.router.post('/users', this.register.bind(this));
@@ -29,6 +45,11 @@ export default class AuthController extends Controller {
     this.sendPage(res, 'auth.html');
   }
 
+  // REVIEW: Registration endpoint — validates required fields, creates user, returns sanitized user.
+  // ATTENTION: Each validation block creates a new IAppError object with near-identical structure.
+  // Consider extracting a helper like `clientError(name, message)` to reduce boilerplate.
+  // ISSUE (not fixed): No email format validation — accepts any non-empty string as email.
+  //   Recommend adding a regex or library-based email check. (Log as GitHub Issue)
   public async register(req: Request, res: Response) {
     // Extract user data from request body (IUser format)
     const reqUsername = req.body.credentials?.username;
@@ -67,6 +88,10 @@ export default class AuthController extends Controller {
 
       const savedUser = await newUser.join();
 
+      // REVIEW – DUPLICATION: This password obfuscation block (spread + override credentials)
+      // is repeated 4 times across auth.controller.ts and map.controller.ts.
+      // Sigrid flagged this as HIGH severity duplication.
+      // Consider extracting to a shared utility like `sanitizeUser(user: IUser): IUser`.
       // Obfuscate password
       const sanitizedUser: IUser = {
         ...savedUser,
@@ -82,6 +107,11 @@ export default class AuthController extends Controller {
         payload: sanitizedUser
       });
     } catch (error: unknown) {
+      // REVIEW – DUPLICATION: This catch block pattern (check for IAppError shape, map status code)
+      // is the most duplicated code in the controllers — repeated 6+ times across auth, map,
+      // and account controllers. Sigrid flagged as HIGH severity (12 lines × 5 occurrences).
+      // Recommend extracting to Controller base class, e.g.:
+      //   protected handleError(res: Response, error: unknown, fallbackMsg: string)
       // Handle errors from model/database
       // Check if it's an IAppError by checking properties
       if (
@@ -105,6 +135,9 @@ export default class AuthController extends Controller {
     }
   }
 
+  // REVIEW: Login endpoint — validates credentials, checks active/agreed status, issues JWT.
+  // ATTENTION: The username/password validation blocks (lines below) are nearly identical
+  // to those in agreed() and register(). Sigrid flagged 15-line duplication (HIGH).
   public async login(req: Request, res: Response) {
     // Username comes from URL params (:username?)
     if (!req.params.username) {
@@ -165,8 +198,9 @@ export default class AuthController extends Controller {
       };
       // In tokenExpiry ever changed in .env, handle BOTH cases of
       // token expiry: actual time period and 'never'
+      // FIX #3: Changed loose equality (==) to strict equality (===) to avoid type coercion bugs
       let signedToken: string;
-      if (tokenExpiry == 'never') {
+      if (tokenExpiry === 'never') {
         signedToken = jwt.sign(tokenPayload, secretKey);
       } else {
         // Cast to jwt.SignOptions to help TypeScript match the correct jwt.sign() overload
@@ -175,6 +209,7 @@ export default class AuthController extends Controller {
         } as jwt.SignOptions);
       }
 
+      // REVIEW – DUPLICATION: Same password obfuscation pattern as in register() above
       // Obfuscate password before returning to client
       const sanitizedUser: IUser = {
         ...user,
@@ -195,6 +230,7 @@ export default class AuthController extends Controller {
       };
       return res.status(200).json(successRes);
     } catch (error: unknown) {
+      // REVIEW – DUPLICATION: Same catch block pattern as register() above.
       // Handle errors from model (UserNotFound, IncorrectPassword)
       if (
         error &&
@@ -217,6 +253,10 @@ export default class AuthController extends Controller {
     }
   }
 
+  // REVIEW: agreed() — Updates user's Terms of Service agreement status.
+  // ATTENTION: This method has TWO separate try/catch blocks with IDENTICAL error handling.
+  // The validation blocks for username/password are also duplicated from login() above.
+  // Sigrid flagged 14-line duplication (HIGH) shared with login() and map.controller.ts.
   public async agreed(req: Request, res: Response) {
     // Username comes from URL params (:username?)
     if (!req.params.username) {
@@ -247,6 +287,7 @@ export default class AuthController extends Controller {
     try {
       userToUpdate = await User.validateUser(credentials);
     } catch (error: unknown) {
+      // REVIEW – DUPLICATION: Third occurrence of the same catch block in this file alone.
       // Handle errors from model and database
       if (
         error &&
@@ -269,6 +310,7 @@ export default class AuthController extends Controller {
     // Now try to update user agreed status and return response
     try {
       const agreedUser: IUser = await User.setUserAgreedToTrue(userToUpdate);
+      // REVIEW – DUPLICATION: Third occurrence of password obfuscation in this file.
       // Obfuscate password before sending to client
       const sanitizedUser: IUser = {
         ...agreedUser,
@@ -285,6 +327,8 @@ export default class AuthController extends Controller {
       };
       return res.status(200).json(successRes);
     } catch (error: unknown) {
+      // REVIEW – DUPLICATION: Fourth occurrence of the same catch block in this file.
+      // This is the most critical duplication issue flagged by Sigrid.
       // Handle errors from model/database
       if (
         error &&

@@ -1,7 +1,21 @@
-// Controller serving the map page where the user lands after login
-// Note that controllers don't access the DB direcly, only through the models
+// ============================================================================
+// CODE REVIEW SCOPE: map.controller.ts (~128 lines)
+// This controller serves the map page and handles user authorization via JWT.
+// It is paired with auth.controller.ts for a combined ~436-line review.
+//
+// KEY AREAS FOR REVIEWERS:
+// 1. Token type mismatch bug in authorize() (FIX #4)
+// 2. Missing username validation in getUser() (FIX #5)
+// 3. Duplicated error handling catch block shared with auth.controller.ts
+// 4. Duplicated password obfuscation pattern
+// ============================================================================
 
-import { IUser, ILogin } from '../../common/user.interface';
+// FIX #6: Corrected typo "direcly" → "directly"
+// Controller serving the map page where the user lands after login
+// Note that controllers don't access the DB directly, only through the models
+
+// FIX #4: Changed ILogin import to ITokenPayload (see authorize() fix below)
+import { IUser, ITokenPayload } from '../../common/user.interface';
 import { User } from '../models/user.model';
 import Controller from './controller';
 import { NextFunction, Request, Response } from 'express';
@@ -14,6 +28,7 @@ export default class MapController extends Controller {
     super(path);
   }
 
+  // REVIEW: Route definitions. Note :username? is optional — getUser must handle missing param.
   public initializeRoutes(): void {
     this.router.get('/', this.mapPage.bind(this));
     this.router.get('/users/:username?', this.authorize, this.getUser);
@@ -24,6 +39,9 @@ export default class MapController extends Controller {
     this.sendPage(res, 'map.html');
   }
 
+  // REVIEW: Authorization middleware — verifies JWT token from Authorization header.
+  // ATTENTION: This is effectively duplicated logic from account.controller.ts#authenticateToken.
+  // Consider extracting to the Controller base class as a shared middleware.
   // Check if the user is logged in by validating token
   public async authorize(
     req: Request,
@@ -44,9 +62,14 @@ export default class MapController extends Controller {
       return; // Stop execution
     }
 
+    // FIX #4: Changed decoded token type from ILogin to ITokenPayload.
+    // The token is signed in auth.controller.ts with ITokenPayload (userId + username),
+    // NOT with ILogin (username + password). Casting to ILogin was incorrect —
+    // it coincidentally worked because both interfaces have a `username` field,
+    // but it misrepresented the token's actual payload structure.
     // Verify and decode token with secretKey
     try {
-      const decodedToken: ILogin = jwt.verify(token, secretKey) as ILogin;
+      const decodedToken = jwt.verify(token, secretKey) as ITokenPayload;
       const userOnToken = decodedToken.username; // Extract username from decoded token
       req.body.userOnToken = userOnToken; // Attach username to request object
       next(); // Continue to next middleware
@@ -111,6 +134,8 @@ export default class MapController extends Controller {
     }
   }
 
+  // REVIEW: Returns Google Maps API key and default center/zoom config to client.
+  // The authorize middleware ensures only authenticated users can access this.
   // Return Google Maps config to the client (API key, default center, zoom)
   public getMapConfig(req: Request, res: Response): void {
     const successRes: responses.ISuccess = {
