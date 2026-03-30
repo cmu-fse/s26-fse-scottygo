@@ -667,32 +667,13 @@ export default class AccountController extends Controller {
   /**
    * GET /account
    * Serve the account page
+  /**
+   * Serve the account management page
    */
   public accountPage(req: Request, res: Response): void {
     this.sendPage(res, 'account.html');
   }
 
-  /**
-   * Common error handler for controller methods
-   */
-  private handleError(res: Response, error: unknown): void {
-    if (
-      error &&
-      typeof error === 'object' &&
-      'type' in error &&
-      'name' in error
-    ) {
-      const appError = error as responses.IAppError;
-      const statusCode = appError.type === 'ClientError' ? 400 : 500;
-      res.status(statusCode).json(appError);
-      return;
-    }
-
-    const unexpectedError: responses.IAppError = {
-      type: 'ServerError',
-      name: 'MongoDBError',
-      message: 'An unexpected error occurred'
-    };
-    res.status(500).json(unexpectedError);
-  }
+  // FIX #7: Removed private handleError() — now uses the base Controller.handleError()
+  // which was extracted from the duplicated pattern across all controllers.
 }

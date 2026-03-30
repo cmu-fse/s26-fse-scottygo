@@ -48,8 +48,9 @@ export default class AuthController extends Controller {
   // REVIEW: Registration endpoint — validates required fields, creates user, returns sanitized user.
   // ATTENTION: Each validation block creates a new IAppError object with near-identical structure.
   // Consider extracting a helper like `clientError(name, message)` to reduce boilerplate.
-  // ISSUE (not fixed): No email format validation — accepts any non-empty string as email.
-  //   Recommend adding a regex or library-based email check. (Log as GitHub Issue)
+  // NOTE: Email format validation (CMU-only) is handled in User.join() -> validateEmailFormat().
+  //   The Sigrid finding about missing email validation refers to the controller layer only;
+  //   the model layer properly validates @cmu.edu format before saving.
   public async register(req: Request, res: Response) {
     // Extract user data from request body (IUser format)
     const reqUsername = req.body.credentials?.username;
@@ -88,18 +89,8 @@ export default class AuthController extends Controller {
 
       const savedUser = await newUser.join();
 
-      // REVIEW – DUPLICATION: This password obfuscation block (spread + override credentials)
-      // is repeated 4 times across auth.controller.ts and map.controller.ts.
-      // Sigrid flagged this as HIGH severity duplication.
-      // Consider extracting to a shared utility like `sanitizeUser(user: IUser): IUser`.
-      // Obfuscate password
-      const sanitizedUser: IUser = {
-        ...savedUser,
-        credentials: {
-          username: savedUser.credentials.username,
-          password: 'obfuscated'
-        }
-      };
+      // FIX #8: Use base class sanitizeUser() instead of inline obfuscation (was duplicated 4x)
+      const sanitizedUser: IUser = this.sanitizeUser(savedUser);
 
       const userLocation = `/auth/users/${savedUser.credentials.username}`;
       return res.status(201).location(userLocation).json({
@@ -107,31 +98,8 @@ export default class AuthController extends Controller {
         payload: sanitizedUser
       });
     } catch (error: unknown) {
-      // REVIEW – DUPLICATION: This catch block pattern (check for IAppError shape, map status code)
-      // is the most duplicated code in the controllers — repeated 6+ times across auth, map,
-      // and account controllers. Sigrid flagged as HIGH severity (12 lines × 5 occurrences).
-      // Recommend extracting to Controller base class, e.g.:
-      //   protected handleError(res: Response, error: unknown, fallbackMsg: string)
-      // Handle errors from model/database
-      // Check if it's an IAppError by checking properties
-      if (
-        error &&
-        typeof error === 'object' &&
-        'type' in error &&
-        'name' in error
-      ) {
-        const appError = error as responses.IAppError;
-        const statusCode = appError.type === 'ClientError' ? 400 : 500;
-        return res.status(statusCode).json(appError);
-      }
-
-      // Handle error not raised as IAppError - create one to wrap unexpected error
-      const unexpectedError: responses.IAppError = {
-        type: 'ServerError',
-        name: 'MongoDBError',
-        message: 'An unexpected error occurred during registration'
-      };
-      return res.status(500).json(unexpectedError);
+      // FIX #7: Use base class handleError() instead of inline catch block (was duplicated 6x)
+      return this.handleError(res, error, 'An unexpected error occurred during registration');
     }
   }
 
@@ -209,15 +177,8 @@ export default class AuthController extends Controller {
         } as jwt.SignOptions);
       }
 
-      // REVIEW – DUPLICATION: Same password obfuscation pattern as in register() above
-      // Obfuscate password before returning to client
-      const sanitizedUser: IUser = {
-        ...user,
-        credentials: {
-          username: user.credentials.username,
-          password: 'obfuscated'
-        }
-      };
+      // FIX #8: Use base class sanitizeUser() instead of inline obfuscation
+      const sanitizedUser: IUser = this.sanitizeUser(user);
 
       const payload: responses.IAuthenticatedUser = {
         token: signedToken,
@@ -230,26 +191,8 @@ export default class AuthController extends Controller {
       };
       return res.status(200).json(successRes);
     } catch (error: unknown) {
-      // REVIEW – DUPLICATION: Same catch block pattern as register() above.
-      // Handle errors from model (UserNotFound, IncorrectPassword)
-      if (
-        error &&
-        typeof error === 'object' &&
-        'type' in error &&
-        'name' in error
-      ) {
-        const appError = error as responses.IAppError;
-        const statusCode = appError.type === 'ClientError' ? 400 : 500;
-        return res.status(statusCode).json(appError);
-      }
-
-      // Unexpected error
-      const unexpectedError: responses.IAppError = {
-        type: 'ServerError',
-        name: 'MongoDBError',
-        message: 'An unexpected error occurred during login'
-      };
-      return res.status(500).json(unexpectedError);
+      // FIX #7: Use base class handleError() instead of inline catch block
+      return this.handleError(res, error, 'An unexpected error occurred during login');
     }
   }
 
@@ -287,38 +230,14 @@ export default class AuthController extends Controller {
     try {
       userToUpdate = await User.validateUser(credentials);
     } catch (error: unknown) {
-      // REVIEW – DUPLICATION: Third occurrence of the same catch block in this file alone.
-      // Handle errors from model and database
-      if (
-        error &&
-        typeof error === 'object' &&
-        'type' in error &&
-        'name' in error
-      ) {
-        const appError = error as responses.IAppError;
-        const statusCode = appError.type === 'ClientError' ? 400 : 500;
-        return res.status(statusCode).json(appError);
-      }
-      // Handle error not raised as IAppError
-      const unexpectedError: responses.IAppError = {
-        type: 'ServerError',
-        name: 'MongoDBError',
-        message: 'An unexpected error occurred in the database'
-      };
-      return res.status(500).json(unexpectedError);
+      // FIX #7: Use base class handleError() instead of inline catch block
+      return this.handleError(res, error, 'An unexpected error occurred in the database');
     }
     // Now try to update user agreed status and return response
     try {
       const agreedUser: IUser = await User.setUserAgreedToTrue(userToUpdate);
-      // REVIEW – DUPLICATION: Third occurrence of password obfuscation in this file.
-      // Obfuscate password before sending to client
-      const sanitizedUser: IUser = {
-        ...agreedUser,
-        credentials: {
-          username: agreedUser.credentials.username,
-          password: 'obfuscated'
-        }
-      };
+      // FIX #8: Use base class sanitizeUser() instead of inline obfuscation
+      const sanitizedUser: IUser = this.sanitizeUser(agreedUser);
       // Return success response
       const successRes: responses.ISuccess = {
         name: 'UserAgreed',
@@ -327,26 +246,8 @@ export default class AuthController extends Controller {
       };
       return res.status(200).json(successRes);
     } catch (error: unknown) {
-      // REVIEW – DUPLICATION: Fourth occurrence of the same catch block in this file.
-      // This is the most critical duplication issue flagged by Sigrid.
-      // Handle errors from model/database
-      if (
-        error &&
-        typeof error === 'object' &&
-        'type' in error &&
-        'name' in error
-      ) {
-        const appError = error as responses.IAppError;
-        const statusCode = appError.type === 'ClientError' ? 400 : 500;
-        return res.status(statusCode).json(appError);
-      }
-      // Handle error not raised as IAppError
-      const unexpectedError: responses.IAppError = {
-        type: 'ServerError',
-        name: 'MongoDBError',
-        message: 'An unexpected error occurred in the database'
-      };
-      return res.status(500).json(unexpectedError);
+      // FIX #7: Use base class handleError() instead of inline catch block
+      return this.handleError(res, error, 'An unexpected error occurred in the database');
     }
   }
 }

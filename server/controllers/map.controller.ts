@@ -96,16 +96,8 @@ export default class MapController extends Controller {
       const user: IUser | null = await User.getUserForUsername(
         req.params.username
       );
-      // Obfuscate password before sending to client
-      const sanitizedUser = user
-        ? {
-            ...user,
-            credentials: {
-              username: user.credentials.username,
-              password: 'obfuscated'
-            }
-          }
-        : null;
+      // FIX #8: Use base class sanitizeUser() instead of inline obfuscation
+      const sanitizedUser = user ? this.sanitizeUser(user) : null;
       const successRes: responses.ISuccess = {
         name: 'UserFound',
         message: 'User retrieved successfully',
@@ -113,24 +105,8 @@ export default class MapController extends Controller {
       };
       return res.status(200).json(successRes);
     } catch (error: unknown) {
-      if (
-        error &&
-        typeof error === 'object' &&
-        'type' in error &&
-        'name' in error
-      ) {
-        // Handle errors raised as IAppError by model/database
-        const appError = error as responses.IAppError;
-        const statusCode = appError.type === 'ClientError' ? 400 : 500;
-        return res.status(statusCode).json(appError);
-      }
-      // Handle error not raised as IAppError - create one to wrap unexpected error
-      const unexpectedError: responses.IAppError = {
-        type: 'ServerError',
-        name: 'MongoDBError',
-        message: 'An unexpected error occurred in the database'
-      };
-      return res.status(500).json(unexpectedError);
+      // FIX #7: Use base class handleError() instead of inline catch block
+      return this.handleError(res, error, 'An unexpected error occurred in the database');
     }
   }
 

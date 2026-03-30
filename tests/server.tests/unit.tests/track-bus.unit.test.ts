@@ -226,9 +226,9 @@ describe('TUC2 – Track Bus in Real-Time unit tests', () => {
     const callHandleError = (error: unknown, res: MockResponse) =>
       (
         controller as unknown as {
-          handleError: (e: unknown, r: Response) => void;
+          handleTransitError: (e: unknown, r: Response) => void;
         }
-      ).handleError(error, res as unknown as Response);
+      ).handleTransitError(error, res as unknown as Response);
 
     test('maps RouteNotFound IAppError to 404', () => {
       const res = createMockResponse();

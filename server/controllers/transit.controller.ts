@@ -114,7 +114,7 @@ export default class BusController extends Controller {
         payload: samples
       });
     } catch (error: unknown) {
-      this.handleError(error, res);
+      this.handleTransitError(error, res);
     }
   }
 
@@ -234,7 +234,7 @@ export default class BusController extends Controller {
         }
       });
     } catch (error: unknown) {
-      this.handleError(error, res);
+      this.handleTransitError(error, res);
     }
   }
 
@@ -920,7 +920,7 @@ export default class BusController extends Controller {
       };
       res.status(200).json(successRes);
     } catch (error: unknown) {
-      this.handleError(error, res);
+      this.handleTransitError(error, res);
     }
   }
 
@@ -956,7 +956,7 @@ export default class BusController extends Controller {
       };
       res.status(200).json(successRes);
     } catch (error: unknown) {
-      this.handleError(error, res);
+      this.handleTransitError(error, res);
     }
   }
 
@@ -990,7 +990,7 @@ export default class BusController extends Controller {
       };
       res.status(200).json(successRes);
     } catch (error: unknown) {
-      this.handleError(error, res);
+      this.handleTransitError(error, res);
     }
   }
 
@@ -1035,7 +1035,7 @@ export default class BusController extends Controller {
       };
       res.status(200).json(successRes);
     } catch (error: unknown) {
-      this.handleError(error, res);
+      this.handleTransitError(error, res);
     }
   }
 
@@ -1086,7 +1086,7 @@ export default class BusController extends Controller {
       };
       res.status(200).json(successRes);
     } catch (error: unknown) {
-      this.handleError(error, res);
+      this.handleTransitError(error, res);
     }
   }
 
@@ -1113,7 +1113,7 @@ export default class BusController extends Controller {
       };
       res.status(200).json(successRes);
     } catch (error: unknown) {
-      this.handleError(error, res);
+      this.handleTransitError(error, res);
     }
   }
 
@@ -1129,7 +1129,7 @@ export default class BusController extends Controller {
       };
       res.status(200).json(successRes);
     } catch (error: unknown) {
-      this.handleError(error, res);
+      this.handleTransitError(error, res);
     }
   }
 
@@ -1145,7 +1145,7 @@ export default class BusController extends Controller {
       };
       res.status(200).json(successRes);
     } catch (error: unknown) {
-      this.handleError(error, res);
+      this.handleTransitError(error, res);
     }
   }
 
@@ -1163,13 +1163,13 @@ export default class BusController extends Controller {
       };
       res.status(200).json(successRes);
     } catch (error: unknown) {
-      this.handleError(error, res);
+      this.handleTransitError(error, res);
     }
   }
 
   // -------------------------------------------------------------------------
 
-  private handleError(error: unknown, res: Response): void {
+  private handleTransitError(error: unknown, res: Response): void {
     // Log the actual error for debugging
     console.error(
       `[Transit Controller ${new Date().toISOString()}] Error:`,
