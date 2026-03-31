@@ -1,6 +1,5 @@
 import axios, { AxiosResponse } from 'axios';
 import './components/app-header';
-import './components/live-notifications';
 import { io, Socket } from 'socket.io-client';
 import type { IResponse } from '../../common/server.responses';
 import { isSuccess } from '../../common/server.responses';
@@ -221,8 +220,7 @@ const getResponseMessage = (
     IncorrectPassword: 'Current password is incorrect',
     MissingPassword: 'Missing Password',
     MissingUsername: 'Missing Username',
-    MissingEmail: 'Missing Email',
-    InvalidSearchField: 'Invalid user search field'
+    MissingEmail: 'Missing Email'
   };
   if (typeof errorName === 'string' && errorName in errorMessages) {
     return errorMessages[errorName];
@@ -803,27 +801,23 @@ const closeCombobox = (): void => {
   userSelector.setAttribute('aria-expanded', 'false');
 };
 
-const populateUserSelector = async (query = ''): Promise<void> => {
+const populateUserSelector = async (): Promise<void> => {
   try {
     const res: AxiosResponse<IResponse> = await axios.request({
       method: 'get',
       headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-      url: '/account/users/search',
-      params: {
-        field: 'username',
-        q: query
-      },
+      url: '/account/users',
       validateStatus: () => true
     });
 
     if (res.status >= 200 && res.status < 300 && isSuccess(res.data)) {
       const users = res.data.payload as string[];
       allUsernames = users;
-    } else {
-      allUsernames = [];
     }
   } catch {
-    allUsernames = [];
+    if (currentUserAccount) {
+      allUsernames = [currentUserAccount.credentials.username];
+    }
   }
 
   refreshUserSelectorOptions();
@@ -859,8 +853,8 @@ userSelector.addEventListener('focus', async () => {
 });
 
 // Admin combobox: filter as user types
-userSelector.addEventListener('input', async () => {
-  await populateUserSelector(userSelector.value.trim());
+userSelector.addEventListener('input', () => {
+  refreshUserSelectorOptions();
   openCombobox();
 });
 
@@ -1031,3 +1025,4 @@ document.addEventListener('DOMContentLoaded', async () => {
     setFormStatus(message, true);
   }
 });
+

@@ -6,43 +6,10 @@
     <title>ScottyGo - Notifications</title>
     <link rel="stylesheet" href="../styles/shared.css" />
     <link rel="stylesheet" href="../styles/notifications.css" />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined"
-    />
   </head>
   <body>
     <app-header back></app-header>
     <main class="content">
-      <h1 class="page-title" id="page-title">Live Notifications</h1>
-      <div class="notif-search-wrap">
-        <div class="notif-search">
-          <span class="material-icons-outlined notif-search-icon">search</span>
-          <input
-            type="text"
-            id="notif-search-input"
-            placeholder="Search routes, buses, or alerts..."
-            autocomplete="off"
-            aria-label="Search notifications"
-            aria-autocomplete="list"
-            aria-controls="notif-search-suggestions"
-          />
-          <button
-            class="notif-search-clear"
-            id="notif-search-clear"
-            aria-label="Clear search"
-          >
-            <span class="material-icons-outlined">close</span>
-          </button>
-        </div>
-        <div
-          class="notif-search-suggestions"
-          id="notif-search-suggestions"
-          hidden
-        ></div>
-      </div>
-      <ul class="notif-list" id="notif-list"></ul>
-      <p class="notif-empty" id="notif-empty">No notifications found.</p>
     </main>
     <script type="module" src="../scripts/notification.ts"></script>
   </body>
