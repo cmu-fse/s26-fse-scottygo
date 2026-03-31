@@ -667,7 +667,6 @@ export default class AccountController extends Controller {
   /**
    * GET /account
    * Serve the account page
-  /**
    * Serve the account management page
    */
   public accountPage(req: Request, res: Response): void {
