@@ -5,6 +5,7 @@ import type { IMapProvider, IConfig } from '../../common/map.interface';
 import { GoogleMapProvider } from './maps/google-map.provider';
 
 // Import web components
+import './components/app-header';
 import './components/transit-search';
 import './components/map-controls';
 import './components/zoom-controls';
@@ -801,26 +802,3 @@ function isInPittsburghArea(lat: number, lng: number): boolean {
   return lat >= MIN_LAT && lat <= MAX_LAT && lng >= MIN_LNG && lng <= MAX_LNG;
 }
 
-// Menu toggle process
-const menuIcon = document.getElementById('menu-icon');
-const dropdownMenu = document.getElementById('dropdown-menu');
-const backIcon = document.getElementById('back-icon');
-
-menuIcon?.addEventListener('click', () => {
-  menuIcon.classList.toggle('is-active');
-  dropdownMenu?.classList.toggle('is-active');
-  backIcon?.classList.toggle('is-hidden');
-});
-
-// Logout process
-const menuLogoutBtn = document.getElementById(
-  'menu-logout-btn'
-) as HTMLAnchorElement | null;
-
-const handleLogout = () => {
-  localStorage.removeItem('token');
-  localStorage.removeItem('username');
-  window.location.replace('/home');
-};
-
-menuLogoutBtn?.addEventListener('click', handleLogout);

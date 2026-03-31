@@ -1,4 +1,5 @@
 import axios, { AxiosResponse } from 'axios';
+import './components/app-header';
 import { io, Socket } from 'socket.io-client';
 import type { IResponse } from '../../common/server.responses';
 import { isSuccess } from '../../common/server.responses';
@@ -1025,17 +1026,3 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
-// Menu toggle
-const menuIcon = document.getElementById('menu-icon');
-const dropdownMenu = document.getElementById('dropdown-menu');
-const backIcon = document.getElementById('back-icon');
-
-menuIcon?.addEventListener('click', () => {
-  menuIcon.classList.toggle('is-active');
-  dropdownMenu?.classList.toggle('is-active');
-  backIcon?.classList.toggle('is-hidden');
-});
-
-// Logout from menu
-const menuLogoutBtn = document.getElementById('menu-logout-btn');
-menuLogoutBtn?.addEventListener('click', handleLogout);

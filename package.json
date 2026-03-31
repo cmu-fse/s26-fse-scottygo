@@ -100,7 +100,9 @@
         "client/pages/home.html",
         "client/pages/auth.html",
         "client/pages/map.html",
-        "client/pages/account.html"
+        "client/pages/account.html",
+        "client/pages/notifications.html",
+        "client/pages/subscriptions.html"
       ],
       "distDir": ".dist/client",
       "context": "browser"

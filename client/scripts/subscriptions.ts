@@ -2,5 +2,3 @@
 export {};
 
 import './components/app-header';
-
-console.log('Home page loaded');
