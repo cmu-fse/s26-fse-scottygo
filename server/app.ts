@@ -5,8 +5,10 @@ import Controller from './controllers/controller';
 import gtfsService from './services/gtfs.service';
 import vehiclePositionsService from './services/vehicle-positions.service';
 import tripUpdatesService from './services/trip-updates.service';
+import alertsService from './services/alerts.service';
 import memoryMonitorService from './services/memory-monitor.service';
 import { TransitModel } from './models/transit.model';
+import { NotificationModel } from './models/notification.model';
 import { JWT_KEY as secretKey, STAGE } from './env';
 import { Server as SocketServer, Socket } from 'socket.io';
 import {
@@ -142,6 +144,15 @@ class App {
         return;
       }
       memoryMonitorService.capture('realtime-pollers.started');
+
+      // Start GTFS-RT alerts polling and wire up Socket.io push (TUC3)
+      alertsService.onAlertsChanged = (alerts) => {
+        this.io.emit('alertUpdate', alerts);
+      };
+      alertsService.start();
+
+      // Initialize last-known bus status map from DB (TUC3 R12)
+      await NotificationModel.initialize();
 
       // Schedule a daily cache refresh (every 24 h).
       const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
@@ -307,6 +318,7 @@ class App {
         memoryMonitorService.stop();
         vehiclePositionsService.stop();
         tripUpdatesService.stop();
+        alertsService.stop();
         if (this.dailyRefreshIntervalId) {
           clearInterval(this.dailyRefreshIntervalId);
           this.dailyRefreshIntervalId = null;
@@ -375,6 +387,26 @@ class App {
         // Handle unsubscribeAccount event
         socket.on('unsubscribeAccount', (username: string) => {
           const roomName = `account:${username.toLowerCase()}`;
+          socket.leave(roomName);
+          console.log(
+            `[Socket ${new Date().toISOString()}] Client ${socket.id} unsubscribed from ${roomName}`
+          );
+        });
+
+        // Handle subscribeRoute event (TUC3 — Observer Pattern R4)
+        socket.on('subscribeRoute', (data: { routeId: string }) => {
+          if (!data?.routeId) return;
+          const roomName = `route:${data.routeId}`;
+          socket.join(roomName);
+          console.log(
+            `[Socket ${new Date().toISOString()}] Client ${socket.id} subscribed to ${roomName}`
+          );
+        });
+
+        // Handle unsubscribeRoute event (TUC3)
+        socket.on('unsubscribeRoute', (data: { routeId: string }) => {
+          if (!data?.routeId) return;
+          const roomName = `route:${data.routeId}`;
           socket.leave(roomName);
           console.log(
             `[Socket ${new Date().toISOString()}] Client ${socket.id} unsubscribed from ${roomName}`
