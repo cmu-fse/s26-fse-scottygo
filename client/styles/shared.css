@@ -161,3 +161,12 @@ body {
   text-align: center;
   line-height: 1.2;
 }
+
+/* Page title */
+.page-title {
+  color: #c41230;
+  font-size: 32px;
+  font-weight: bold;
+  margin-bottom: 24px;
+  text-align: center;
+}
