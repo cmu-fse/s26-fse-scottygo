@@ -9,6 +9,7 @@ import AuthController from './controllers/auth.controller';
 import AccountController from './controllers/account.controller';
 import MapController from './controllers/map.controller';
 import BusController from './controllers/transit.controller';
+import NotificationController from './controllers/notification.controller';
 
 const app = new App(
   [
@@ -16,7 +17,8 @@ const app = new App(
     new AuthController('/auth'),
     new AccountController('/account'),
     new MapController('/map'),
-    new BusController('/transit')
+    new BusController('/transit'),
+    new NotificationController('/notifications')
   ],
   {
     clientDir: path.join(__dirname, '../.dist/client'),
