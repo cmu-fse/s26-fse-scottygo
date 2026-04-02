@@ -7,7 +7,6 @@ import {
   IDetour,
   IPattern,
   IBulkTransitData,
-  ITransitSearchResult,
   INearbyStopsPayload,
   ISubscription,
   IBusReport,
