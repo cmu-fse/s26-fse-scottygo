@@ -79,6 +79,8 @@ export class TransitSearch extends HTMLElement {
 
     this.clearBtn?.addEventListener('click', () => this.clearSearch());
 
+    this.clearBtn?.addEventListener('click', () => this.clearSearch());
+
     layersBtn?.addEventListener('click', () => {
       this.dispatchEvent(new CustomEvent('toggleLayers', { bubbles: true }));
     });
