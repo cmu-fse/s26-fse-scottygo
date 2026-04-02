@@ -4,23 +4,6 @@
  * Polls backend every 30 seconds to match the GTFS-RT feed refresh rate
  */
 
-/** Haversine distance in miles between two lat/lon points (R9). */
-function haversineDistanceMiles(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number
-): number {
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const R = 3958.8;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
 import axios from 'axios';
 import type { IMapProvider, IMapMarker } from '../../../common/map.interface';
 import type { IVehicle } from '../../../common/transit.interface';
@@ -31,7 +14,6 @@ export class VehicleTracker {
   private static instance: VehicleTracker;
   private mapProvider: IMapProvider | null = null;
   private stateManager: MapStateManager;
-  private isAdminProximityBypass = false;
 
   private pollingInterval: number | null = null;
   private currentRouteId: string | null = null;
@@ -40,8 +22,6 @@ export class VehicleTracker {
   private hasShownStaticToast = false;
   private hasShownNoVehiclesToast = false;
   private currentZoom = 14;
-  private openPopupVehicleId: string | null = null;
-  private popupUpdatedInterval: number | null = null;
 
   private constructor() {
     this.stateManager = MapStateManager.getInstance();
@@ -66,13 +46,6 @@ export class VehicleTracker {
       this.currentZoom = zoom;
       this.updateAllIcons();
     });
-  }
-
-  /**
-   * Enable proximity-check bypass for administrators.
-   */
-  setAdminProximityBypass(enabled: boolean): void {
-    this.isAdminProximityBypass = enabled;
   }
 
   /**
@@ -222,9 +195,6 @@ export class VehicleTracker {
 
     this.vehicleMarkers.forEach((marker, vid) => {
       if (!currentVehicleIds.has(vid)) {
-        if (this.openPopupVehicleId === vid) {
-          this.closeVehiclePopup();
-        }
         marker.remove();
         markersToRemove.push(vid);
       }
@@ -243,7 +213,7 @@ export class VehicleTracker {
     this.vehicleMarkers.forEach((marker) => marker.remove());
     this.vehicleMarkers.clear();
     this.vehicleData.clear();
-    this.closeVehiclePopup();
+    closeMapPopup();
     console.log('Cleared all vehicle markers');
   }
 
@@ -394,8 +364,7 @@ export class VehicleTracker {
     if (!vehicle) return;
 
     // Remove any existing map popup (stop or bus)
-    this.closeVehiclePopup();
-    this.openPopupVehicleId = vid;
+    closeMapPopup();
 
     const popup = document.createElement('div');
     popup.id = MAP_POPUP_ID;
@@ -440,17 +409,15 @@ export class VehicleTracker {
     }
 
     // Last update
-    const timeText = this.formatElapsedTime(vehicle.lastUpdate);
+    const lastUpdate = new Date(vehicle.lastUpdate);
+    const secsAgo = Math.round((Date.now() - lastUpdate.getTime()) / 1000);
+    const timeText =
+      secsAgo < 60 ? `${secsAgo}s ago` : `${Math.round(secsAgo / 60)}m ago`;
 
     if (vehicle.source === 'live') {
       this.addUpdatedRowWithDot(details, timeText);
     } else {
-      this.addDetailRow(
-        details,
-        'Updated',
-        timeText,
-        'map-popup__updated-time'
-      );
+      this.addDetailRow(details, 'Updated', timeText);
     }
 
     popup.appendChild(details);
@@ -463,21 +430,14 @@ export class VehicleTracker {
       popup.appendChild(badge);
     }
 
-    // Action buttons — Report only available for live buses (server validates against GTFS-RT)
+    // Action buttons
     const actions = document.createElement('div');
     actions.className = 'map-popup__actions';
-    const reportBtnHtml =
-      vehicle.source === 'live'
-        ? `<button class="map-popup__action-btn map-popup__action-btn--report">
-           <span class="material-icons-outlined">warning_amber</span>
-           <strong>Report</strong>
-         </button>`
-        : `<button class="map-popup__action-btn map-popup__action-btn--report" disabled title="Reporting only available for live buses">
-           <span class="material-icons-outlined">warning_amber</span>
-           <strong>Report</strong>
-         </button>`;
     actions.innerHTML = `
-      ${reportBtnHtml}
+      <button class="map-popup__action-btn map-popup__action-btn--report">
+        <span class="material-icons-outlined">warning_amber</span>
+        <strong>Report</strong>
+      </button>
       <button class="map-popup__action-btn map-popup__action-btn--check">
         <span class="material-icons-outlined">task_alt</span>
         <strong>Check</strong>
@@ -494,68 +454,20 @@ export class VehicleTracker {
     // Close button
     const closeBtn = popup.querySelector('.map-popup__close');
     if (closeBtn) {
-      closeBtn.addEventListener('click', () => this.closeVehiclePopup());
+      closeBtn.addEventListener('click', () => closeMapPopup());
     }
 
-    // Report button — geolocation + proximity check before opening form (R9, R10, A16, A17)
+    // Report button → open bus report form
     const reportBtn = popup.querySelector('.map-popup__action-btn--report');
     if (reportBtn) {
       reportBtn.addEventListener('click', () => {
-        if (!('geolocation' in navigator)) {
-          this.showToast(
-            'Location access is required to submit a bus report. Please enable location services.'
-          );
-          return;
-        }
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            const userLat = pos.coords.latitude;
-            const userLon = pos.coords.longitude;
-            const latestVehicle = this.vehicleData.get(vid) ?? vehicle;
-            if (!this.isAdminProximityBypass) {
-              const dist = haversineDistanceMiles(
-                userLat,
-                userLon,
-                latestVehicle.lat,
-                latestVehicle.lon
-              );
-              if (dist > 0.5) {
-                this.showToast(
-                  'You need to be near this bus to submit a report.'
-                );
-                return;
-              }
-            }
-            document.dispatchEvent(
-              new CustomEvent('busReport', {
-                detail: {
-                  vid: latestVehicle.vid,
-                  routeId: latestVehicle.routeId,
-                  lat: userLat,
-                  lon: userLon
-                }
-              })
-            );
-          },
-          () => {
-            this.showToast(
-              'Location access is required to submit a bus report. Please enable location services.'
-            );
-          }
+        document.dispatchEvent(
+          new CustomEvent('busReport', {
+            detail: { vid: vehicle.vid, routeId: vehicle.routeId }
+          })
         );
       });
     }
-
-    // Check button — navigate to notifications page pre-filtered by bus (A3)
-    const checkBtn = popup.querySelector('.map-popup__action-btn--check');
-    if (checkBtn) {
-      checkBtn.addEventListener('click', () => {
-        window.location.href = `/notifications?bus=${encodeURIComponent(vehicle.vid)}`;
-      });
-    }
-
-    this.startPopupUpdatedTicker();
-    this.refreshOpenPopupUpdatedTime();
   }
 
   /**
@@ -571,7 +483,7 @@ export class VehicleTracker {
 
     const val = document.createElement('span');
     val.className = 'map-popup__value map-popup__value--live';
-    val.innerHTML = `<span class="map-popup__live-dot"></span><span class="map-popup__updated-time">${timeText}</span>`;
+    val.innerHTML = `<span class="map-popup__live-dot"></span>${timeText}`;
 
     row.appendChild(lbl);
     row.appendChild(val);
@@ -584,8 +496,7 @@ export class VehicleTracker {
   private addDetailRow(
     container: HTMLElement,
     label: string,
-    value: string,
-    valueClass?: string
+    value: string
   ): void {
     const row = document.createElement('div');
     row.className = 'map-popup__row';
@@ -596,9 +507,6 @@ export class VehicleTracker {
 
     const val = document.createElement('span');
     val.className = 'map-popup__value';
-    if (valueClass) {
-      val.classList.add(valueClass);
-    }
     val.textContent = value;
 
     row.appendChild(lbl);
@@ -629,58 +537,6 @@ export class VehicleTracker {
     const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
     const idx = Math.round(degrees / 45) % 8;
     return `${dirs[idx]} (${Math.round(degrees)}°)`;
-  }
-
-  private formatElapsedTime(lastUpdate: string): string {
-    const updatedAt = new Date(lastUpdate);
-    const secsAgo = Math.max(
-      0,
-      Math.round((Date.now() - updatedAt.getTime()) / 1000)
-    );
-    return secsAgo < 60
-      ? `${secsAgo}s ago`
-      : `${Math.round(secsAgo / 60)}m ago`;
-  }
-
-  private startPopupUpdatedTicker(): void {
-    this.stopPopupUpdatedTicker();
-    this.popupUpdatedInterval = window.setInterval(() => {
-      this.refreshOpenPopupUpdatedTime();
-    }, 1000);
-  }
-
-  private stopPopupUpdatedTicker(): void {
-    if (this.popupUpdatedInterval !== null) {
-      clearInterval(this.popupUpdatedInterval);
-      this.popupUpdatedInterval = null;
-    }
-  }
-
-  private refreshOpenPopupUpdatedTime(): void {
-    if (!this.openPopupVehicleId) return;
-
-    const popup = document.getElementById(MAP_POPUP_ID);
-    if (!popup) {
-      this.openPopupVehicleId = null;
-      this.stopPopupUpdatedTicker();
-      return;
-    }
-
-    const vehicle = this.vehicleData.get(this.openPopupVehicleId);
-    if (!vehicle) return;
-
-    const updatedNode = popup.querySelector<HTMLElement>(
-      '.map-popup__updated-time'
-    );
-    if (updatedNode) {
-      updatedNode.textContent = this.formatElapsedTime(vehicle.lastUpdate);
-    }
-  }
-
-  private closeVehiclePopup(): void {
-    this.openPopupVehicleId = null;
-    this.stopPopupUpdatedTicker();
-    closeMapPopup();
   }
 
   /**

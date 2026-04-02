@@ -1,6 +1,7 @@
 export {};
 
 import './components/app-header';
+import './components/live-notifications';
 
 const MAX_SUBSCRIPTIONS = 10;
 

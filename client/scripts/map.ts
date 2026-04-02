@@ -9,6 +9,11 @@ import './components/app-header';
 import './components/transit-search';
 import './components/map-controls';
 import './components/zoom-controls';
+import './components/route-bell';
+import './components/live-notifications';
+import './components/bus-report-form';
+import type { BusReportFormElement } from './components/bus-report-form';
+import type { IRouteBellElement } from './components/route-bell';
 import { LocationIndicator } from './components/location-indicator';
 import './components/toggle-panel';
 import './components/time-picker';
@@ -182,6 +187,66 @@ async function getUser(username: string): Promise<IUser | null> {
   }
 }
 
+// ─── Subscription helpers (localStorage) ──────────────────────────────────────
+
+const SUBSCRIPTIONS_KEY = 'scottygo_subscriptions';
+
+interface StoredSubscription {
+  routeId: string;
+  routeName: string;
+  lastUpdated: string;
+  muted: boolean;
+}
+
+function getStoredSubscriptions(): StoredSubscription[] {
+  try {
+    return JSON.parse(localStorage.getItem(SUBSCRIPTIONS_KEY) ?? '[]');
+  } catch {
+    return [];
+  }
+}
+
+function isRouteSubscribed(routeId: string): boolean {
+  return getStoredSubscriptions().some((s) => s.routeId === routeId);
+}
+
+function saveSubscription(routeId: string): void {
+  const subs = getStoredSubscriptions();
+  if (!subs.some((s) => s.routeId === routeId)) {
+    subs.push({ routeId, routeName: `Route ${routeId}`, lastUpdated: 'just now', muted: false });
+    localStorage.setItem(SUBSCRIPTIONS_KEY, JSON.stringify(subs));
+  }
+}
+
+function removeSubscription(routeId: string): void {
+  const subs = getStoredSubscriptions().filter((s) => s.routeId !== routeId);
+  localStorage.setItem(SUBSCRIPTIONS_KEY, JSON.stringify(subs));
+}
+
+function showSubscriptionToast(message: string): void {
+  const toast = document.createElement('div');
+  toast.className = 'toast-notification';
+  toast.textContent = message;
+  toast.style.cssText = `
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 8px;
+    z-index: 10000;
+    font-size: 14px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  `;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 5000);
+}
+
+
+// ─── Map provider ──────────────────────────────────────────────────────────────
+
 // Map provider instance — depends on IMapProvider, not Google Maps directly
 const mapProvider: IMapProvider = new GoogleMapProvider();
 
@@ -264,6 +329,17 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
     // Setup event listeners for filter panels
     setupMapEventListeners();
 
+    // Show/hide the route bell whenever the selected route changes
+    mapStateManager.subscribe((state) => {
+      const bell = document.querySelector('route-bell') as IRouteBellElement | null;
+      if (!bell || typeof bell.showBell !== 'function') return;
+      if (state.selectedRouteId) {
+        bell.showBell(state.selectedRouteId, isRouteSubscribed(state.selectedRouteId));
+      } else {
+        bell.hideBell();
+      }
+    });
+
     // After initialization, if a route was restored from URL, apply route filter to render stops
     const restoredState = mapStateManager.getState();
     if (restoredState.selectedRouteId) {
@@ -273,6 +349,7 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
 
     // Request user location for centering map
     requestUserLocation();
+
   } else {
     console.error('Map could not be initialized: config unavailable');
     showModal(
@@ -689,6 +766,33 @@ function setupMapEventListeners(): void {
     console.log('Date selected:', date.toLocaleDateString());
     mapStateManager.updateFilter('selectedDate', date);
     await filterController.applyDateTimeFilter();
+  });
+
+  // Bell subscription events
+  document.addEventListener('bellSubscribe', (e: Event) => {
+    const { routeId } = (e as CustomEvent<{ routeId: string }>).detail;
+    saveSubscription(routeId);
+    showSubscriptionToast(`Subscribed to Route ${routeId}`);
+  });
+
+  document.addEventListener('bellUnsubscribe', (e: Event) => {
+    const { routeId } = (e as CustomEvent<{ routeId: string }>).detail;
+    removeSubscription(routeId);
+  });
+
+  // Bus Report Form
+  document.addEventListener('busReport', (e: Event) => {
+    const { vid, routeId } = (e as CustomEvent<{ vid: string; routeId: string }>).detail;
+    const form = document.querySelector('bus-report-form') as BusReportFormElement | null;
+    if (form && typeof form.open === 'function') {
+      form.open(vid, routeId);
+    }
+  });
+
+  document.addEventListener('busReportSubmitted', (e: Event) => {
+    const detail = (e as CustomEvent).detail;
+    console.log('Bus report submitted:', detail);
+    // TODO: send report to server
   });
 
   // Route Selector Events

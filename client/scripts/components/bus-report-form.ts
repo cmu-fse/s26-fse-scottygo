@@ -4,76 +4,48 @@
  *
  * Usage:
  *   const form = document.querySelector('bus-report-form') as BusReportFormElement;
- *   form.open('6551', '71A', 40.4418, -79.9440);
+ *   form.open('6551', '71A');
  */
 
 export interface BusReportFormElement extends HTMLElement {
-  open(vid: string, routeId: string, lat: number, lon: number): void;
+  open(vid: string, routeId: string): void;
   close(): void;
 }
 
-interface StepOption {
-  label: string;
-  value: string;
-}
-
-interface Step {
-  id: string;
-  question: string;
-  options: StepOption[];
-  wrap: boolean;
-}
-
-const STEPS: Step[] = [
+const STEPS = [
   {
-    id: 'crowdedness',
+    id: 'crowding',
     question: 'How crowded is the bus?',
-    options: [
-      { label: 'Empty', value: 'Empty' },
-      { label: 'Few Seats', value: 'Few Seats Taken' },
-      { label: 'Standing', value: 'Standing Room' },
-      { label: 'Packed', value: 'Packed' }
-    ],
+    options: ['Empty', 'Few Seats', 'Standing', 'Packed'],
     wrap: true
   },
   {
-    id: 'prioritySeating',
+    id: 'priority-seating',
     question: 'Priority seating available?',
-    options: [
-      { label: 'Yes', value: 'Available' },
-      { label: 'No', value: 'Occupied' },
-      { label: 'Not Sure', value: '__NOT_SURE__' }
-    ],
+    options: ['Yes', 'No', 'Not Sure'],
     wrap: false
   },
   {
     id: 'condition',
     question: 'Condition of the bus?',
-    options: [
-      { label: 'Clean', value: 'Clean' },
-      { label: 'Average', value: 'Average' },
-      { label: 'Dirty', value: 'Dirty' }
-    ],
+    options: ['Clean', 'Average', 'Dirty'],
     wrap: false
   },
   {
-    id: 'comment',
+    id: 'comments',
     question: 'Any comments?',
     options: [],
     wrap: false
   }
-];
+] as const;
 
 const TOTAL_STEPS = STEPS.length;
 
 class BusReportForm extends HTMLElement implements BusReportFormElement {
   private currentStep = 1;
-  private answers: Record<string, string> = {};
+  private answers: Partial<Record<string, string>> = {};
   private vid = '';
   private routeId = '';
-  private lat = 0;
-  private lon = 0;
-  private rootListenersAttached = false;
 
   connectedCallback(): void {
     this.render();
@@ -81,11 +53,9 @@ class BusReportForm extends HTMLElement implements BusReportFormElement {
     this.setAttribute('inert', '');
   }
 
-  open(vid: string, routeId: string, lat: number, lon: number): void {
+  open(vid: string, routeId: string): void {
     this.vid = vid;
     this.routeId = routeId;
-    this.lat = lat;
-    this.lon = lon;
     this.currentStep = 1;
     this.answers = {};
     this.render();
@@ -112,26 +82,22 @@ class BusReportForm extends HTMLElement implements BusReportFormElement {
             <p class="bus-report__subtitle">Bus ${this.vid} &middot; Route ${this.routeId}</p>
           </div>
           <div class="bus-report__progress">
-            ${Array.from(
-              { length: TOTAL_STEPS },
-              (_, i) =>
-                `<div class="bus-report__bar${i < this.currentStep ? ' bus-report__bar--filled' : ''}"></div>`
+            ${Array.from({ length: TOTAL_STEPS }, (_, i) =>
+              `<div class="bus-report__bar${i < this.currentStep ? ' bus-report__bar--filled' : ''}"></div>`
             ).join('')}
           </div>
           <div class="bus-report__body">
             ${this.renderStepContent(step)}
           </div>
-          <p class="bus-report__error" id="bus-report-error" style="display:none;color:var(--color-error,#d32f2f);font-size:0.85rem;text-align:center;margin:0 0 0.5rem"></p>
           <div class="bus-report__nav">
             <button
-              type="button"
               class="bus-report__nav-btn bus-report__nav-btn--back"
               id="bus-report-back"
               ${isFirstStep ? 'disabled' : ''}
               aria-label="Previous step"
             >&#8249;</button>
-            <button type="button" class="bus-report__nav-btn bus-report__nav-btn--skip" id="bus-report-skip">Skip</button>
-            <button type="button" class="bus-report__nav-btn bus-report__nav-btn--next" id="bus-report-next">
+            <button class="bus-report__nav-btn bus-report__nav-btn--skip" id="bus-report-skip">Skip</button>
+            <button class="bus-report__nav-btn bus-report__nav-btn--next" id="bus-report-next">
               ${isLastStep ? 'Submit' : 'Next &#8250;'}
             </button>
           </div>
@@ -140,9 +106,10 @@ class BusReportForm extends HTMLElement implements BusReportFormElement {
     `;
   }
 
-  private renderStepContent(step: Step): string {
-    if (step.id === 'comment') {
-      const saved = this.answers['comment'] ?? '';
+  private renderStepContent(step: (typeof STEPS)[number]): string {
+    if (step.id === 'comments') {
+      const saved = this.answers['comments'] ?? '';
+      const count = saved.length;
       return `
         <p class="bus-report__question">${step.question}</p>
         <p class="bus-report__hint">Optional &middot; max 200 characters</p>
@@ -152,16 +119,16 @@ class BusReportForm extends HTMLElement implements BusReportFormElement {
           placeholder="Add a note..."
           maxlength="200"
         >${saved}</textarea>
-        <p class="bus-report__char-count"><span id="bus-report-char-count">${saved.length}</span> / 200</p>
+        <p class="bus-report__char-count"><span id="bus-report-char-count">${count}</span> / 200</p>
       `;
     }
 
     const selected = this.answers[step.id];
     const optionsHtml = step.options
       .map((opt) => {
-        const isSelected = selected === opt.value;
-        const active = isSelected ? ' bus-report__option--active' : '';
-        return `<button type="button" class="bus-report__option${active}" data-value="${opt.value}">${opt.label}</button>`;
+        const val = opt.toLowerCase().replace(/\s+/g, '-');
+        const active = selected === val ? ' bus-report__option--active' : '';
+        return `<button class="bus-report__option${active}" data-value="${val}">${opt}</button>`;
       })
       .join('');
 
@@ -174,42 +141,29 @@ class BusReportForm extends HTMLElement implements BusReportFormElement {
   }
 
   private setupListeners(): void {
-    if (!this.rootListenersAttached) {
-      // Option selection
-      this.addEventListener('click', (e: Event) => {
-        const target = e.target as HTMLElement;
-        const option = target.closest<HTMLElement>('.bus-report__option');
-        if (!option) return;
-
+    // Option selection
+    this.addEventListener('click', (e: Event) => {
+      const target = e.target as HTMLElement;
+      const option = target.closest<HTMLElement>('.bus-report__option');
+      if (option && option.dataset.value) {
         const step = STEPS[this.currentStep - 1];
-        const selectedValue = option.dataset.value;
-        if (!selectedValue) return;
-
-        this.answers[step.id] = selectedValue;
+        this.answers[step.id] = option.dataset.value;
         this.querySelectorAll('.bus-report__option').forEach((btn) =>
           btn.classList.remove('bus-report__option--active')
         );
         option.classList.add('bus-report__option--active');
-        this.hideError();
-      });
+      }
+    });
 
-      // Char counter for comment step
-      this.addEventListener('input', (e: Event) => {
-        const textarea = e.target as HTMLTextAreaElement;
-        if (textarea.id === 'bus-report-comment') {
-          const counter = this.querySelector('#bus-report-char-count');
-          if (counter) counter.textContent = String(textarea.value.length);
-          if (textarea.value.trim()) {
-            this.answers['comment'] = textarea.value;
-          } else {
-            delete this.answers['comment'];
-          }
-          this.hideError();
-        }
-      });
-
-      this.rootListenersAttached = true;
-    }
+    // Char counter for comments step
+    this.addEventListener('input', (e: Event) => {
+      const textarea = e.target as HTMLTextAreaElement;
+      if (textarea.id === 'bus-report-comment') {
+        const counter = this.querySelector('#bus-report-char-count');
+        if (counter) counter.textContent = String(textarea.value.length);
+        this.answers['comments'] = textarea.value;
+      }
+    });
 
     // Back
     this.querySelector('#bus-report-back')?.addEventListener('click', () => {
@@ -235,12 +189,9 @@ class BusReportForm extends HTMLElement implements BusReportFormElement {
     });
 
     // Close on backdrop click
-    this.querySelector('.bus-report-backdrop')?.addEventListener(
-      'click',
-      (e: Event) => {
-        if (e.target === e.currentTarget) this.close();
-      }
-    );
+    this.querySelector('.bus-report-backdrop')?.addEventListener('click', (e: Event) => {
+      if (e.target === e.currentTarget) this.close();
+    });
   }
 
   private advanceOrSubmit(): void {
@@ -254,40 +205,15 @@ class BusReportForm extends HTMLElement implements BusReportFormElement {
   }
 
   private submitReport(): void {
-    const { crowdedness, prioritySeating, condition, comment } = this.answers;
-    const normalizedPrioritySeating =
-      prioritySeating === '__NOT_SURE__' ? undefined : prioritySeating;
-    const normalizedComment = comment?.trim();
-
-    const payload: Record<string, unknown> = {
+    const payload = {
       vid: this.vid,
       routeId: this.routeId,
-      lat: this.lat,
-      lon: this.lon
+      ...this.answers
     };
-    if (crowdedness) payload.crowdedness = crowdedness;
-    if (normalizedPrioritySeating)
-      payload.prioritySeating = normalizedPrioritySeating;
-    if (condition) payload.condition = condition;
-    if (normalizedComment) payload.comment = normalizedComment;
-
     this.dispatchEvent(
       new CustomEvent('busReportSubmitted', { detail: payload, bubbles: true })
     );
     this.close();
-  }
-
-  private showError(message: string): void {
-    const el = this.querySelector<HTMLElement>('#bus-report-error');
-    if (el) {
-      el.textContent = message;
-      el.style.display = 'block';
-    }
-  }
-
-  private hideError(): void {
-    const el = this.querySelector<HTMLElement>('#bus-report-error');
-    if (el) el.style.display = 'none';
   }
 }
 
