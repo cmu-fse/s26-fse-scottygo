@@ -16,72 +16,72 @@ This section covers the map configuration endpoints.
 
 **IRoute**
 
-* id: string (e.g., "P1", "61C")  
-* name: string (Short description)  
-* system: "PRT" | "CMU"  
-* color: string (Hex code for map rendering)  
-* directions: string\[\]; //\[“INBOUND”, “OUTBOUND”\]  
-* activeStatus: boolean; //Currently operational?  
-* operatingDays: number\[\]; //0-6 (Sunday-Sat)
+- id: string (e.g., "P1", "61C")
+- name: string (Short description)
+- system: "PRT" | "CMU"
+- color: string (Hex code for map rendering)
+- directions: string\[\]; //\[“INBOUND”, “OUTBOUND”\]
+- activeStatus: boolean; //Currently operational?
+- operatingDays: number\[\]; //0-6 (Sunday-Sat)
 
 **IVehicle**
 
-* vid: string (Vehicle ID)  
-* lat: number (Latitude)  
-* lon: number (Longitude)  
-* routeId: string   
-* heading: number  
-* Source: “live” | “static”; //for handling A2, serving static routes with PRT Api is down  
-* lastUpdate: string (ISO Timestamp)  
-* isDetoured: boolean  
-* delay?: number
+- vid: string (Vehicle ID)
+- lat: number (Latitude)
+- lon: number (Longitude)
+- routeId: string
+- heading: number
+- Source: “live” | “static”; //for handling A2, serving static routes with PRT Api is down
+- lastUpdate: string (ISO Timestamp)
+- isDetoured: boolean
+- delay?: number
 
 **IStop**
 
-* stopid: string  
-* stopname: string (Stop Name)  
-* lat: number  
-* lon: number  
-* routes?: string\[\]  
-* dtradd: string\[\]  
-* dtrrem: string\[\]
+- stopid: string
+- stopname: string (Stop Name)
+- lat: number
+- lon: number
+- routes?: string\[\]
+- dtradd: string\[\]
+- dtrrem: string\[\]
 
 **IPrediction**
 
-* stopId: string    
-* routeId: string  
-* vid?: string  
-* predictedArrivalTime: number  
-* isDelayed: boolean  
-* minutes: number
+- stopId: string
+- routeId: string
+- vid?: string
+- predictedArrivalTime: number
+- isDelayed: boolean
+- minutes: number
 
 **IDetour**
 
-* id: string   
-* description:  
-* Startdt: (start date and time)  
-* Enddt: (end date and time)
+- id: string
+- description:
+- Startdt: (start date and time)
+- Enddt: (end date and time)
 
 **ISuccess\<T\>**
 
-* name: string  
-* desc?: string  
-* source: "live" | "static" (Indicates if data is real-time or from local cache)  
-* payload: T | null
+- name: string
+- desc?: string
+- source: "live" | "static" (Indicates if data is real-time or from local cache)
+- payload: T | null
 
 **IConfig**
 
-* apiKey: string  
-* lat: number  
-* lon: number  
-* defaultZoom: number
+- apiKey: string
+- lat: number
+- lon: number
+- defaultZoom: number
 
 ---
 
 ### **2\. REST API Endpoints**
 
 | Method | Path | Function | Success Response Type | Body Type |
-| :---- | :---- | :---- | :---- | :---- |
+| :-- | :-- | :-- | :-- | :-- |
 | **GET** | / | Get main map page | Static page: map.html | None |
 | **GET** | /routes | Fetch all available routes | ISuccess\<IRoute\[\]\> | None |
 | **GET** | /routes/:id | Get specific route geometry in GeoJson format for both directions | ISuccess\<GeoJSON.Feature\> | None |
@@ -98,18 +98,18 @@ This section covers the map configuration endpoints.
 
 #### **3.1 Get All Routes (GET /transit/routes)**
 
-* **Query Parameters:**  
-  * system (string, optional): Filter by PRT or CMU.  
-* **Example Request:** GET /transit/routes?system=PRT
+- **Query Parameters:**
+  - system (string, optional): Filter by PRT or CMU.
+- **Example Request:** GET /transit/routes?system=PRT
 
 #### **3.2 Get Route Geometry (GET /transit/routes/:id)**
 
 Purpose: Fetches the route geometry of a single selected route  
 Returns: A GeoJson.FeatureCollection containing two features (Inbound & Outbound)
 
-* **Path Parameters:**  
-  * id (string, required): The unique route identifier (e.g., P1).  
-* **Example Request:** GET /transit/routes/P1
+- **Path Parameters:**
+  - id (string, required): The unique route identifier (e.g., P1).
+- **Example Request:** GET /transit/routes/P1
 
 #### **3.3 Get Route Vehicles (GET /transit/vehicles/:routeId)**
 
@@ -118,7 +118,7 @@ Constraint: Per Rule R1, only one route is visualized at a time. This endpoint f
 **Path Parameters:**  
 routeId (string, required): The unique identifier (e.g., 61C).  
 **Query Parameters:**  
-tm (string, optional): Simulated time (YYYYMMDD HH:MM) for the Clock Menu filter.   
+tm (string, optional): Simulated time (YYYYMMDD HH:MM) for the Clock Menu filter.  
 **Example Request:** URL: /transit/vehicles/P1?tm=20260212 14:30  
 **Query Param:** tm (string, optional).  
 \* If tm is within 5 minutes of "now", returns live GPS data (source: "live").  
@@ -126,27 +126,27 @@ If tm is historical or omitted, returns scheduled positions (source: "static").
 
 #### **3.4 Get Route Stops (GET /transit/stops/:routeId)**
 
-* **Path Parameters:**  
-  * routeId (string, required): The ID of the route.  
-* **Query Parameters:**  
-  * dir (string, required): Travel direction (INBOUND or OUTBOUND).  
-* **Example Request:** GET /transit/stops/G2?dir=INBOUND
+- **Path Parameters:**
+  - routeId (string, required): The ID of the route.
+- **Query Parameters:**
+  - dir (string, required): Travel direction (INBOUND or OUTBOUND).
+- **Example Request:** GET /transit/stops/G2?dir=INBOUND
 
 #### **3.5 Get Stop Predictions (GET /transit/stops/:stopId/predictions)**
 
-* **Path Parameters:**  
-  * stopId (string, required): The stop identifier (e.g., "7079", "8192")  
-* **Query Parameters:**  
-  * None  
-* **Example Request: GET /transit/stops/7079/predictions**
+- **Path Parameters:**
+  - stopId (string, required): The stop identifier (e.g., "7079", "8192")
+- **Query Parameters:**
+  - None
+- **Example Request: GET /transit/stops/7079/predictions**
 
 #### **3.5 Get Map Configuration (GET /api/maps/config)**
 
-* **Path Parameters:**  
-  * None  
-* **Query Parameters:**  
-  * None  
-* **Example Request: GET /maps/config**
+- **Path Parameters:**
+  - None
+- **Query Parameters:**
+  - None
+- **Example Request: GET /maps/config**
 
 ---
 
@@ -156,10 +156,10 @@ If tm is historical or omitted, returns scheduled positions (source: "static").
 
 **Payload Type:** IRoute\[\]
 
-* **id**: Unique route code.  
-* **name**: Descriptive route name.  
-* **system**: The transit provider.  
-* **color**: Hex code for rendering lines on the map.
+- **id**: Unique route code.
+- **name**: Descriptive route name.
+- **system**: The transit provider.
+- **color**: Hex code for rendering lines on the map.
 
 **Example Body:**
 
@@ -189,9 +189,9 @@ JSON
 
 **Payload Type:** GeoJSON.Feature
 
-* **type**: Must be "Feature".  
-* **geometry**: Contains the coordinate array. **Note:** GeoJSON standard is \[longitude, latitude\].  
-* **properties**: Metadata used by the Google Maps Data Layer to style the line.
+- **type**: Must be "Feature".
+- **geometry**: Contains the coordinate array. **Note:** GeoJSON standard is \[longitude, latitude\].
+- **properties**: Metadata used by the Google Maps Data Layer to style the line.
 
 **Example Body:**
 
@@ -225,9 +225,9 @@ JSON
 
 **Payload Type:** IVehicle\[\]
 
-* **vid**: Vehicle ID.  
-* **lat / lon**: Current coordinates.  
-* **source**: live (from PRT API) or static (from local schedule cache if API is down).
+- **vid**: Vehicle ID.
+- **lat / lon**: Current coordinates.
+- **source**: live (from PRT API) or static (from local schedule cache if API is down).
 
 **Example Body:**
 
@@ -256,10 +256,10 @@ JSON
 
 **Payload Type**: IDetour\[\]
 
-* id: String  
-* description: String  
-* startdt: String  
-* enddt: String
+- id: String
+- description: String
+- startdt: String
+- enddt: String
 
 **Example Body:**
 
@@ -284,10 +284,10 @@ JSON
 
 **Payload Type:** I`config`
 
-* **apiKey:** string  
-* **lat:** number  
-* **lon:** number  
-* **defaultZoom:** number
+- **apiKey:** string
+- **lat:** number
+- **lon:** number
+- **defaultZoom:** number
 
 **Example Body:**
 
@@ -313,14 +313,14 @@ JSON
 ### **5\. Response Codes and Error Names**
 
 | Code | Error/Flow Name | Logic & Alternative Flow (UC Mapping) |
-| :---- | :---- | :---- |
+| :-- | :-- | :-- |
 | **0** | NetworkError | **A1: No Network Access.** Triggered client-side when navigator.onLine is false. Displays "Connection Lost" overlay. |
 | **200** | SuccessLive | **Basic Flow.** Data retrieved successfully from live PRT/CMU sources. |
 | **200** | SuccessStatic | **A2: PRT API Down.** Backend returns source: "static". Client displays toast: "Real-time tracking unavailable. |
 | **200** | NoService | **A7: No Service Available.** Returns empty payload \[\]. Client displays: "No service available for this selection." |
 | **200** | EmptyOverlay | **A8: Multi-System Toggle.** Triggered when system filters are off. Returns empty features; map displays base layer only. |
 | **200** | DetourActive | **A1: Reroute.** In Step 2, the TrueTime API flags a "Detour" event for the selected route. |
-| **400** | OutOfBounds | **A3: Location Out of Bounds.** User coordinates outside Pittsburgh. Client displays warning “This transit app only supports the Pittsburgh bus system” and centers on Point State Park.  |
+| **400** | OutOfBounds | **A3: Location Out of Bounds.** User coordinates outside Pittsburgh. Client displays warning “This transit app only supports the Pittsburgh bus system” and centers on Point State Park. |
 | **403** | PermissionDenied | **A5/A6: Location Denied.** Triggered when the user blocks GPS. Client centers on Downtown Pittsburgh default coordinates. |
 | **451** | ServiceUnavailable | **A4: Map API Blocked.** Map fails to load (e.g., regional IP block). Redirects to the landing page explaining restrictions. |
 | **502** | UpstreamError | Backend failed to communicate with PRT servers; triggers **A2** fallback logic. |
@@ -336,10 +336,10 @@ Google Maps JavaScript API requires client-side access to render maps in the bro
 **Polling:** For live tracking, the client should poll `/vehicles/:routeId` every 15 seconds
 
 ```ts
-setInterval(() => { 
-fetch(`/transit/vehicles/${selectedRoute}`) 
-.then(res => res.json()) 
-.then(data => updateBusMarkers(data.payload)); 
+setInterval(() => {
+  fetch(`/transit/vehicles/${selectedRoute}`)
+    .then((res) => res.json())
+    .then((data) => updateBusMarkers(data.payload));
 }, 15000);
 ```
 
@@ -353,9 +353,9 @@ The `selectedRoute`, `selectedTime`, and `selectedDate` must be synced to the UR
 
 The URL Hash is everything that follows the `#` symbol in a web address. Browsers do not send this part of the URL to the server; it is strictly for the client-side JavaScript to read.
 
-* Initial State: `yoursite.com/#/map`  
-* User selects Route P1: JavaScript updates the URL to `yoursite.com/#/map?r=P1`  
-* User changes time to 2:30 PM: JavaScript updates it to `yoursite.com/#/map?r=P1&t=1430`
+- Initial State: `yoursite.com/#/map`
+- User selects Route P1: JavaScript updates the URL to `yoursite.com/#/map?r=P1`
+- User changes time to 2:30 PM: JavaScript updates it to `yoursite.com/#/map?r=P1&t=1430`
 
 The app "listens" for these changes. If you press the back button, the URL changes back to just `?r=P1`, and the map automatically removes the bus markers for you.
 
@@ -365,6 +365,5 @@ The app "listens" for these changes. If you press the back button, the URL chang
 
 If a Member is looking at the 61C route at 10:00 PM and their browser crashes or they hit refresh, you don't want them to have to re-enter all those filters.
 
-* Without Sync: The app reloads at the default view (Downtown Pittsburgh, all routes).  
-* With Sync: The app reads the URL on startup, sees `r=61C` and `t=2200`, and xfsimmediately restores that exact view.
-
+- Without Sync: The app reloads at the default view (Downtown Pittsburgh, all routes).
+- With Sync: The app reads the URL on startup, sees `r=61C` and `t=2200`, and xfsimmediately restores that exact view.
