@@ -7,6 +7,7 @@ import {
   IDetour,
   IPattern,
   IBulkTransitData,
+  INearbyStopsPayload,
   ISubscription,
   IBusReport,
   INotification,
@@ -47,6 +48,7 @@ export type SuccessName =
   | 'PredictionsRetrieved'
   | 'DetoursRetrieved'
   | 'BulkDataRetrieved'
+  | 'NearbyStopsRetrieved'
   | 'ConfigFound'
   | 'SubscriptionsRetrieved'
   | 'RouteSubscribed'
@@ -113,6 +115,7 @@ export type IPayload =
   | IDetour[]
   | IPattern[]
   | IBulkTransitData
+  | INearbyStopsPayload
   | IConfig
   | ISubscription
   | ISubscription[]
