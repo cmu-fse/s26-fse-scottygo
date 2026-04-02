@@ -86,6 +86,8 @@ export interface IDatabase {
   // Transit cache methods
   getTransitCache(cacheKey: string): Promise<ITransitCache | null>;
 
+  getAllTransitCaches(): Promise<ITransitCache[]>;
+
   upsertTransitCache(entry: ITransitCache): Promise<void>;
 
   clearTransitCache(dataType?: ITransitCacheType): Promise<void>;

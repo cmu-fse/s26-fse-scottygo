@@ -360,6 +360,12 @@ export class MongoDB implements IDatabase {
     return entry as ITransitCache;
   }
 
+  async getAllTransitCaches(): Promise<ITransitCache[]> {
+    const now = new Date();
+    const entries = await MTransitCache.find({ expiresAt: { $gt: now } }).lean();
+    return entries as ITransitCache[];
+  }
+
   async upsertTransitCache(entry: ITransitCache): Promise<void> {
     await MTransitCache.findOneAndUpdate(
       { cacheKey: entry.cacheKey },

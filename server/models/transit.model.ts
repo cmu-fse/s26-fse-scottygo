@@ -1,7 +1,7 @@
-// Transit model – caching layer that uses GTFS as the primary data source
-// for routes, stops, and patterns.  TrueTime is called ONCE (on startup)
-// solely to obtain route colors.  Everything is cached in MongoDB so that
-// client requests never hit GTFS parsing or the TrueTime API directly.
+// Transit model – in-memory caching layer for GTFS routes, stops, and patterns.
+// TrueTime is called ONCE (on startup) solely to obtain route colors.
+// Routes/patterns/stops live entirely in server memory (never written to MongoDB).
+// Only detours are cached in MongoDB.
 //
 // Vehicles & predictions remain live (not cached) — they change every few seconds.
 
@@ -69,87 +69,74 @@ export class TransitModel {
   /** Number of consecutive color-retry failures. */
   private static colorRetryCount = 0;
 
+  /**
+   * In-memory snapshot of bulk transit data (routes + patterns + stops).
+   * Populated by refreshAllCaches() so client requests never hit MongoDB.
+   */
+  private static bulkDataCache: IBulkTransitData | null = null;
+
   /** Whether route colors were fetched from TrueTime. */
   static get colorsAvailable(): boolean {
     return TransitModel.hasColors;
   }
 
   // -------------------------------------------------------------------
-  // Routes  (GTFS + TrueTime colors, cached in MongoDB)
+  // Routes  (GTFS + TrueTime colors, in-memory)
   // -------------------------------------------------------------------
 
-  /** Return PRT routes from cache. Cache is populated by refreshAllCaches(). */
+  /** Return PRT routes from in-memory cache; on miss, build from GTFS. */
   static async getRoutes(): Promise<IRoute[]> {
-    const CACHE_KEY = 'routes';
-    const cached = await readCache<IRoute[]>(CACHE_KEY);
-    if (cached) {
+    if (TransitModel.bulkDataCache) {
       console.log(
-        `[TransitModel ${new Date().toISOString()}] Routes served from cache`
+        `[TransitModel ${new Date().toISOString()}] Routes served from memory`
       );
-      return cached;
+      return TransitModel.bulkDataCache.routes;
     }
 
-    // Cache miss — build routes from GTFS & color them
     console.log(
-      `[TransitModel ${new Date().toISOString()}] Routes cache miss — building from GTFS`
+      `[TransitModel ${new Date().toISOString()}] Routes not in memory — building from GTFS`
     );
-    const routes = await TransitModel.buildColoredRoutes();
-    if (routes.length > 0) {
-      await writeCache(CACHE_KEY, 'routes', routes);
-    }
-    return routes;
+    return TransitModel.buildColoredRoutes();
   }
 
   // -------------------------------------------------------------------
-  // Patterns  (GTFS only, cached in MongoDB)
+  // Patterns  (GTFS only, in-memory)
   // -------------------------------------------------------------------
 
-  /** Return patterns for a route from cache; on miss, read from GTFS and cache. */
+  /** Return patterns for a route from in-memory cache; on miss, read GTFS directly. */
   static async getPatterns(routeId: string): Promise<IPattern[]> {
-    const CACHE_KEY = `patterns:${routeId}`;
-    const cached = await readCache<IPattern[]>(CACHE_KEY);
-    if (cached) {
+    if (TransitModel.bulkDataCache) {
       console.log(
-        `[TransitModel ${new Date().toISOString()}] Patterns for ${routeId} served from cache`
+        `[TransitModel ${new Date().toISOString()}] Patterns for ${routeId} served from memory`
       );
-      return cached;
+      return TransitModel.bulkDataCache.patterns[routeId] ?? [];
     }
 
     console.log(
-      `[TransitModel ${new Date().toISOString()}] Patterns cache miss for ${routeId} — reading from GTFS`
+      `[TransitModel ${new Date().toISOString()}] Patterns not in memory for ${routeId} — reading from GTFS`
     );
     if (!gtfsService.isLoaded()) return [];
-    const patterns = gtfsService.getPatterns(routeId);
-    if (patterns.length > 0) {
-      await writeCache(CACHE_KEY, 'patterns', patterns);
-    }
-    return patterns;
+    return gtfsService.getPatterns(routeId);
   }
 
   // -------------------------------------------------------------------
-  // Stops  (GTFS only, direction-aware, cached in MongoDB)
+  // Stops  (GTFS only, direction-aware, in-memory)
   // -------------------------------------------------------------------
 
-  /** Return stops for a route/direction from cache; on miss, read from GTFS and cache. */
+  /** Return stops for a route/direction from in-memory cache; on miss, read GTFS directly. */
   static async getStops(routeId: string, direction: string): Promise<IStop[]> {
-    const CACHE_KEY = `stops:${routeId}:${direction}`;
-    const cached = await readCache<IStop[]>(CACHE_KEY);
-    if (cached) {
+    if (TransitModel.bulkDataCache) {
       console.log(
-        `[TransitModel ${new Date().toISOString()}] Stops for ${routeId}/${direction} served from cache`
+        `[TransitModel ${new Date().toISOString()}] Stops for ${routeId}/${direction} served from memory`
       );
-      return cached;
+      return TransitModel.bulkDataCache.stops[`${routeId}:${direction}`] ?? [];
     }
 
     console.log(
-      `[TransitModel ${new Date().toISOString()}] Stops cache miss for ${routeId}/${direction} — reading from GTFS`
+      `[TransitModel ${new Date().toISOString()}] Stops not in memory for ${routeId}/${direction} — reading from GTFS`
     );
     if (!gtfsService.isLoaded()) return [];
-    const stops = gtfsService.getStopsByDirection(routeId, direction);
-    if (stops.length > 0) {
-      await writeCache(CACHE_KEY, 'stops', stops);
-    }
-    return stops;
+    return gtfsService.getStopsByDirection(routeId, direction);
   }
 
   // -------------------------------------------------------------------
@@ -265,38 +252,51 @@ export class TransitModel {
 
   /**
    * Return every piece of static transit data the client needs in one shot.
-   * The response is assembled from whatever is already in the MongoDB cache
-   * (populated by refreshAllCaches on startup / daily).
+   * Served entirely from in-memory cache (populated by refreshAllCaches).
+   * If memory is empty (before first refresh), builds from GTFS directly.
    */
   static async getAllTransitData(): Promise<IBulkTransitData> {
-    const routes = await TransitModel.getRoutes();
+    // Serve from in-memory cache if available (populated by refreshAllCaches)
+    if (TransitModel.bulkDataCache) {
+      const c = TransitModel.bulkDataCache;
+      console.log(
+        `[TransitModel ${new Date().toISOString()}] Bulk data served from memory: ` +
+          `${c.routes.length} routes, ${Object.keys(c.patterns).length} pattern sets, ` +
+          `${Object.keys(c.stops).length} stop sets`
+      );
+      return c;
+    }
 
+    // Memory empty (before first refresh) — build directly from GTFS
+    console.log(
+      `[TransitModel ${new Date().toISOString()}] Bulk data not in memory — building from GTFS`
+    );
+
+    if (!gtfsService.isLoaded()) {
+      return { routes: [], patterns: {}, stops: {} };
+    }
+
+    const routes = await TransitModel.buildColoredRoutes();
     const patterns: Record<string, IPattern[]> = {};
     const stops: Record<string, IStop[]> = {};
 
     for (const route of routes) {
-      // Patterns keyed by routeId
-      const routePatterns = await TransitModel.getPatterns(route.id);
-      if (routePatterns.length > 0) {
-        patterns[route.id] = routePatterns;
-      }
-
-      // Stops keyed by "routeId:DIRECTION"
+      const p = gtfsService.getPatterns(route.id);
+      if (p.length > 0) patterns[route.id] = p;
       for (const dir of route.directions) {
-        const dirStops = await TransitModel.getStops(route.id, dir);
-        if (dirStops.length > 0) {
-          stops[`${route.id}:${dir}`] = dirStops;
-        }
+        const s = gtfsService.getStopsByDirection(route.id, dir);
+        if (s.length > 0) stops[`${route.id}:${dir}`] = s;
       }
     }
 
+    TransitModel.bulkDataCache = { routes, patterns, stops };
     console.log(
-      `[TransitModel ${new Date().toISOString()}] Bulk data: ${routes.length} routes, ` +
-        `${Object.keys(patterns).length} pattern sets, ` +
+      `[TransitModel ${new Date().toISOString()}] Bulk data built from GTFS: ` +
+        `${routes.length} routes, ${Object.keys(patterns).length} pattern sets, ` +
         `${Object.keys(stops).length} stop sets`
     );
 
-    return { routes, patterns, stops };
+    return TransitModel.bulkDataCache;
   }
 
   // -------------------------------------------------------------------
@@ -304,13 +304,12 @@ export class TransitModel {
   // -------------------------------------------------------------------
 
   /**
-   * Populate the MongoDB cache from GTFS data.
+   * Build the in-memory transit data cache from GTFS + TrueTime colors.
    *
    * 1. Call TrueTime getRoutes **once** to obtain route colors.
    * 2. Merge those colors into the GTFS route list.
-   * 3. Cache routes, patterns (all routes), and stops (all routes × both directions).
-   *
-   * After this, every client request is served entirely from MongoDB.
+   * 3. Build in-memory snapshot of routes, patterns, and stops.
+   * 4. Cache detours in MongoDB (the only transit data that uses DB).
    */
   static async refreshAllCaches(): Promise<void> {
     console.log(
@@ -325,40 +324,31 @@ export class TransitModel {
     }
 
     try {
-      // 1. Build routes (GTFS base + TrueTime colors) and cache
+      // 1. Build routes (GTFS base + TrueTime colors)
       const routes = await TransitModel.buildColoredRoutes();
-      if (routes.length > 0) {
-        await writeCache('routes', 'routes', routes);
-      }
       console.log(
-        `[TransitModel ${new Date().toISOString()}] Cached ${routes.length} routes`
+        `[TransitModel ${new Date().toISOString()}] Built ${routes.length} routes`
       );
 
-      // 2. Cache patterns for every route
+      // 2. Build in-memory bulk snapshot (routes + patterns + stops)
+      const patterns: Record<string, IPattern[]> = {};
+      const stops: Record<string, IStop[]> = {};
       for (const route of routes) {
-        const patterns = gtfsService.getPatterns(route.id);
-        if (patterns.length > 0) {
-          await writeCache(`patterns:${route.id}`, 'patterns', patterns);
-        }
-      }
-      console.log(
-        `[TransitModel ${new Date().toISOString()}] Cached patterns for all routes`
-      );
-
-      // 3. Cache stops for every route × direction
-      for (const route of routes) {
+        const p = gtfsService.getPatterns(route.id);
+        if (p.length > 0) patterns[route.id] = p;
         for (const dir of route.directions) {
-          const stops = gtfsService.getStopsByDirection(route.id, dir);
-          if (stops.length > 0) {
-            await writeCache(`stops:${route.id}:${dir}`, 'stops', stops);
-          }
+          const s = gtfsService.getStopsByDirection(route.id, dir);
+          if (s.length > 0) stops[`${route.id}:${dir}`] = s;
         }
       }
+      TransitModel.bulkDataCache = { routes, patterns, stops };
       console.log(
-        `[TransitModel ${new Date().toISOString()}] Cached stops for all routes`
+        `[TransitModel ${new Date().toISOString()}] In-memory data ready ` +
+          `(${routes.length} routes, ${Object.keys(patterns).length} pattern sets, ` +
+          `${Object.keys(stops).length} stop sets)`
       );
 
-      // 4. Cache detours (all routes at once)
+      // 3. Cache detours in MongoDB (only transit data that uses DB)
       try {
         const detours = await trueTimeService.getDetours();
         await writeCache('detours:all', 'detours', detours);
@@ -390,6 +380,7 @@ export class TransitModel {
   /** Clear all transit cache entries, or only entries of a specific type. */
   static async clearCache(dataType?: ITransitCache['dataType']): Promise<void> {
     await DAC.db.clearTransitCache(dataType);
+    TransitModel.bulkDataCache = null;
     console.log(
       `[TransitModel ${new Date().toISOString()}] Cache cleared${dataType ? ` (type: ${dataType})` : ''}`
     );
@@ -459,19 +450,20 @@ export class TransitModel {
         );
         TransitModel.hasColors = true;
 
-        // Rebuild routes with colors and update cache
-        if (gtfsService.isLoaded()) {
+        // Rebuild routes with colors and update in-memory cache
+        if (gtfsService.isLoaded() && TransitModel.bulkDataCache) {
           const gtfsRoutes = gtfsService.getRoutes();
           const coloredRoutes = gtfsRoutes.map((r) => ({
             ...r,
             color: colorMap.get(r.id) ?? r.color
           }));
-          if (coloredRoutes.length > 0) {
-            await writeCache('routes', 'routes', coloredRoutes);
-            console.log(
-              `[TransitModel ${new Date().toISOString()}] Updated route cache with TrueTime colors`
-            );
-          }
+          TransitModel.bulkDataCache = {
+            ...TransitModel.bulkDataCache,
+            routes: coloredRoutes
+          };
+          console.log(
+            `[TransitModel ${new Date().toISOString()}] Updated in-memory routes with TrueTime colors`
+          );
         }
 
         TransitModel.stopColorRetry();
