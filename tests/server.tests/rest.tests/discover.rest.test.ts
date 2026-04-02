@@ -12,6 +12,7 @@ import { Server as HttpServer } from 'http';
 import App from '../../../server/app';
 import { MongoDB } from '../../../server/db/mongo.db';
 import AuthController from '../../../server/controllers/auth.controller';
+import HomeController from '../../../server/controllers/home.controller';
 import MapController from '../../../server/controllers/map.controller';
 import BusController from '../../../server/controllers/transit.controller';
 import DAC from '../../../server/db/dac';
@@ -63,7 +64,7 @@ const nearbyStops: IStop[] = [
     stopId: '4408',
     stopName: 'Forbes Ave at Craig St',
     lat: 40.4445,
-    lon: -79.949,
+    lon: -79.9490,
     routes: ['61C', 'P1'],
     dtradd: [],
     dtrrem: []
@@ -258,8 +259,9 @@ beforeAll(async () => {
   const db = new MongoDB(TEST_DB_URL);
   app = new App(
     [
+      new HomeController('/'),
       new AuthController('/auth'),
-      new MapController('/'),
+      new MapController('/map'),
       new BusController('/transit')
     ],
     {
@@ -457,7 +459,10 @@ describe('GET /transit/stops/nearbystops', () => {
   // 6. 400 MissingParameter when lat/lon are absent
   // --------------------------------------------------------------------------
   test('returns 400 MissingParameter when lat is missing', async () => {
-    const res = await request('GET', '/transit/stops/nearbystops?lon=-79.9436');
+    const res = await request(
+      'GET',
+      '/transit/stops/nearbystops?lon=-79.9436'
+    );
 
     expect(res.status).toBe(400);
     const error = res.data as responses.IAppError;
@@ -465,7 +470,10 @@ describe('GET /transit/stops/nearbystops', () => {
   });
 
   test('returns 400 MissingParameter when lon is missing', async () => {
-    const res = await request('GET', '/transit/stops/nearbystops?lat=40.4433');
+    const res = await request(
+      'GET',
+      '/transit/stops/nearbystops?lat=40.4433'
+    );
 
     expect(res.status).toBe(400);
     const error = res.data as responses.IAppError;
@@ -672,7 +680,9 @@ describe('GET /transit/stops/nearbystops', () => {
   // 15. INearbyStop payload has all required fields
   // --------------------------------------------------------------------------
   test('each nearby stop has required INearbyStop fields', async () => {
-    const mockStops = [buildNearbyStop(nearbyStops[0], 210, ['61C'])];
+    const mockStops = [
+      buildNearbyStop(nearbyStops[0], 210, ['61C'])
+    ];
     const payload = buildNearbyPayload(mockStops);
     mockTransitModel.getNearbyStops.mockResolvedValue(payload);
 
