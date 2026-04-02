@@ -33,13 +33,13 @@ interface ServiceCalendar {
 }
 
 /** Convert a GTFS time string "HH:MM:SS" (hours may exceed 23) to minutes from midnight. */
-function timeToMinutes(gtfsTime: string): number {
+export function timeToMinutes(gtfsTime: string): number {
   const parts = gtfsTime.split(':');
   return parseInt(parts[0]) * 60 + parseInt(parts[1]);
 }
 
 /** Format a Date as YYYYMMDD for comparison against GTFS date strings. */
-function toGtfsDate(date: Date): string {
+export function toGtfsDate(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');

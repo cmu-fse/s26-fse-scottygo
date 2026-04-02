@@ -83,6 +83,57 @@ export interface IBulkTransitData {
   stops: Record<string, IStop[]>;
 }
 
+// ── Live Notification (TUC3) ───────────────────────────────────────────
+
+export type ICrowdedness = 'Empty' | 'Few Seats Taken' | 'Standing Room' | 'Packed';
+export type IPrioritySeating = 'Available' | 'Occupied';
+export type IBusCondition = 'Clean' | 'Dirty' | 'Needs Maintenance';
+
+export interface ISubscription {
+  _id?: string;
+  userId: string;
+  routeId: string;
+  createdAt: string;
+}
+
+export interface IBusReport {
+  _id?: string;
+  userId: string;
+  vid: string;
+  routeId: string;
+  crowdedness?: ICrowdedness;
+  prioritySeating?: IPrioritySeating;
+  condition?: IBusCondition;
+  comment?: string;
+  lat: number;
+  lon: number;
+  createdAt: string;
+}
+
+export interface INotification {
+  _id?: string;
+  routeId: string;
+  vid: string;
+  message: string;
+  changedFields: string[];
+  reportId: string;
+  createdAt: string;
+}
+
+export interface IServiceAlert {
+  id: string;
+  headerText: string;
+  descriptionText: string;
+  routeIds: string[];
+  activePeriods: { start: string; end: string }[];
+}
+
+export interface ILastKnownBusStatus {
+  crowdedness?: ICrowdedness;
+  prioritySeating?: IPrioritySeating;
+  condition?: IBusCondition;
+}
+
 // ── Transit Cache ──────────────────────────────────────────────────────
 // Cached TrueTime data stored in MongoDB to respect the daily API limit.
 

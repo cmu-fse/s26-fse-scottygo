@@ -12,7 +12,10 @@ import {
 } from '../../common/user.interface';
 import {
   ITransitCache,
-  ITransitCacheType
+  ITransitCacheType,
+  ISubscription,
+  IBusReport,
+  INotification
 } from '../../common/transit.interface';
 import bcrypt from 'bcrypt';
 import { v4 as uuidV4 } from 'uuid';
@@ -80,6 +83,57 @@ const MMemorySample = model<IMemorySampleRecord>(
   'MemorySample',
   MemorySampleSchema
 );
+
+// ── Subscription Schema (TUC3) ────────────────────────────────────────
+const SubscriptionSchema = new Schema<ISubscription>({
+  _id: { type: String, required: true },
+  userId: { type: String, required: true },
+  routeId: { type: String, required: true },
+  createdAt: { type: String, required: true }
+});
+
+// Compound unique index: one subscription per user per route
+SubscriptionSchema.index({ userId: 1, routeId: 1 }, { unique: true });
+
+const MSubscription = model<ISubscription>('Subscription', SubscriptionSchema);
+
+// ── Bus Report Schema (TUC3) ──────────────────────────────────────────
+const BusReportSchema = new Schema<IBusReport>({
+  _id: { type: String, required: true },
+  userId: { type: String, required: true },
+  vid: { type: String, required: true },
+  routeId: { type: String, required: true },
+  crowdedness: { type: String, enum: ['Empty', 'Few Seats Taken', 'Standing Room', 'Packed'] },
+  prioritySeating: { type: String, enum: ['Available', 'Occupied'] },
+  condition: { type: String, enum: ['Clean', 'Dirty', 'Needs Maintenance'] },
+  comment: { type: String },
+  lat: { type: Number, required: true },
+  lon: { type: Number, required: true },
+  createdAt: { type: String, required: true }
+});
+
+BusReportSchema.index({ vid: 1, createdAt: -1 });
+
+const MBusReport = model<IBusReport>('BusReport', BusReportSchema);
+
+// ── Notification Schema (TUC3) ────────────────────────────────────────
+const NotificationSchema = new Schema({
+  _id: { type: String, required: true },
+  routeId: { type: String, required: true },
+  vid: { type: String, required: true },
+  message: { type: String, required: true },
+  changedFields: [{ type: String }],
+  reportId: { type: String, required: true },
+  createdAt: { type: String, required: true },
+  _expiresAt: { type: Date, required: true }
+});
+
+// TTL index: auto-delete notifications after 30 minutes (R3)
+NotificationSchema.index({ _expiresAt: 1 }, { expireAfterSeconds: 0 });
+NotificationSchema.index({ routeId: 1, createdAt: -1 });
+NotificationSchema.index({ vid: 1, createdAt: -1 });
+
+const MNotification = model('Notification', NotificationSchema);
 
 export class MongoDB implements IDatabase {
   public dbURL: string;
@@ -338,5 +392,67 @@ export class MongoDB implements IDatabase {
       .limit(limit)
       .lean();
     return docs as IMemorySampleRecord[];
+  }
+
+  // ── Notification (TUC3) Methods ──────────────────────────────────────
+
+  async getSubscriptionsByUserId(userId: string): Promise<ISubscription[]> {
+    return await MSubscription.find({ userId }).lean() as ISubscription[];
+  }
+
+  async findSubscription(userId: string, routeId: string): Promise<ISubscription | null> {
+    return await MSubscription.findOne({ userId, routeId }).lean() as ISubscription | null;
+  }
+
+  async countSubscriptionsByUserId(userId: string): Promise<number> {
+    return await MSubscription.countDocuments({ userId });
+  }
+
+  async saveSubscription(sub: ISubscription): Promise<ISubscription> {
+    const doc = new MSubscription(sub);
+    const saved = await doc.save();
+    return saved.toObject();
+  }
+
+  async deleteSubscription(userId: string, routeId: string): Promise<boolean> {
+    const result = await MSubscription.deleteOne({ userId, routeId });
+    return result.deletedCount > 0;
+  }
+
+  async saveBusReport(report: IBusReport): Promise<IBusReport> {
+    const doc = new MBusReport(report);
+    const saved = await doc.save();
+    return saved.toObject();
+  }
+
+  async getLatestReportByVehicle(vid: string): Promise<IBusReport | null> {
+    return await MBusReport.findOne({ vid })
+      .sort({ createdAt: -1 })
+      .lean() as IBusReport | null;
+  }
+
+  async saveNotification(notification: INotification): Promise<INotification> {
+    const doc = new MNotification({
+      ...notification,
+      _expiresAt: new Date(Date.now() + 30 * 60 * 1000)
+    });
+    const saved = await doc.save();
+    const obj = saved.toObject();
+    // Remove internal TTL field from returned object
+    delete (obj as Record<string, unknown>)._expiresAt;
+    return obj as unknown as INotification;
+  }
+
+  async getRecentNotifications(filter: Record<string, unknown>): Promise<INotification[]> {
+    const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    const query = { ...filter, createdAt: { $gte: thirtyMinAgo } };
+    const docs = await MNotification.find(query)
+      .sort({ createdAt: -1 })
+      .lean();
+    // Strip internal _expiresAt field
+    return docs.map((d) => {
+      const { _expiresAt, __v, ...rest } = d as Record<string, unknown>;
+      return rest as unknown as INotification;
+    });
   }
 }

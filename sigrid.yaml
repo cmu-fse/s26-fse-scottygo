@@ -1,5 +1,5 @@
 exclude:
-  # Add more folders / files as regular expression to exclude files for sigird analysis.
+  # Add more folders/files as regular expressions to exclude from Sigrid analysis.
   - '^testing(/|$)' # Excludes the entire testing/ folder
   - '^common(/|$)' # Excludes the entire common/ folder
   - "^\\.vscode(/|$)" # Excludes the entire .vscode/ folder
@@ -13,6 +13,7 @@ exclude:
   - '^node_modules(/|$)'
   - '^tools(/|$)'
   - '^tests(/|$)'
+  - '^trials(/|$)' # Excludes experimental/demo files
 
 languages:
   - name: TypeScript
