@@ -15,7 +15,7 @@ import {
   ClientToServerEvents,
   ServerToClientEvents
 } from '../common/socket.interface';
-import { ExtendedError } from 'socket.io/dist/namespace';
+import { ExtendedError } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { User } from './models/user.model';
 import { ITokenPayload } from '../common/user.interface';
