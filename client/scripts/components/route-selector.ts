@@ -198,7 +198,6 @@ export class RouteSelectorPanel
       if (newRouteList) {
         newRouteList.scrollTop = scrollTop;
       }
-      // Restore focus and cursor position
       const newInput = this.querySelector(
         '.route-search-input'
       ) as HTMLInputElement;

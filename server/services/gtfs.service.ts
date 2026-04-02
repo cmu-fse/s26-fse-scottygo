@@ -378,6 +378,33 @@ class GTFSService {
   }
 
   /**
+   * Return all unique stops across every route, with the `routes` field
+   * populated to indicate which route IDs serve each stop.
+   * Used by TransitSearchStrategy for keyword-based stop search.
+   */
+  getAllStops(): IStop[] {
+    const stopRoutes = new Map<string, Set<string>>();
+
+    for (const [routeId, stops] of this.routeStops.entries()) {
+      for (const stop of stops) {
+        if (!stopRoutes.has(stop.stopId)) {
+          stopRoutes.set(stop.stopId, new Set());
+        }
+        stopRoutes.get(stop.stopId)!.add(routeId);
+      }
+    }
+
+    const result: IStop[] = [];
+    for (const stop of this.stopMap.values()) {
+      result.push({
+        ...stop,
+        routes: [...(stopRoutes.get(stop.stopId) ?? [])]
+      });
+    }
+    return result;
+  }
+
+  /**
    * Return routes that have at least one trip running on the given date,
    * based on GTFS calendar.txt and calendar_dates.txt.
    */

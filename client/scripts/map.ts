@@ -345,6 +345,12 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
     // Initialize filter controller (fetches and renders routes)
     await filterController.initialize();
 
+    // Pass stop data to the search component so it can show stop results
+    const transitSearch = document.querySelector('transit-search') as (HTMLElement & { setStopsData?: (d: Record<string, unknown[]>) => void }) | null;
+    if (transitSearch && typeof transitSearch.setStopsData === 'function') {
+      transitSearch.setStopsData(filterController.getStopsData());
+    }
+
     // Sync subscription state from server so bell icons are accurate
     await syncSubscriptionsFromServer();
 

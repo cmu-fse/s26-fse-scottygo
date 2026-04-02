@@ -8,6 +8,12 @@ import { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { JWT_KEY as secretKey, GOOGLE_MAPS_KEY } from '../env';
 import * as responses from '../../common/server.responses';
+import {
+  RouteSearchStrategy,
+  TransitSearchStrategy,
+  SearchContext
+} from '../search/search-strategy';
+import type { IRoute, ITransitSearchResult } from '../../common/transit.interface';
 
 export default class MapController extends Controller {
   public constructor(path: string) {
@@ -18,6 +24,11 @@ export default class MapController extends Controller {
     this.router.get('/', this.mapPage.bind(this));
     this.router.get('/users/:username?', this.authorize, this.getUser);
     this.router.get('/config', this.authorize, this.getMapConfig.bind(this));
+
+    // Search endpoints (SearchInfo UC — R1 contextual search)
+    // Auth middleware is applied inline so the page route above stays open.
+    this.router.get('/routes/search', this.authorize, this.searchRoutes.bind(this));
+    this.router.get('/search', this.authorize, this.searchTransit.bind(this));
   }
 
   public mapPage(req: Request, res: Response): void {
@@ -108,6 +119,88 @@ export default class MapController extends Controller {
         message: 'An unexpected error occurred in the database'
       };
       return res.status(500).json(unexpectedError);
+    }
+  }
+
+  // ── Search endpoints (SearchInfo UC) ──────────────────────────────────
+
+  /**
+   * GET /map/routes/search?q=<keywords>
+   * Route Search context — returns up to 5 matching routes.
+   * Uses RouteSearchStrategy (Strategy Pattern, R1).
+   * Applies stop word filtering (R2).
+   */
+  public async searchRoutes(req: Request, res: Response): Promise<void> {
+    const q = (req.query.q as string | undefined)?.trim();
+    if (!q) {
+      const error: responses.IAppError = {
+        type: 'ClientError',
+        name: 'MissingSearchQuery',
+        message: 'Query parameter "q" is required'
+      };
+      res.status(400).json(error);
+      return;
+    }
+
+    try {
+      const context = new SearchContext<IRoute[]>(new RouteSearchStrategy());
+      const results = await context.executeSearch(q);
+      const success: responses.ISuccess = {
+        name: 'SearchTransitCompleted',
+        message: results.length
+          ? `Found ${results.length} route${results.length === 1 ? '' : 's'} matching '${q}'`
+          : `No routes found matching '${q}'`,
+        payload: results
+      };
+      res.status(200).json(success);
+    } catch (error: unknown) {
+      const err: responses.IAppError = {
+        type: 'ServerError',
+        name: 'GetRequestFailure',
+        message: 'Unexpected error during route search'
+      };
+      res.status(500).json(err);
+    }
+  }
+
+  /**
+   * GET /map/search?q=<keywords>
+   * Stop and Route Search context — returns up to 5 matching routes and 5 stops.
+   * Uses TransitSearchStrategy (Strategy Pattern, R1).
+   * Applies stop word filtering (R2).
+   */
+  public async searchTransit(req: Request, res: Response): Promise<void> {
+    const q = (req.query.q as string | undefined)?.trim();
+    if (!q) {
+      const error: responses.IAppError = {
+        type: 'ClientError',
+        name: 'MissingSearchQuery',
+        message: 'Query parameter "q" is required'
+      };
+      res.status(400).json(error);
+      return;
+    }
+
+    try {
+      const context = new SearchContext<ITransitSearchResult>(new TransitSearchStrategy());
+      const results = await context.executeSearch(q);
+      const total = results.routes.length + results.stops.length;
+      const success: responses.ISuccess = {
+        name: 'SearchTransitCompleted',
+        message: total
+          ? `Found ${total} result${total === 1 ? '' : 's'} matching '${q}'`
+          : `No results found matching '${q}'`,
+        metadata: { totalItems: total },
+        payload: results
+      };
+      res.status(200).json(success);
+    } catch (error: unknown) {
+      const err: responses.IAppError = {
+        type: 'ServerError',
+        name: 'GetRequestFailure',
+        message: 'Unexpected error during transit search'
+      };
+      res.status(500).json(err);
     }
   }
 
