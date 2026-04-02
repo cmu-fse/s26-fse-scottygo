@@ -11,6 +11,7 @@ Visit Sigrid at https://sigrid-says.com/cmusvfse
 ## Repo Artifacts
 
 - Quick link: [Memory Monitoring Runbook](docs/MemoryMonitoringRunbook.md)
+- Quick link: [REST API Document Conversion Guide](docs/REST_API/README_Document_Conversion.md)
 
 ## Selected Technology
 
