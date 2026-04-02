@@ -1,5 +1,5 @@
 import axios, { AxiosResponse } from 'axios';
-import type { IUser } from '../../common/user.interface';
+import type { IUser, IUserAccount } from '../../common/user.interface';
 import type { IResponse } from '../../common/server.responses';
 import type { IMapProvider, IConfig } from '../../common/map.interface';
 import { GoogleMapProvider } from './maps/google-map.provider';
@@ -187,40 +187,54 @@ async function getUser(username: string): Promise<IUser | null> {
   }
 }
 
-// ─── Subscription helpers (localStorage) ──────────────────────────────────────
-
-const SUBSCRIPTIONS_KEY = 'scottygo_subscriptions';
-
-interface StoredSubscription {
-  routeId: string;
-  routeName: string;
-  lastUpdated: string;
-  muted: boolean;
-}
-
-function getStoredSubscriptions(): StoredSubscription[] {
+// Get current user account information for role-based UI behavior.
+async function getCurrentUserAccount(username: string): Promise<IUserAccount | null> {
   try {
-    return JSON.parse(localStorage.getItem(SUBSCRIPTIONS_KEY) ?? '[]');
+    const token = localStorage.getItem('token');
+    const res: AxiosResponse = await axios.request({
+      method: 'get',
+      headers: { Authorization: `Bearer ${token}` },
+      url: `/account/users/${encodeURIComponent(username)}`,
+      validateStatus: () => true
+    });
+
+    const response: IResponse = res.data;
+    if (res.status === 200 && response.name === 'AccountRetrieved') {
+      return response.payload as IUserAccount;
+    }
+    return null;
   } catch {
-    return [];
+    return null;
   }
 }
+
+// ─── Subscription helpers ──────────────────────────────────────────────────────
+// Subscriptions are authoritative on the server. We keep a local Set as a fast
+// cache so the bell icon renders synchronously; it is synced from the API on load.
+
+const subscribedRoutes = new Set<string>();
 
 function isRouteSubscribed(routeId: string): boolean {
-  return getStoredSubscriptions().some((s) => s.routeId === routeId);
+  return subscribedRoutes.has(routeId);
 }
 
-function saveSubscription(routeId: string): void {
-  const subs = getStoredSubscriptions();
-  if (!subs.some((s) => s.routeId === routeId)) {
-    subs.push({ routeId, routeName: `Route ${routeId}`, lastUpdated: 'just now', muted: false });
-    localStorage.setItem(SUBSCRIPTIONS_KEY, JSON.stringify(subs));
+async function syncSubscriptionsFromServer(): Promise<void> {
+  const token = localStorage.getItem('token');
+  if (!token) return;
+  try {
+    const res = await axios.get('/notifications/subscriptions', {
+      headers: { Authorization: `Bearer ${token}` },
+      validateStatus: () => true
+    });
+    if (res.status === 200 && res.data.name === 'SubscriptionsRetrieved') {
+      subscribedRoutes.clear();
+      (res.data.payload as { routeId: string }[]).forEach((s) =>
+        subscribedRoutes.add(s.routeId)
+      );
+    }
+  } catch {
+    // Best-effort — bell state may be stale until next load
   }
-}
-
-function removeSubscription(routeId: string): void {
-  const subs = getStoredSubscriptions().filter((s) => s.routeId !== routeId);
-  localStorage.setItem(SUBSCRIPTIONS_KEY, JSON.stringify(subs));
 }
 
 function showSubscriptionToast(message: string): void {
@@ -286,6 +300,10 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
     return;
   }
 
+  const username = localStorage.getItem('username');
+  const userAccount = username ? await getCurrentUserAccount(username) : null;
+  const isAdminUser = userAccount?.privilegeLevel === 'Administrator';
+
   // Initialize map via provider abstraction
   const config = await getMapConfig();
   if (config) {
@@ -305,6 +323,7 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
     // Initialize all components
     routeRenderer.initialize(mapProvider);
     vehicleTracker.initialize(mapProvider);
+    vehicleTracker.setAdminProximityBypass(isAdminUser);
 
     // Initialize toggle panels
     await initializeTogglePanels();
@@ -325,6 +344,9 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
 
     // Initialize filter controller (fetches and renders routes)
     await filterController.initialize();
+
+    // Sync subscription state from server so bell icons are accurate
+    await syncSubscriptionsFromServer();
 
     // Setup event listeners for filter panels
     setupMapEventListeners();
@@ -471,8 +493,8 @@ function setupMapEventListeners(): void {
   });
 
   document.addEventListener('toggleLayers', () => {
-    console.log('Toggle layers clicked');
-    // TODO: Implement layer toggle functionality
+    const mode = mapProvider.toggleLayers();
+    showSubscriptionToast(`Map layer: ${mode}`);
   });
 
   // Map Control Events (Filters)
@@ -769,30 +791,94 @@ function setupMapEventListeners(): void {
   });
 
   // Bell subscription events
-  document.addEventListener('bellSubscribe', (e: Event) => {
+  document.addEventListener('bellSubscribe', async (e: Event) => {
     const { routeId } = (e as CustomEvent<{ routeId: string }>).detail;
-    saveSubscription(routeId);
-    showSubscriptionToast(`Subscribed to Route ${routeId}`);
-  });
-
-  document.addEventListener('bellUnsubscribe', (e: Event) => {
-    const { routeId } = (e as CustomEvent<{ routeId: string }>).detail;
-    removeSubscription(routeId);
-  });
-
-  // Bus Report Form
-  document.addEventListener('busReport', (e: Event) => {
-    const { vid, routeId } = (e as CustomEvent<{ vid: string; routeId: string }>).detail;
-    const form = document.querySelector('bus-report-form') as BusReportFormElement | null;
-    if (form && typeof form.open === 'function') {
-      form.open(vid, routeId);
+    const token = localStorage.getItem('token');
+    try {
+      const res = await axios.post(
+        '/notifications/subscriptions',
+        { routeId },
+        { headers: { Authorization: `Bearer ${token}` }, validateStatus: () => true }
+      );
+      if (res.status === 201 && res.data.name === 'RouteSubscribed') {
+        subscribedRoutes.add(routeId);
+        document.dispatchEvent(new CustomEvent('notifRouteJoin', { detail: { routeId } }));
+        showSubscriptionToast(`Subscribed to Route ${routeId}.`);
+      } else if (res.status === 409 && res.data.name === 'SubscriptionLimitReached') {
+        showSubscriptionToast('Subscription limit reached (10). Please remove a subscription first.');
+        // Revert bell to unsubscribed state
+        const bell = document.querySelector('route-bell') as IRouteBellElement | null;
+        bell?.showBell(routeId, false);
+      } else if (res.status === 409 && res.data.name === 'DuplicateSubscription') {
+        // Already subscribed server-side — sync local state
+        subscribedRoutes.add(routeId);
+        document.dispatchEvent(new CustomEvent('notifRouteJoin', { detail: { routeId } }));
+      } else {
+        showSubscriptionToast('Failed to subscribe. Please try again.');
+        const bell = document.querySelector('route-bell') as IRouteBellElement | null;
+        bell?.showBell(routeId, false);
+      }
+    } catch {
+      showSubscriptionToast('Failed to subscribe. Please try again.');
+      const bell = document.querySelector('route-bell') as IRouteBellElement | null;
+      bell?.showBell(routeId, false);
     }
   });
 
-  document.addEventListener('busReportSubmitted', (e: Event) => {
-    const detail = (e as CustomEvent).detail;
-    console.log('Bus report submitted:', detail);
-    // TODO: send report to server
+  document.addEventListener('bellUnsubscribe', async (e: Event) => {
+    const { routeId } = (e as CustomEvent<{ routeId: string }>).detail;
+    const token = localStorage.getItem('token');
+    try {
+      const res = await axios.delete(`/notifications/subscriptions/${routeId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        validateStatus: () => true
+      });
+      if (res.status === 200 || res.status === 404) {
+        subscribedRoutes.delete(routeId);
+        document.dispatchEvent(new CustomEvent('notifRouteLeave', { detail: { routeId } }));
+        showSubscriptionToast(`Unsubscribed from Route ${routeId}.`);
+      } else {
+        showSubscriptionToast('Failed to unsubscribe. Please try again.');
+        // Revert bell to subscribed state
+        const bell = document.querySelector('route-bell') as IRouteBellElement | null;
+        bell?.showBell(routeId, true);
+      }
+    } catch {
+      showSubscriptionToast('Failed to unsubscribe. Please try again.');
+      const bell = document.querySelector('route-bell') as IRouteBellElement | null;
+      bell?.showBell(routeId, true);
+    }
+  });
+
+  // Bus Report Form — opened by vehicle-tracker with lat/lon already checked
+  document.addEventListener('busReport', (e: Event) => {
+    const { vid, routeId, lat, lon } = (e as CustomEvent<{ vid: string; routeId: string; lat: number; lon: number }>).detail;
+    const form = document.querySelector('bus-report-form') as BusReportFormElement | null;
+    if (form && typeof form.open === 'function') {
+      form.open(vid, routeId, lat, lon);
+    }
+  });
+
+  document.addEventListener('busReportSubmitted', async (e: Event) => {
+    const detail = (e as CustomEvent).detail as Record<string, unknown>;
+    const token = localStorage.getItem('token');
+    try {
+      const res = await axios.post('/notifications/reports', detail, {
+        headers: { Authorization: `Bearer ${token}` },
+        validateStatus: () => true
+      });
+      if (res.status === 201) {
+        showSubscriptionToast(res.data.message ?? 'Report submitted. Thank you!');
+      } else {
+        console.error('Report submission failed:', res.status, res.data);
+        // Show the server's message when available (e.g. ProximityViolation, VehicleNotFound)
+        const serverMsg: string | undefined = res.data?.message;
+        showSubscriptionToast(serverMsg ?? 'Failed to submit report. Please try again.');
+      }
+    } catch (err) {
+      console.error('Report submission error:', err);
+      showSubscriptionToast('Failed to submit report. Please try again.');
+    }
   });
 
   // Route Selector Events

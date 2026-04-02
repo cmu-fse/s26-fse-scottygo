@@ -23,7 +23,7 @@ const PROXIMITY_LIMIT_MILES = 0.5;
 /** Valid enum values for report field validation. */
 const VALID_CROWDEDNESS: ICrowdedness[] = ['Empty', 'Few Seats Taken', 'Standing Room', 'Packed'];
 const VALID_PRIORITY_SEATING: IPrioritySeating[] = ['Available', 'Occupied'];
-const VALID_CONDITION: IBusCondition[] = ['Clean', 'Dirty', 'Needs Maintenance'];
+const VALID_CONDITION: IBusCondition[] = ['Clean', 'Dirty', 'Average'];
 
 /**
  * Haversine distance between two lat/lon points, in miles (R9).
@@ -147,11 +147,13 @@ export class NotificationModel {
       comment?: string;
       lat: number;
       lon: number;
+      bypassProximityCheck?: boolean;
     }
   ): Promise<{
     report: IBusReport;
     notification: INotification | null;
     commentFlagged: boolean;
+    commentFlagCategory?: 'inappropriate' | 'irrelevant';
   }> {
     // Validate required fields
     if (!data.vid || !data.routeId || data.lat == null || data.lon == null) {
@@ -163,7 +165,7 @@ export class NotificationModel {
       throw error;
     }
 
-    // R5: at least one optional field must be provided
+    // R5/A5: at least one optional field must be provided
     if (!data.crowdedness && !data.prioritySeating && !data.condition && !data.comment) {
       const error: IAppError = {
         type: 'ClientError',
@@ -212,7 +214,7 @@ export class NotificationModel {
     }
 
     const distance = haversineDistanceMiles(data.lat, data.lon, bus.lat, bus.lon);
-    if (distance > PROXIMITY_LIMIT_MILES) {
+    if (!data.bypassProximityCheck && distance > PROXIMITY_LIMIT_MILES) {
       const error: IAppError = {
         type: 'ClientError',
         name: 'ProximityViolation',
@@ -223,11 +225,13 @@ export class NotificationModel {
 
     // R11: LLM content moderation for comments
     let commentFlagged = false;
+    let commentFlagCategory: 'inappropriate' | 'irrelevant' | undefined;
     let moderatedComment = data.comment;
     if (data.comment) {
       const moderationResult = await moderationService.moderate(data.comment);
       if (moderationResult.flagged) {
         commentFlagged = true;
+        commentFlagCategory = moderationResult.category;
         moderatedComment = undefined; // Exclude from notification
       }
     }
@@ -272,7 +276,12 @@ export class NotificationModel {
 
     // A18: If no field changed, do not publish a notification
     if (changedFields.length === 0) {
-      return { report: savedReport, notification: null, commentFlagged };
+      return {
+        report: savedReport,
+        notification: null,
+        commentFlagged,
+        commentFlagCategory
+      };
     }
 
     // R6: Construct notification message highlighting only changed fields
@@ -308,7 +317,12 @@ export class NotificationModel {
 
     const savedNotification = await DAC.db.saveNotification(notification);
 
-    return { report: savedReport, notification: savedNotification, commentFlagged };
+    return {
+      report: savedReport,
+      notification: savedNotification,
+      commentFlagged,
+      commentFlagCategory
+    };
   }
 
   // ── Notifications (Strategy Pattern — R13) ─────────────────────────

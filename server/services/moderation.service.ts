@@ -15,6 +15,7 @@ function tag(): string {
 export interface IModerationResult {
   flagged: boolean;
   reason?: string;
+  category?: 'inappropriate' | 'irrelevant';
 }
 
 /** Basic blocklist for the fallback filter. */
@@ -31,7 +32,7 @@ class ModerationService {
   /**
    * Moderate a comment string.
    * Uses Gemini LLM if configured, otherwise falls back to keyword filter.
-   * Returns { flagged: true, reason } if the comment is inappropriate.
+   * Returns { flagged: true, reason, category } for flagged comments.
    */
   async moderate(comment: string): Promise<IModerationResult> {
     if (!comment || comment.trim().length === 0) {
@@ -56,12 +57,20 @@ class ModerationService {
   private async geminiModerate(comment: string): Promise<IModerationResult> {
     const url = `${GEMINI_BASE_URL}/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
-    const prompt = `You are a content moderation system for a public transit app. Analyze the following user comment and determine if it contains inappropriate content (profanity, hate speech, threats, harassment, or sexually explicit content).
+    const prompt = `You are a content moderation system for a public transit app.
 
-Respond with ONLY a JSON object in this exact format, no other text:
-{"flagged": true/false, "reason": "brief explanation if flagged"}
+  Analyze the following user comment and decide whether it should be flagged.
 
-Comment to analyze: "${comment.replace(/"/g, '\\"')}"`;
+  Flag the comment if it is EITHER:
+  1) Inappropriate: profanity, hate speech, threats, harassment, or sexually explicit content.
+  2) Irrelevant: not meaningfully related to a bus ride, route/service conditions, accessibility, timing/delays, cleanliness, crowding, seating availability, safety, stops, or driver behavior.
+
+  Do NOT flag short but relevant comments, including uncertain ones like "not sure", if they are clearly about transit context.
+
+  Respond with ONLY a JSON object in this exact format, with no extra text:
+  {"flagged": true/false, "reason": "brief explanation if flagged", "category": "inappropriate|irrelevant|none"}
+
+  Comment to analyze: "${comment.replace(/"/g, '\\"')}"`;
 
     const response = await fetch(url, {
       method: 'POST',
@@ -94,9 +103,15 @@ Comment to analyze: "${comment.replace(/"/g, '\\"')}"`;
     if (result.flagged) {
       console.log(`${tag()} Comment flagged by Gemini: ${result.reason}`);
     }
+    const categoryRaw =
+      typeof result.category === 'string' ? result.category.toLowerCase() : '';
+    const normalizedCategory: IModerationResult['category'] =
+      categoryRaw === 'irrelevant' ? 'irrelevant' : result.flagged ? 'inappropriate' : undefined;
+
     return {
       flagged: !!result.flagged,
-      reason: result.reason
+      reason: result.reason,
+      category: normalizedCategory
     };
   }
 
@@ -106,7 +121,8 @@ Comment to analyze: "${comment.replace(/"/g, '\\"')}"`;
         console.log(`${tag()} Comment flagged by keyword filter`);
         return {
           flagged: true,
-          reason: 'Comment contains inappropriate language.'
+          reason: 'Comment contains inappropriate language.',
+          category: 'inappropriate'
         };
       }
     }

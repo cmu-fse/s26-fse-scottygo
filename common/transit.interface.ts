@@ -87,7 +87,7 @@ export interface IBulkTransitData {
 
 export type ICrowdedness = 'Empty' | 'Few Seats Taken' | 'Standing Room' | 'Packed';
 export type IPrioritySeating = 'Available' | 'Occupied';
-export type IBusCondition = 'Clean' | 'Dirty' | 'Needs Maintenance';
+export type IBusCondition = 'Clean' | 'Dirty' | 'Average';
 
 export interface ISubscription {
   _id?: string;

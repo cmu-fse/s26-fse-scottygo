@@ -3,90 +3,61 @@ export {};
 
 import './components/app-header';
 import './components/live-notifications';
+import { io } from 'socket.io-client';
+import type { INotification, IServiceAlert } from '../../common/transit.interface';
 
-type NotifCategory = 'accessibility' | 'capacity' | 'condition' | 'delay';
+// ── Auth ───────────────────────────────────────────────────────────────────────
 
-interface Notification {
-  id: number;
-  title: string;
-  body: string;
-  category: NotifCategory;
-  busLabel: string;
-  minutesAgo: number;
+function getToken(): string {
+  return localStorage.getItem('token') ?? '';
 }
 
-const MOCK_NOTIFICATIONS: Notification[] = [
-  {
-    id: 1,
-    title: 'Accessibility Update',
-    body: 'Bus 6551 near stop x: Priority seating is blocked. Consider the next bus if you need wheelchair or stroller space.',
-    category: 'accessibility',
-    busLabel: '6551',
-    minutesAgo: 1,
-  },
-  {
-    id: 2,
-    title: 'Bus 6551 is Full',
-    body: 'Bus 6551 near stop x: At capacity. It may not stop for new passengers.',
-    category: 'capacity',
-    busLabel: '6551',
-    minutesAgo: 2,
-  },
-  {
-    id: 3,
-    title: 'Condition Report',
-    body: 'Bus 6551: AC is out — too hot. You might want a window seat or a different bus.',
-    category: 'condition',
-    busLabel: '6551',
-    minutesAgo: 10,
-  },
-  {
-    id: 4,
-    title: 'Delay Alert',
-    body: 'Bus 61A running 8 minutes late due to traffic on Forbes Ave near CMU.',
-    category: 'delay',
-    busLabel: '61A',
-    minutesAgo: 5,
-  },
-];
-
-const CATEGORY_ICONS: Record<NotifCategory, string> = {
-  accessibility: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="12" cy="12" r="10"></circle>
-    <line x1="12" y1="8" x2="12" y2="12"></line>
-    <line x1="12" y1="16" x2="12.01" y2="16"></line>
-  </svg>`,
-  capacity: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-    <line x1="12" y1="9" x2="12" y2="13"></line>
-    <line x1="12" y1="17" x2="12.01" y2="17"></line>
-  </svg>`,
-  condition: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="12" cy="12" r="10"></circle>
-    <line x1="12" y1="8" x2="12" y2="12"></line>
-    <line x1="12" y1="16" x2="12.01" y2="16"></line>
-  </svg>`,
-  delay: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="12" cy="12" r="10"></circle>
-    <polyline points="12 6 12 12 16 14"></polyline>
-  </svg>`,
-};
-
-function formatTime(minutesAgo: number): string {
-  if (minutesAgo < 60) return `${minutesAgo}m ago`;
-  const h = Math.floor(minutesAgo / 60);
-  return `${h}h ago`;
+function authHeaders(): Record<string, string> {
+  return { Authorization: `Bearer ${getToken()}` };
 }
 
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
+// ── DOM refs ───────────────────────────────────────────────────────────────────
+
+const list = document.getElementById('notif-list')!;
+const emptyEl = document.getElementById('notif-empty')!;
+const searchInput = document.getElementById('notif-search-input') as HTMLInputElement;
+const clearBtn = document.getElementById('notif-search-clear')!;
+
+// ── State ──────────────────────────────────────────────────────────────────────
+
+/** true while showing live notification search results (not alerts) */
+let showingNotifications = false;
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+function formatTime(isoTimestamp: string): string {
+  const mins = Math.round((Date.now() - new Date(isoTimestamp).getTime()) / 60_000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  return `${Math.floor(mins / 60)}h ago`;
 }
 
-function createCard(notif: Notification): HTMLLIElement {
+function updateEmptyState(query?: string): void {
+  const hasItems = list.children.length > 0;
+  emptyEl.classList.toggle('is-visible', !hasItems);
+  if (!hasItems && query) {
+    emptyEl.textContent = `No notifications found for '${query}'.`;
+  } else if (!hasItems) {
+    emptyEl.textContent = 'No notifications found.';
+  }
+}
+
+// ── Notification cards ─────────────────────────────────────────────────────────
+
+const NOTIF_ICON = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+  <line x1="12" y1="9" x2="12" y2="13"></line>
+  <line x1="12" y1="17" x2="12.01" y2="17"></line>
+</svg>`;
+
+function createNotifCard(notif: INotification): HTMLLIElement {
   const li = document.createElement('li');
   li.className = 'notif-card';
-  li.dataset.id = String(notif.id);
-  li.dataset.category = notif.category;
 
   li.innerHTML = `
     <button class="notif-dismiss" aria-label="Dismiss notification">
@@ -96,62 +67,196 @@ function createCard(notif: Notification): HTMLLIElement {
       </svg>
     </button>
     <div class="notif-card-header">
-      <span class="notif-icon" data-category="${notif.category}">${CATEGORY_ICONS[notif.category]}</span>
-      <span class="notif-title">${notif.title}</span>
+      <span class="notif-icon">${NOTIF_ICON}</span>
+      <span class="notif-title">Route ${notif.routeId} · Bus #${notif.vid}</span>
     </div>
-    <p class="notif-body">${notif.body}</p>
+    <p class="notif-body">${notif.message}</p>
     <div class="notif-card-footer">
-      <span class="notif-tag" data-category="${notif.category}">${capitalize(notif.category)}</span>
-      <span class="notif-time">${formatTime(notif.minutesAgo)}</span>
+      <span class="notif-tag">Live Update</span>
+      <span class="notif-time">${formatTime(notif.createdAt)}</span>
     </div>
   `;
 
   li.querySelector<HTMLButtonElement>('.notif-dismiss')!.addEventListener('click', () => {
     li.remove();
-    updateEmptyState();
+    updateEmptyState(searchInput.value.trim() || undefined);
   });
 
   return li;
 }
 
-function updateEmptyState(): void {
-  const list = document.getElementById('notif-list')!;
-  const empty = document.getElementById('notif-empty')!;
-  empty.classList.toggle('is-visible', list.children.length === 0);
+// ── Alert cards ────────────────────────────────────────────────────────────────
+
+const ALERT_ICON = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="10"></circle>
+  <line x1="12" y1="8" x2="12" y2="12"></line>
+  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+</svg>`;
+
+function createAlertCard(alert: IServiceAlert): HTMLLIElement {
+  const li = document.createElement('li');
+  li.className = 'notif-card';
+  const routes = alert.routeIds.join(', ');
+
+  li.innerHTML = `
+    <div class="notif-card-header">
+      <span class="notif-icon">${ALERT_ICON}</span>
+      <span class="notif-title">${alert.headerText}</span>
+    </div>
+    <p class="notif-body">${alert.descriptionText}</p>
+    <div class="notif-card-footer">
+      <span class="notif-tag">Service Alert${routes ? ` · ${routes}` : ''}</span>
+    </div>
+  `;
+
+  return li;
 }
 
-function render(notifications: Notification[]): void {
-  const list = document.getElementById('notif-list')!;
+// ── Data fetching ──────────────────────────────────────────────────────────────
+
+async function loadAlerts(): Promise<void> {
+  showingNotifications = false;
   list.innerHTML = '';
-  notifications.forEach((n) => list.appendChild(createCard(n)));
-  updateEmptyState();
+
+  try {
+    const res = await fetch('/notifications/alerts', { headers: authHeaders() });
+    if (res.status === 503) {
+      emptyEl.textContent = 'Service alerts are temporarily unavailable.';
+      emptyEl.classList.add('is-visible');
+      return;
+    }
+    if (!res.ok) {
+      emptyEl.textContent = 'Failed to load service alerts.';
+      emptyEl.classList.add('is-visible');
+      return;
+    }
+    const data = await res.json();
+    const alerts: IServiceAlert[] = data.payload ?? [];
+    alerts.forEach((a) => list.appendChild(createAlertCard(a)));
+    updateEmptyState();
+  } catch {
+    emptyEl.textContent = 'Service alerts are temporarily unavailable.';
+    emptyEl.classList.add('is-visible');
+  }
 }
 
-function init(): void {
-  const notifications = [...MOCK_NOTIFICATIONS];
-  render(notifications);
+async function searchNotifications(params: {
+  route?: string;
+  bus?: string;
+  q?: string;
+}): Promise<void> {
+  showingNotifications = true;
+  list.innerHTML = '';
 
-  const searchInput = document.getElementById('notif-search-input') as HTMLInputElement;
-  const clearBtn = document.getElementById('notif-search-clear')!;
+  const qs = new URLSearchParams();
+  if (params.route) qs.set('route', params.route);
+  if (params.bus) qs.set('bus', params.bus);
+  if (params.q) qs.set('q', params.q);
 
-  searchInput.addEventListener('input', () => {
-    const query = searchInput.value.trim().toLowerCase();
-    clearBtn.classList.toggle('is-visible', query.length > 0);
+  const query = [params.route, params.bus, params.q].filter(Boolean).join(' ');
 
-    const filtered = notifications.filter(
-      (n) =>
-        n.busLabel.toLowerCase().includes(query) ||
-        n.title.toLowerCase().includes(query) ||
-        n.body.toLowerCase().includes(query) ||
-        n.category.toLowerCase().includes(query),
-    );
-    render(filtered);
+  try {
+    const res = await fetch(`/notifications/notifications?${qs}`, { headers: authHeaders() });
+    if (!res.ok) {
+      emptyEl.textContent = 'Failed to load notifications.';
+      emptyEl.classList.add('is-visible');
+      return;
+    }
+    const data = await res.json();
+    const notifs: INotification[] = data.payload ?? [];
+    notifs.forEach((n) => list.appendChild(createNotifCard(n)));
+    updateEmptyState(query || undefined);
+  } catch {
+    emptyEl.textContent = 'Failed to load notifications.';
+    emptyEl.classList.add('is-visible');
+  }
+}
+
+// ── URL pre-fill (A14) ─────────────────────────────────────────────────────────
+
+function getPreFill(): { route?: string; bus?: string } {
+  const params = new URLSearchParams(window.location.search);
+  const route = params.get('route') ?? undefined;
+  const bus = params.get('bus') ?? undefined;
+  return { route, bus };
+}
+
+// ── Socket.io — live alertUpdate refresh ───────────────────────────────────────
+
+function connectForAlerts(): void {
+  const token = getToken();
+  if (!token) return;
+
+  const socket = io({ query: { token } });
+  socket.on('alertUpdate', () => {
+    // Refresh alert display only if we're not showing a search result
+    if (!showingNotifications) {
+      loadAlerts();
+    }
   });
+}
+
+// ── Search bar ─────────────────────────────────────────────────────────────────
+
+let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+function handleSearchInput(): void {
+  const query = searchInput.value.trim();
+  clearBtn.classList.toggle('is-visible', query.length > 0);
+
+  if (debounceTimer) clearTimeout(debounceTimer);
+
+  if (!query) {
+    loadAlerts();
+    return;
+  }
+
+  debounceTimer = setTimeout(() => {
+    // Decide search strategy based on pre-fill context or detected pattern
+    const preFill = getPreFill();
+    if (preFill.route && query === preFill.route) {
+      searchNotifications({ route: query });
+    } else if (preFill.bus && query === preFill.bus) {
+      searchNotifications({ bus: query });
+    } else {
+      // General text search — server picks strategy based on content
+      searchNotifications({ q: query });
+    }
+  }, 300);
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────────
+
+async function init(): Promise<void> {
+  const token = getToken();
+  if (!token) {
+    window.location.replace('/home');
+    return;
+  }
+
+  connectForAlerts();
+
+  const { route, bus } = getPreFill();
+
+  if (route || bus) {
+    // A14: pre-filled from external navigation
+    const displayValue = route ?? bus ?? '';
+    searchInput.value = displayValue;
+    clearBtn.classList.add('is-visible');
+    await searchNotifications({ route, bus });
+  } else {
+    // Default: show GTFS-RT alerts
+    await loadAlerts();
+  }
+
+  searchInput.addEventListener('input', handleSearchInput);
 
   clearBtn.addEventListener('click', () => {
     searchInput.value = '';
     clearBtn.classList.remove('is-visible');
-    render(notifications);
+    // Clear URL params without reload
+    history.replaceState(null, '', window.location.pathname);
+    loadAlerts();
     searchInput.focus();
   });
 }

@@ -19,6 +19,10 @@ export class GoogleMapProvider implements IMapProvider {
   private map!: google.maps.Map;
   private markers: Map<string, google.maps.Marker> = new Map();
   private polylines: Map<string, google.maps.Polyline> = new Map();
+  private transitLayer!: google.maps.TransitLayer;
+  private trafficLayer!: google.maps.TrafficLayer;
+  private bikeLayer!: google.maps.BicyclingLayer;
+  private layerModeIndex = 0;
   private markerIdCounter = 0;
   private polylineIdCounter = 0;
 
@@ -38,6 +42,11 @@ export class GoogleMapProvider implements IMapProvider {
         position: google.maps.ControlPosition.RIGHT_BOTTOM
       }
     });
+
+    this.transitLayer = new google.maps.TransitLayer();
+    this.trafficLayer = new google.maps.TrafficLayer();
+    this.bikeLayer = new google.maps.BicyclingLayer();
+    this.applyLayerMode('none');
   }
 
   setCenter(position: ILatLng): void {
@@ -209,6 +218,55 @@ export class GoogleMapProvider implements IMapProvider {
       { lat: bounds.north, lng: bounds.east }
     );
     this.map.fitBounds(googleBounds);
+  }
+
+  toggleLayers(): string {
+    const modes: Array<'none' | 'transit' | 'traffic' | 'bike' | 'satellite'> = [
+      'none',
+      'transit',
+      'traffic',
+      'bike',
+      'satellite'
+    ];
+    this.layerModeIndex = (this.layerModeIndex + 1) % modes.length;
+    const nextMode = modes[this.layerModeIndex];
+    this.applyLayerMode(nextMode);
+
+    switch (nextMode) {
+      case 'transit':
+        return 'Transit';
+      case 'traffic':
+        return 'Traffic';
+      case 'bike':
+        return 'Bicycling';
+      case 'satellite':
+        return 'Satellite';
+      default:
+        return 'Off';
+    }
+  }
+
+  private applyLayerMode(mode: 'none' | 'transit' | 'traffic' | 'bike' | 'satellite'): void {
+    this.transitLayer.setMap(null);
+    this.trafficLayer.setMap(null);
+    this.bikeLayer.setMap(null);
+    this.map.setMapTypeId(google.maps.MapTypeId.ROADMAP);
+
+    if (mode === 'transit') {
+      this.transitLayer.setMap(this.map);
+      return;
+    }
+    if (mode === 'traffic') {
+      this.trafficLayer.setMap(this.map);
+      return;
+    }
+    if (mode === 'bike') {
+      this.bikeLayer.setMap(this.map);
+      return;
+    }
+    if (mode === 'satellite') {
+      this.map.setMapTypeId(google.maps.MapTypeId.SATELLITE);
+    }
   }
 
   /**

@@ -5,6 +5,7 @@ import { Request, Response, NextFunction } from 'express';
 import Controller from './controller';
 import { ITokenPayload } from '../../common/user.interface';
 import { NotificationModel } from '../models/notification.model';
+import { User } from '../models/user.model';
 import alertsService from '../services/alerts.service';
 import jwt from 'jsonwebtoken';
 import { JWT_KEY as secretKey } from '../env';
@@ -16,7 +17,10 @@ export default class NotificationController extends Controller {
   }
 
   public initializeRoutes(): void {
-    // All notification routes require authentication
+    // Serve the notifications HTML page (no auth required — auth handled client-side)
+    this.router.get('/', (_req, res) => this.sendPage(res, 'notifications.html'));
+
+    // All notification API routes require authentication
     this.router.use(this.authenticateToken.bind(this));
 
     // Subscription routes
@@ -136,6 +140,8 @@ export default class NotificationController extends Controller {
     try {
       const user = (req as Request & { user: ITokenPayload }).user;
       const { vid, routeId, crowdedness, prioritySeating, condition, comment, lat, lon } = req.body;
+      const requestingUser = await User.getUserAccountById(user.userId);
+      const isAdmin = requestingUser.privilegeLevel === 'Administrator';
 
       const result = await NotificationModel.submitReport(user.userId, {
         vid,
@@ -145,7 +151,8 @@ export default class NotificationController extends Controller {
         condition,
         comment,
         lat,
-        lon
+        lon,
+        bypassProximityCheck: isAdmin
       });
 
       // R4: If a notification was created, publish via Socket.io to the route's room
@@ -154,7 +161,9 @@ export default class NotificationController extends Controller {
       }
 
       const message = result.commentFlagged
-        ? 'Your comment was flagged and will not be included in the notification.'
+        ? result.commentFlagCategory === 'irrelevant'
+          ? 'Your comment was not included because it appears unrelated to bus service.'
+          : 'Your comment was flagged and will not be included in the notification.'
         : 'Report submitted. Thank you!';
 
       const success: responses.ISuccess = {

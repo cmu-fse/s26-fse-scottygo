@@ -105,7 +105,7 @@ const BusReportSchema = new Schema<IBusReport>({
   routeId: { type: String, required: true },
   crowdedness: { type: String, enum: ['Empty', 'Few Seats Taken', 'Standing Room', 'Packed'] },
   prioritySeating: { type: String, enum: ['Available', 'Occupied'] },
-  condition: { type: String, enum: ['Clean', 'Dirty', 'Needs Maintenance'] },
+  condition: { type: String, enum: ['Clean', 'Dirty', 'Average'] },
   comment: { type: String },
   lat: { type: Number, required: true },
   lon: { type: Number, required: true },
