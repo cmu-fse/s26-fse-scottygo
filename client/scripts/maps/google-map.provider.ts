@@ -32,6 +32,8 @@ export class GoogleMapProvider implements IMapProvider {
       mapTypeControl: false, // Disable map type selector
       streetViewControl: false, // Disable street view pegman
       fullscreenControl: false, // Disable fullscreen button
+      rotateControl: false, // Disable rotate/tilt diamond control
+      tilt: 0, // Prevent 45° imagery which also triggers the rotate control
       zoomControlOptions: {
         position: google.maps.ControlPosition.RIGHT_BOTTOM
       }

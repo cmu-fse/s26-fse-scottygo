@@ -64,6 +64,12 @@ body.dark {
   touch-action: none;
 }
 
+/* Hide Google Maps native controls — all are disabled via API options but the
+   rotate control can still inject itself via gm-control-active */
+#map .gm-control-active {
+  display: none !important;
+}
+
 /* ============================================
    COMPONENT STYLES
    ============================================ */
@@ -235,11 +241,31 @@ body.dark .control-panel {
   background: rgba(31, 41, 55, 0.95);
 }
 
+/* Route Bell Component — sits above the zoom panel, hidden until a route is selected */
+route-bell {
+  position: absolute;
+  right: 20px;
+  /* 20px (zoom-panel bottom) + 3×48px (buttons) + 2×8px (gaps) + 8px (gap to bell) = 188px */
+  bottom: 188px;
+  display: none;
+  z-index: 20;
+}
+
+.bell-btn.bell-subscribed {
+  background: var(--primary);
+  color: white;
+}
+
+body.dark .bell-btn.bell-subscribed {
+  background: var(--primary);
+  color: white;
+}
+
 /* Zoom Controls Component */
 .zoom-panel {
   position: absolute;
   right: 20px;
-  bottom: 120px;
+  bottom: 20px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1170,7 +1196,12 @@ body.dark .route-btn:hover {
 
   .zoom-panel {
     right: 16px;
-    bottom: 100px;
+    bottom: 16px;
+  }
+
+  route-bell {
+    right: 16px;
+    bottom: 184px; /* 16 + 160 + 8 */
   }
 
   .dark-btn {
@@ -1595,6 +1626,63 @@ body.dark .service-status-banner__close:hover {
   color: #854d0e;
 }
 
+.map-popup__value--live {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.map-popup__live-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #16a34a;
+  flex-shrink: 0;
+}
+
+.map-popup__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.map-popup__action-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 8px;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.map-popup__action-btn .material-icons-outlined {
+  font-size: 18px;
+}
+
+.map-popup__action-btn--report {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+.map-popup__action-btn--report:hover {
+  background: #e5e7eb;
+}
+
+.map-popup__action-btn--check {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+.map-popup__action-btn--check:hover {
+  background: #e5e7eb;
+}
+
 /* ── Dark mode ─── */
 
 body.dark .map-popup {
@@ -1638,4 +1726,409 @@ body.dark .map-popup__source--live {
 body.dark .map-popup__source--static {
   background: #713f12;
   color: #fef08a;
+}
+
+/* ============================================
+   MAP NOTIFICATION POPUPS
+   Stacked toast-style cards in top-right corner
+   that appear for subscribed routes.
+   ============================================ */
+
+.map-notif-container {
+  position: absolute;
+  top: 80px;
+  right: 20px;
+  z-index: 400;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+  width: min(320px, calc(100% - 40px));
+}
+
+@keyframes mapNotifSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(32px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes mapNotifFadeOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+    max-height: 200px;
+    margin-bottom: 0;
+  }
+  to {
+    opacity: 0;
+    transform: translateX(32px);
+    max-height: 0;
+    margin-bottom: -10px;
+  }
+}
+
+.map-notif-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 12px 12px 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14);
+  border-left: 4px solid #ccc;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  pointer-events: auto;
+  animation: mapNotifSlideIn 0.3s ease-out;
+  overflow: hidden;
+}
+
+.map-notif-card.is-dismissing {
+  animation: mapNotifFadeOut 0.3s ease-in forwards;
+}
+
+.map-notif-card[data-category='accessibility'] { border-left-color: #f59e0b; }
+.map-notif-card[data-category='capacity']      { border-left-color: #ef4444; }
+.map-notif-card[data-category='condition']     { border-left-color: #3b82f6; }
+.map-notif-card[data-category='delay']         { border-left-color: #8b5cf6; }
+
+.map-notif-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-right: 20px;
+}
+
+.map-notif-icon { flex-shrink: 0; line-height: 0; }
+.map-notif-icon[data-category='accessibility'] { color: #f59e0b; }
+.map-notif-icon[data-category='capacity']      { color: #ef4444; }
+.map-notif-icon[data-category='condition']     { color: #3b82f6; }
+.map-notif-icon[data-category='delay']         { color: #8b5cf6; }
+
+.map-notif-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111;
+  line-height: 1.2;
+}
+
+.map-notif-body {
+  font-size: 13px;
+  color: #444;
+  line-height: 1.4;
+}
+
+.map-notif-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 2px;
+}
+
+.map-notif-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #f0f0f0;
+  color: #555;
+}
+
+.map-notif-tag[data-category='accessibility'] { background: #fef3c7; color: #b45309; }
+.map-notif-tag[data-category='capacity']      { background: #fee2e2; color: #b91c1c; }
+.map-notif-tag[data-category='condition']     { background: #dbeafe; color: #1d4ed8; }
+.map-notif-tag[data-category='delay']         { background: #ede9fe; color: #6d28d9; }
+
+.map-notif-time {
+  font-size: 11px;
+  color: #aaa;
+}
+
+.map-notif-dismiss {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #bbb;
+  padding: 2px;
+  line-height: 0;
+  border-radius: 4px;
+}
+
+.map-notif-dismiss:hover {
+  color: #666;
+  background: #f0f0f0;
+}
+
+/* Each card is position:relative to anchor the dismiss button */
+.map-notif-card { position: relative; }
+
+@media (max-width: 768px) {
+  .map-notif-container {
+    top: 70px;
+    right: 12px;
+    width: min(290px, calc(100% - 24px));
+  }
+}
+
+/* ============================================
+   BUS REPORT FORM
+   Centered multi-step modal triggered from the
+   map popup's Report button.
+   ============================================ */
+
+bus-report-form {
+  display: contents;
+}
+
+.bus-report-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.45);
+  align-items: center;
+  justify-content: center;
+}
+
+bus-report-form.is-open .bus-report-backdrop {
+  display: flex;
+}
+
+.bus-report {
+  background: #faf9f7;
+  border-radius: 20px;
+  padding: 22px 20px 18px;
+  width: min(380px, calc(100vw - 32px));
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.22);
+  font-family: inherit;
+  color: #1f2937;
+  animation: busReportFadeIn 0.2s ease-out;
+}
+
+@keyframes busReportFadeIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* Header */
+.bus-report__header {
+  margin-bottom: 12px;
+}
+
+.bus-report__title {
+  font-size: 17px;
+  font-weight: 700;
+  display: block;
+}
+
+.bus-report__subtitle {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 2px 0 0;
+}
+
+/* Progress bar */
+.bus-report__progress {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+
+.bus-report__bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: #e5e7eb;
+}
+
+.bus-report__bar--filled {
+  background: var(--primary);
+}
+
+/* Step body */
+.bus-report__body {
+  min-height: 110px;
+}
+
+.bus-report__question {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 14px;
+}
+
+.bus-report__hint {
+  font-size: 12px;
+  color: #9ca3af;
+  margin: -10px 0 10px;
+}
+
+/* Option chips */
+.bus-report__options {
+  display: flex;
+  gap: 8px;
+}
+
+.bus-report__options--wrap {
+  flex-wrap: wrap;
+}
+
+.bus-report__option {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1.5px solid #d1d5db;
+  background: #fff;
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  color: #1f2937;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.bus-report__option:hover {
+  border-color: var(--primary);
+}
+
+.bus-report__option--active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+/* Comments textarea */
+.bus-report__textarea {
+  width: 100%;
+  height: 90px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-family: inherit;
+  font-size: 14px;
+  color: #1f2937;
+  resize: none;
+  box-sizing: border-box;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.bus-report__textarea:focus {
+  border-color: var(--primary);
+}
+
+.bus-report__char-count {
+  font-size: 12px;
+  color: #9ca3af;
+  text-align: right;
+  margin: 4px 0 0;
+}
+
+/* Navigation row */
+.bus-report__nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.bus-report__nav-btn {
+  border: none;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.bus-report__nav-btn--back {
+  width: 40px;
+  height: 40px;
+  background: #f3f4f6;
+  color: #1f2937;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.bus-report__nav-btn--back:hover:not(:disabled) {
+  background: #e5e7eb;
+}
+
+.bus-report__nav-btn--back:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.bus-report__nav-btn--skip {
+  flex: 1;
+  padding: 10px;
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+.bus-report__nav-btn--skip:hover {
+  background: #e5e7eb;
+}
+
+.bus-report__nav-btn--next {
+  flex: 1;
+  padding: 10px 20px;
+  background: var(--primary);
+  color: #fff;
+}
+
+.bus-report__nav-btn--next:hover {
+  background: #a30f27;
+}
+
+/* Dark mode */
+body.dark .bus-report {
+  background: #1f2937;
+  color: #f3f4f6;
+}
+
+body.dark .bus-report__subtitle {
+  color: #9ca3af;
+}
+
+body.dark .bus-report__bar {
+  background: #374151;
+}
+
+body.dark .bus-report__option {
+  background: #374151;
+  border-color: #4b5563;
+  color: #f3f4f6;
+}
+
+body.dark .bus-report__option--active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+body.dark .bus-report__textarea {
+  background: #374151;
+  border-color: #4b5563;
+  color: #f3f4f6;
+}
+
+body.dark .bus-report__nav-btn--back,
+body.dark .bus-report__nav-btn--skip {
+  background: #374151;
+  color: #f3f4f6;
+}
+
+body.dark .bus-report__nav-btn--back:hover:not(:disabled),
+body.dark .bus-report__nav-btn--skip:hover {
+  background: #4b5563;
 }

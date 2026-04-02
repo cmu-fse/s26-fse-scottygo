@@ -1,5 +1,6 @@
 import axios, { AxiosResponse } from 'axios';
 import './components/app-header';
+import './components/live-notifications';
 import { io, Socket } from 'socket.io-client';
 import type { IResponse } from '../../common/server.responses';
 import { isSuccess } from '../../common/server.responses';

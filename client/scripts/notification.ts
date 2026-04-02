@@ -2,6 +2,7 @@
 export {};
 
 import './components/app-header';
+import './components/live-notifications';
 
 type NotifCategory = 'accessibility' | 'capacity' | 'condition' | 'delay';
 

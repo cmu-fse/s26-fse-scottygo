@@ -411,19 +411,39 @@ export class VehicleTracker {
     // Last update
     const lastUpdate = new Date(vehicle.lastUpdate);
     const secsAgo = Math.round((Date.now() - lastUpdate.getTime()) / 1000);
-    this.addDetailRow(
-      details,
-      'Updated',
-      secsAgo < 60 ? `${secsAgo}s ago` : `${Math.round(secsAgo / 60)}m ago`
-    );
+    const timeText =
+      secsAgo < 60 ? `${secsAgo}s ago` : `${Math.round(secsAgo / 60)}m ago`;
+
+    if (vehicle.source === 'live') {
+      this.addUpdatedRowWithDot(details, timeText);
+    } else {
+      this.addDetailRow(details, 'Updated', timeText);
+    }
 
     popup.appendChild(details);
 
-    // Source badge
-    const badge = document.createElement('div');
-    badge.className = `map-popup__source map-popup__source--${vehicle.source}`;
-    badge.textContent = vehicle.source === 'live' ? 'LIVE' : 'SCHEDULED';
-    popup.appendChild(badge);
+    // Source badge — only for scheduled (live uses the green dot instead)
+    if (vehicle.source !== 'live') {
+      const badge = document.createElement('div');
+      badge.className = `map-popup__source map-popup__source--${vehicle.source}`;
+      badge.textContent = 'SCHEDULED';
+      popup.appendChild(badge);
+    }
+
+    // Action buttons
+    const actions = document.createElement('div');
+    actions.className = 'map-popup__actions';
+    actions.innerHTML = `
+      <button class="map-popup__action-btn map-popup__action-btn--report">
+        <span class="material-icons-outlined">warning_amber</span>
+        <strong>Report</strong>
+      </button>
+      <button class="map-popup__action-btn map-popup__action-btn--check">
+        <span class="material-icons-outlined">task_alt</span>
+        <strong>Check</strong>
+      </button>
+    `;
+    popup.appendChild(actions);
 
     // Append to map container
     const container = document.querySelector('.map-container');
@@ -436,6 +456,38 @@ export class VehicleTracker {
     if (closeBtn) {
       closeBtn.addEventListener('click', () => closeMapPopup());
     }
+
+    // Report button → open bus report form
+    const reportBtn = popup.querySelector('.map-popup__action-btn--report');
+    if (reportBtn) {
+      reportBtn.addEventListener('click', () => {
+        document.dispatchEvent(
+          new CustomEvent('busReport', {
+            detail: { vid: vehicle.vid, routeId: vehicle.routeId }
+          })
+        );
+      });
+    }
+  }
+
+  /**
+   * Add the "Updated" row with a green live dot before the time text.
+   */
+  private addUpdatedRowWithDot(container: HTMLElement, timeText: string): void {
+    const row = document.createElement('div');
+    row.className = 'map-popup__row';
+
+    const lbl = document.createElement('span');
+    lbl.className = 'map-popup__label';
+    lbl.textContent = 'Updated';
+
+    const val = document.createElement('span');
+    val.className = 'map-popup__value map-popup__value--live';
+    val.innerHTML = `<span class="map-popup__live-dot"></span>${timeText}`;
+
+    row.appendChild(lbl);
+    row.appendChild(val);
+    container.appendChild(row);
   }
 
   /**
