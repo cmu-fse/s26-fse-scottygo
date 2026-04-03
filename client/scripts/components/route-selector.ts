@@ -304,7 +304,7 @@ export class RouteSelectorPanel
     );
 
     if (!res.ok) {
-      return [];
+      throw new Error(`Route search API returned ${res.status}`);
     }
 
     const data = (await res.json()) as { payload?: IRouteOption[] };

@@ -27,6 +27,7 @@ export class VehicleTracker {
   private mapProvider: IMapProvider | null = null;
   private stateManager: MapStateManager;
   private isAdminProximityBypass = false;
+  private userLocation: { lat: number; lng: number } | null = null;
 
   private pollingInterval: number | null = null;
   private currentRouteId: string | null = null;
@@ -68,6 +69,13 @@ export class VehicleTracker {
    */
   setAdminProximityBypass(enabled: boolean): void {
     this.isAdminProximityBypass = enabled;
+  }
+
+  /**
+   * Update the cached user location (called from map.ts watchPosition).
+   */
+  updateUserLocation(position: { lat: number; lng: number }): void {
+    this.userLocation = position;
   }
 
   /**
@@ -486,49 +494,41 @@ export class VehicleTracker {
       closeBtn.addEventListener('click', () => this.closeVehiclePopup());
     }
 
-    // Report button — geolocation + proximity check before opening form (R9, R10, A16, A17)
-    const reportBtn = popup.querySelector('.map-popup__action-btn--report');
+    // Report button — proximity check using cached location (R9, R10, A16, A17)
+    const reportBtn = popup.querySelector('.map-popup__action-btn--report') as HTMLButtonElement | null;
     if (reportBtn) {
       reportBtn.addEventListener('click', () => {
-        if (!('geolocation' in navigator)) {
+        if (!this.userLocation) {
           this.showToast(
             'Location access is required to submit a bus report. Please enable location services.'
           );
           return;
         }
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            const userLat = pos.coords.latitude;
-            const userLon = pos.coords.longitude;
-            const latestVehicle = this.vehicleData.get(vid) ?? vehicle;
-            if (!this.isAdminProximityBypass) {
-              const dist = haversineDistanceMiles(
-                userLat,
-                userLon,
-                latestVehicle.lat,
-                latestVehicle.lon
-              );
-              if (dist > 0.5) {
-                this.showToast('You need to be near this bus to submit a report.');
-                return;
-              }
-            }
-            document.dispatchEvent(
-              new CustomEvent('busReport', {
-                detail: {
-                  vid: latestVehicle.vid,
-                  routeId: latestVehicle.routeId,
-                  lat: userLat,
-                  lon: userLon
-                }
-              })
-            );
-          },
-          () => {
-            this.showToast(
-              'Location access is required to submit a bus report. Please enable location services.'
-            );
+
+        const userLat = this.userLocation.lat;
+        const userLon = this.userLocation.lng;
+        const latestVehicle = this.vehicleData.get(vid) ?? vehicle;
+        if (!this.isAdminProximityBypass) {
+          const dist = haversineDistanceMiles(
+            userLat,
+            userLon,
+            latestVehicle.lat,
+            latestVehicle.lon
+          );
+          if (dist > 0.5) {
+            this.showToast('You need to be near this bus to submit a report.');
+            return;
           }
+        }
+        document.dispatchEvent(
+          new CustomEvent('busReport', {
+            detail: {
+              vid: latestVehicle.vid,
+              routeId: latestVehicle.routeId,
+              lat: userLat,
+              lon: userLon
+            }
+          })
         );
       });
     }
