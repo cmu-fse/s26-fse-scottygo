@@ -15,7 +15,9 @@ import {
   IDetour,
   IDetourGeometry,
   ITransitCache,
-  IBulkTransitData
+  IBulkTransitData,
+  INearbyStop,
+  INearbyStopsPayload
 } from '../../common/transit.interface';
 
 /** How long a cache entry is considered fresh (24 hours in ms). */
@@ -27,11 +29,53 @@ const COLOR_RETRY_INTERVAL_MS = 5 * 60 * 1000;
 /** Maximum number of color retry attempts before giving up until next daily refresh. */
 const COLOR_MAX_RETRIES = 12; // 12 × 5 min = 1 hour of retrying
 
+// ── Nearby Stops Constants (TUC4 — Discover Stops & Schedules) ─────────
+
+/** Default search radius for nearby stops in meters (TUC4 step 2: ~15 min walk). */
+const DEFAULT_NEARBY_RADIUS_M = 1000;
+
+/** Expanded search radius in meters when no stops found at default (TUC4 A6: ~30 min walk). */
+const EXPANDED_NEARBY_RADIUS_M = 2000;
+
+/** Walking-time heuristic: minutes to walk one kilometer (TUC4 R4). */
+const WALK_MINUTES_PER_KM = 15;
+
+/** Meters per kilometer — used to convert distance to walk-time estimate. */
+const METERS_PER_KM = 1000;
+
+/** Mean Earth radius in meters — used in haversine distance formula. */
+const EARTH_RADIUS_M = 6_371_000;
+
 // ── Helpers ────────────────────────────────────────────────────────────
 
 /** Build a Date that is `ttl` ms from now. */
 function expiresAt(ttl: number = CACHE_TTL_MS): Date {
   return new Date(Date.now() + ttl);
+}
+
+/**
+ * Haversine formula — computes the great-circle distance between two
+ * geographic coordinates on the Earth's surface, returned in meters.
+ *
+ * Formula:
+ *   a = sin²(Δlat/2) + cos(lat1) · cos(lat2) · sin²(Δlon/2)
+ *   distance = 2 · R · atan2(√a, √(1−a))
+ *
+ * where R is the mean Earth radius (6 371 000 m).
+ */
+function haversineDistanceMeters(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return EARTH_RADIUS_M * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 /** Try to read a non-expired cache entry from MongoDB. */
@@ -371,6 +415,157 @@ export class TransitModel {
         err
       );
     }
+  }
+
+  // -------------------------------------------------------------------
+  // Nearby Stops  (TUC4 — Discover Stops & Schedules)
+  // -------------------------------------------------------------------
+
+  /**
+   * Return stops within `radiusMeters` of the given coordinates, sorted by
+   * distance.  Each result includes the straight-line distance and a walking
+   * time estimate computed with the heuristic 1 km = 15 min (TUC4 R4).
+   *
+   * If no stops are found within 1 000 m the radius is automatically
+   * expanded to 2 000 m (TUC4 A6).
+   */
+  static async getNearbyStops(
+    lat: number,
+    lon: number,
+    radiusMeters: number = DEFAULT_NEARBY_RADIUS_M,
+    filters?: {
+      routeId?: string;
+      system?: string;
+      direction?: string;
+      date?: string;
+      time?: string;
+      includeRoutes?: boolean;
+    }
+  ): Promise<INearbyStopsPayload> {
+    // 1. Collect candidate routes
+    let routes = await TransitModel.getRoutes();
+
+    // Add CMU routes if available and not filtered to PRT only
+    if (!filters?.system || filters.system === 'CMU') {
+      try {
+        const tripshotService = (await import('../services/tripshot.service'))
+          .default;
+        if (tripshotService.isConfigured()) {
+          const cmuRoutes = await tripshotService.getRoutes();
+          routes = [...routes, ...cmuRoutes];
+        }
+      } catch {
+        // Tripshot unavailable — continue with PRT only
+      }
+    }
+
+    // Apply system filter
+    if (filters?.system) {
+      routes = routes.filter((r) => r.system === filters.system);
+    }
+
+    // Apply routeId filter
+    if (filters?.routeId) {
+      routes = routes.filter((r) => r.id === filters.routeId);
+    }
+
+    // Apply date/time filter (schedule-aware)
+    if (filters?.date && filters?.time) {
+      const activeRoutes = gtfsService.filterRoutesByDateTime(
+        new Date(filters.date),
+        filters.time
+      );
+      const activeIds = new Set(activeRoutes.map((r) => r.id));
+      routes = routes.filter((r) => activeIds.has(r.id));
+    } else if (filters?.date) {
+      const activeRoutes = gtfsService.filterRoutesByDate(
+        new Date(filters.date)
+      );
+      const activeIds = new Set(activeRoutes.map((r) => r.id));
+      routes = routes.filter((r) => activeIds.has(r.id));
+    }
+
+    // 2. Collect all unique stops from candidate routes
+    const stopDataMap = new Map<
+      string,
+      { stop: IStop; routeIds: Set<string> }
+    >();
+
+    for (const route of routes) {
+      const directions =
+        filters?.direction ? [filters.direction] : route.directions;
+
+      for (const dir of directions) {
+        const stops = await TransitModel.getStops(route.id, dir);
+        for (const stop of stops) {
+          const existing = stopDataMap.get(stop.stopId);
+          if (existing) {
+            existing.routeIds.add(route.id);
+          } else {
+            stopDataMap.set(stop.stopId, {
+              stop,
+              routeIds: new Set([route.id])
+            });
+          }
+        }
+      }
+    }
+
+    // includeRoutes defaults to true per REST spec; when false, omit route IDs
+    // from each result to reduce payload size.
+    const includeRoutes = filters?.includeRoutes !== false;
+
+    // 3. Filter by distance and build result
+    const buildNearbyStops = (radius: number): INearbyStop[] => {
+      const result: INearbyStop[] = [];
+      for (const { stop, routeIds } of stopDataMap.values()) {
+        // Compute straight-line (haversine) distance from member to stop
+        const distanceMeters = haversineDistanceMeters(
+          lat,
+          lon,
+          stop.lat,
+          stop.lon
+        );
+        if (distanceMeters <= radius) {
+          // Walk-time heuristic (TUC4 R4): 1 km ≈ 15 min of slow walking
+          // walkMinutesEstimate = ⌈(distanceMeters / 1000) × 15⌉
+          const walkMinutesEstimate = Math.ceil(
+            (distanceMeters / METERS_PER_KM) * WALK_MINUTES_PER_KM
+          );
+
+          result.push({
+            stop,
+            distanceMeters: Math.round(distanceMeters),
+            walkMinutesEstimate,
+            routesServingStop: includeRoutes ? [...routeIds] : []
+          });
+        }
+      }
+      // Sort ascending so the closest stops appear first
+      result.sort((a, b) => a.distanceMeters - b.distanceMeters);
+      return result;
+    };
+
+    let nearbyStops = buildNearbyStops(radiusMeters);
+    let expandedRadiusApplied = false;
+
+    // TUC4 A6: if no stops within the default 1 km radius, automatically
+    // double to 2 km (~30 min walk) and flag the expansion in the response.
+    if (
+      nearbyStops.length === 0 &&
+      radiusMeters === DEFAULT_NEARBY_RADIUS_M
+    ) {
+      radiusMeters = EXPANDED_NEARBY_RADIUS_M;
+      expandedRadiusApplied = true;
+      nearbyStops = buildNearbyStops(radiusMeters);
+    }
+
+    return {
+      center: { lat, lon },
+      radiusMeters,
+      expandedRadiusApplied,
+      stops: nearbyStops
+    };
   }
 
   // -------------------------------------------------------------------

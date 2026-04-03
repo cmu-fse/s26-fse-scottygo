@@ -56,6 +56,10 @@ export default class BusController extends Controller {
     );
     this.router.get('/routes/:id', this.getPatterns.bind(this));
     this.router.get('/vehicles/:routeId', this.getVehicles.bind(this));
+    this.router.get(
+      '/stops/nearbystops',
+      this.getNearbyStops.bind(this)
+    );
     this.router.get('/stops/:routeId', this.getStops.bind(this));
     this.router.get(
       '/stops/:stopId/predictions',
@@ -1032,6 +1036,87 @@ export default class BusController extends Controller {
         name: 'PathGenerated',
         message: `Found ${patterns.length} patterns for route ${id}`,
         payload: patterns
+      };
+      res.status(200).json(successRes);
+    } catch (error: unknown) {
+      this.handleError(error, res);
+    }
+  }
+
+  // GET /transit/stops/nearbystops?lat=...&lon=...&radiusMeters=...
+  private async getNearbyStops(req: Request, res: Response): Promise<void> {
+    const latStr = req.query.lat as string | undefined;
+    const lonStr = req.query.lon as string | undefined;
+
+    if (!latStr || !lonStr) {
+      const errorRes: responses.IAppError = {
+        type: 'ClientError',
+        name: 'MissingParameter',
+        message: 'Query parameters "lat" and "lon" are required'
+      };
+      res.status(400).json(errorRes);
+      return;
+    }
+
+    const lat = parseFloat(latStr);
+    const lon = parseFloat(lonStr);
+
+    if (
+      !Number.isFinite(lat) ||
+      !Number.isFinite(lon) ||
+      lat < -90 ||
+      lat > 90 ||
+      lon < -180 ||
+      lon > 180
+    ) {
+      const errorRes: responses.IAppError = {
+        type: 'ClientError',
+        name: 'OutOfBounds',
+        message:
+          'Coordinates out of valid range (lat: -90 to 90, lon: -180 to 180)'
+      };
+      res.status(400).json(errorRes);
+      return;
+    }
+
+    // Default radius: 1000 m (~15 min walk); override via query param
+    const radiusMeters = req.query.radiusMeters
+      ? parseInt(req.query.radiusMeters as string, 10)
+      : undefined; // let the model apply its own default
+
+    // includeRoutes defaults to true per REST spec
+    const includeRoutesParam = req.query.includeRoutes as string | undefined;
+    const includeRoutes =
+      includeRoutesParam === undefined || includeRoutesParam !== 'false';
+
+    const filters: {
+      routeId?: string;
+      system?: string;
+      direction?: string;
+      date?: string;
+      time?: string;
+      includeRoutes?: boolean;
+    } = { includeRoutes };
+
+    if (req.query.routeId) filters.routeId = req.query.routeId as string;
+    if (req.query.system) filters.system = req.query.system as string;
+    if (req.query.direction)
+      filters.direction = (req.query.direction as string).toUpperCase();
+    if (req.query.date) filters.date = req.query.date as string;
+    if (req.query.time) filters.time = req.query.time as string;
+
+    try {
+      const payload = await TransitModel.getNearbyStops(
+        lat,
+        lon,
+        radiusMeters,
+        filters
+      );
+
+      const successRes: responses.ISuccess = {
+        name: 'NearbyStopsRetrieved',
+        message: `Found ${payload.stops.length} nearby stops within ${payload.radiusMeters}m`,
+        payload
       };
       res.status(200).json(successRes);
     } catch (error: unknown) {

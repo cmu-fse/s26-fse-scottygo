@@ -91,6 +91,22 @@ export interface IBulkTransitData {
   stops: Record<string, IStop[]>;
 }
 
+// ── Discover Stops & Schedules (TUC4) ──────────────────────────────────
+
+export interface INearbyStop {
+  stop: IStop;
+  distanceMeters: number;
+  walkMinutesEstimate: number;
+  routesServingStop: string[];
+}
+
+export interface INearbyStopsPayload {
+  center: { lat: number; lon: number };
+  radiusMeters: number;
+  expandedRadiusApplied: boolean;
+  stops: INearbyStop[];
+}
+
 // ── Live Notification (TUC3) ───────────────────────────────────────────
 
 export type ICrowdedness = 'Empty' | 'Few Seats Taken' | 'Standing Room' | 'Packed';
