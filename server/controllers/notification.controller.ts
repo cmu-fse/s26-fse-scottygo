@@ -23,7 +23,9 @@ export default class NotificationController extends Controller {
 
   public initializeRoutes(): void {
     // Serve the notifications HTML page (no auth required — auth handled client-side)
-    this.router.get('/', (_req, res) => this.sendPage(res, 'notifications.html'));
+    this.router.get('/', (_req, res) =>
+      this.sendPage(res, 'notifications.html')
+    );
 
     // All notification API routes require authentication
     this.router.use(this.authenticateToken.bind(this));
@@ -80,7 +82,9 @@ export default class NotificationController extends Controller {
   private async getSubscriptions(req: Request, res: Response): Promise<void> {
     try {
       const user = (req as Request & { user: ITokenPayload }).user;
-      const subscriptions = await NotificationModel.getSubscriptions(user.userId);
+      const subscriptions = await NotificationModel.getSubscriptions(
+        user.userId
+      );
 
       const success: responses.ISuccess = {
         name: 'SubscriptionsRetrieved',
@@ -108,7 +112,10 @@ export default class NotificationController extends Controller {
         return;
       }
 
-      const subscription = await NotificationModel.subscribe(user.userId, routeId);
+      const subscription = await NotificationModel.subscribe(
+        user.userId,
+        routeId
+      );
 
       const success: responses.ISuccess = {
         name: 'RouteSubscribed',
@@ -144,7 +151,16 @@ export default class NotificationController extends Controller {
   private async submitReport(req: Request, res: Response): Promise<void> {
     try {
       const user = (req as Request & { user: ITokenPayload }).user;
-      const { vid, routeId, crowdedness, prioritySeating, condition, comment, lat, lon } = req.body;
+      const {
+        vid,
+        routeId,
+        crowdedness,
+        prioritySeating,
+        condition,
+        comment,
+        lat,
+        lon
+      } = req.body;
       const requestingUser = await User.getUserAccountById(user.userId);
       const isAdmin = requestingUser.privilegeLevel === 'Administrator';
 
@@ -162,7 +178,9 @@ export default class NotificationController extends Controller {
 
       // R4: If a notification was created, publish via Socket.io to the route's room
       if (result.notification) {
-        Controller.io.to(`route:${routeId}`).emit('liveNotification', result.notification);
+        Controller.io
+          .to(`route:${routeId}`)
+          .emit('liveNotification', result.notification);
       }
 
       const message = result.commentFlagged
@@ -184,7 +202,10 @@ export default class NotificationController extends Controller {
 
   // ── Notifications ──────────────────────────────────────────────────
 
-  private async searchNotifications(req: Request, res: Response): Promise<void> {
+  private async searchNotifications(
+    req: Request,
+    res: Response
+  ): Promise<void> {
     try {
       const normalizeQueryParam = (value: unknown): string | undefined => {
         if (typeof value !== 'string') {
@@ -248,7 +269,12 @@ export default class NotificationController extends Controller {
     error: unknown,
     fallbackName: responses.ServerErrorName
   ): void {
-    if (error && typeof error === 'object' && 'type' in error && 'name' in error) {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'type' in error &&
+      'name' in error
+    ) {
       const appError = error as responses.IAppError;
       const statusMap: Record<string, number> = {
         MissingParameter: 400,
@@ -263,7 +289,9 @@ export default class NotificationController extends Controller {
         DuplicateSubscription: 409,
         SubscriptionLimitReached: 409
       };
-      const statusCode = statusMap[appError.name] ?? (appError.type === 'ClientError' ? 400 : 500);
+      const statusCode =
+        statusMap[appError.name] ??
+        (appError.type === 'ClientError' ? 400 : 500);
       res.status(statusCode).json(appError);
       return;
     }

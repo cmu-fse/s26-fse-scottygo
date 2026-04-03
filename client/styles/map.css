@@ -1989,10 +1989,18 @@ body.dark .map-popup__source--static {
   animation: mapNotifFadeOut 0.3s ease-in forwards;
 }
 
-.map-notif-card[data-category='accessibility'] { border-left-color: #f59e0b; }
-.map-notif-card[data-category='capacity']      { border-left-color: #ef4444; }
-.map-notif-card[data-category='condition']     { border-left-color: #3b82f6; }
-.map-notif-card[data-category='delay']         { border-left-color: #8b5cf6; }
+.map-notif-card[data-category='accessibility'] {
+  border-left-color: #f59e0b;
+}
+.map-notif-card[data-category='capacity'] {
+  border-left-color: #ef4444;
+}
+.map-notif-card[data-category='condition'] {
+  border-left-color: #3b82f6;
+}
+.map-notif-card[data-category='delay'] {
+  border-left-color: #8b5cf6;
+}
 
 .map-notif-header {
   display: flex;
@@ -2001,11 +2009,22 @@ body.dark .map-popup__source--static {
   padding-right: 20px;
 }
 
-.map-notif-icon { flex-shrink: 0; line-height: 0; }
-.map-notif-icon[data-category='accessibility'] { color: #f59e0b; }
-.map-notif-icon[data-category='capacity']      { color: #ef4444; }
-.map-notif-icon[data-category='condition']     { color: #3b82f6; }
-.map-notif-icon[data-category='delay']         { color: #8b5cf6; }
+.map-notif-icon {
+  flex-shrink: 0;
+  line-height: 0;
+}
+.map-notif-icon[data-category='accessibility'] {
+  color: #f59e0b;
+}
+.map-notif-icon[data-category='capacity'] {
+  color: #ef4444;
+}
+.map-notif-icon[data-category='condition'] {
+  color: #3b82f6;
+}
+.map-notif-icon[data-category='delay'] {
+  color: #8b5cf6;
+}
 
 .map-notif-title {
   font-size: 14px;
@@ -2037,10 +2056,22 @@ body.dark .map-popup__source--static {
   color: #555;
 }
 
-.map-notif-tag[data-category='accessibility'] { background: #fef3c7; color: #b45309; }
-.map-notif-tag[data-category='capacity']      { background: #fee2e2; color: #b91c1c; }
-.map-notif-tag[data-category='condition']     { background: #dbeafe; color: #1d4ed8; }
-.map-notif-tag[data-category='delay']         { background: #ede9fe; color: #6d28d9; }
+.map-notif-tag[data-category='accessibility'] {
+  background: #fef3c7;
+  color: #b45309;
+}
+.map-notif-tag[data-category='capacity'] {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.map-notif-tag[data-category='condition'] {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+.map-notif-tag[data-category='delay'] {
+  background: #ede9fe;
+  color: #6d28d9;
+}
 
 .map-notif-time {
   font-size: 11px;
@@ -2066,7 +2097,9 @@ body.dark .map-popup__source--static {
 }
 
 /* Each card is position:relative to anchor the dismiss button */
-.map-notif-card { position: relative; }
+.map-notif-card {
+  position: relative;
+}
 
 @media (max-width: 768px) {
   .map-notif-container {
@@ -2112,8 +2145,14 @@ bus-report-form.is-open .bus-report-backdrop {
 }
 
 @keyframes busReportFadeIn {
-  from { opacity: 0; transform: scale(0.96); }
-  to   { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* Header */
@@ -2187,7 +2226,10 @@ bus-report-form.is-open .bus-report-backdrop {
   font-family: inherit;
   cursor: pointer;
   color: #1f2937;
-  transition: border-color 0.15s, background 0.15s, color 0.15s;
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    color 0.15s;
 }
 
 .bus-report__option:hover {
@@ -2243,7 +2285,9 @@ bus-report-form.is-open .bus-report-backdrop {
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s, opacity 0.15s;
+  transition:
+    background 0.15s,
+    opacity 0.15s;
 }
 
 .bus-report__nav-btn--back {

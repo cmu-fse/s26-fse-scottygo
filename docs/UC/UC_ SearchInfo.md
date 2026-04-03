@@ -3,10 +3,10 @@
 Short Name: SearchInfo
 
 Participating Actors  
-The use case is initiated by a Member. 
+The use case is initiated by a Member.
 
 Brief Description  
-The use case allows the Member to search for any information stored in the system. 
+The use case allows the Member to search for any information stored in the system.
 
 Assumption  
 The Member is logged into the system.
@@ -15,21 +15,21 @@ Flow of Events
 
 Basic Flow
 
-1. The use case starts when the Member elects to search for information stored in the system.  
-2. The app asks the Member to provide their search criteria (refer to Search Rules under **Search Criteria**) and provides a space to do so.  
-3. The Member provides his search criteria.   
-4. The app queries its stored information based on both the current **Search Context** (current screen) of the application and the provided **Search Criteria** according to the **Search Rules**.  
-5. The app displays any information matching the search context and the Member’s search criteria. 
+1. The use case starts when the Member elects to search for information stored in the system.
+2. The app asks the Member to provide their search criteria (refer to Search Rules under **Search Criteria**) and provides a space to do so.
+3. The Member provides his search criteria.
+4. The app queries its stored information based on both the current **Search Context** (current screen) of the application and the provided **Search Criteria** according to the **Search Rules**.
+5. The app displays any information matching the search context and the Member’s search criteria.
 
 Alternative Flows \[all mandatory\]
 
-* A1 NoMatches. In step 5, if there are no matches *(or no results need to be displayed)*, the system lets the Citizen know about the situation. The use case returns to step 3\.  
-* A2 CancelSearch. At any time, the Citizen can elect to stop searching. The use case ends.
+- A1 NoMatches. In step 5, if there are no matches _(or no results need to be displayed)_, the system lets the Citizen know about the situation. The use case returns to step 3\.
+- A2 CancelSearch. At any time, the Citizen can elect to stop searching. The use case ends.
 
 Rules \[Make sure that the **Rules** are covered in the **OOA model**\]
 
-* **R1 Search Rules**:   
-  * A search is **contextual**, as the system behavior varies depending on the context (current screen).
+- **R1 Search Rules**:
+  - A search is **contextual**, as the system behavior varies depending on the context (current screen).
 
 | Search Context | Search Criteria | Search Results |
 | :-- | :-- | :-- |

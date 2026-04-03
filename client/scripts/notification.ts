@@ -4,7 +4,10 @@ export {};
 import './components/app-header';
 import './components/live-notifications';
 import { io, Socket } from 'socket.io-client';
-import type { INotification, IServiceAlert } from '../../common/transit.interface';
+import type {
+  INotification,
+  IServiceAlert
+} from '../../common/transit.interface';
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
@@ -25,8 +28,12 @@ function authHeaders(): Record<string, string> {
 
 const list = document.getElementById('notif-list')!;
 const emptyEl = document.getElementById('notif-empty')!;
-const searchWrap = document.querySelector('.notif-search-wrap') as HTMLDivElement;
-const searchInput = document.getElementById('notif-search-input') as HTMLInputElement;
+const searchWrap = document.querySelector(
+  '.notif-search-wrap'
+) as HTMLDivElement;
+const searchInput = document.getElementById(
+  'notif-search-input'
+) as HTMLInputElement;
 const clearBtn = document.getElementById('notif-search-clear')!;
 const suggestionsEl = document.getElementById(
   'notif-search-suggestions'
@@ -41,7 +48,9 @@ let socket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null;
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function formatTime(isoTimestamp: string): string {
-  const mins = Math.round((Date.now() - new Date(isoTimestamp).getTime()) / 60_000);
+  const mins = Math.round(
+    (Date.now() - new Date(isoTimestamp).getTime()) / 60_000
+  );
   if (mins < 1) return 'just now';
   if (mins < 60) return `${mins}m ago`;
   return `${Math.floor(mins / 60)}h ago`;
@@ -194,10 +203,13 @@ function createNotifCard(notif: INotification): HTMLLIElement {
     </div>
   `;
 
-  li.querySelector<HTMLButtonElement>('.notif-dismiss')!.addEventListener('click', () => {
-    li.remove();
-    updateEmptyState(searchInput.value.trim() || undefined);
-  });
+  li.querySelector<HTMLButtonElement>('.notif-dismiss')!.addEventListener(
+    'click',
+    () => {
+      li.remove();
+      updateEmptyState(searchInput.value.trim() || undefined);
+    }
+  );
 
   return li;
 }
@@ -237,7 +249,9 @@ async function loadAlerts(): Promise<void> {
   list.innerHTML = '';
 
   try {
-    const res = await fetch('/notifications/alerts', { headers: authHeaders() });
+    const res = await fetch('/notifications/alerts', {
+      headers: authHeaders()
+    });
     if (res.status === 503) {
       emptyEl.textContent = 'Service alerts are temporarily unavailable.';
       emptyEl.classList.add('is-visible');
@@ -420,12 +434,16 @@ async function init(): Promise<void> {
 
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       const buttons = Array.from(
-        suggestionsEl.querySelectorAll<HTMLButtonElement>('.notif-search-suggestion')
+        suggestionsEl.querySelectorAll<HTMLButtonElement>(
+          '.notif-search-suggestion'
+        )
       );
       if (buttons.length === 0) return;
       e.preventDefault();
 
-      const focused = suggestionsEl.querySelector<HTMLButtonElement>('.notif-search-suggestion:focus');
+      const focused = suggestionsEl.querySelector<HTMLButtonElement>(
+        '.notif-search-suggestion:focus'
+      );
       const idx = focused ? buttons.indexOf(focused) : -1;
 
       if (e.key === 'ArrowDown') {

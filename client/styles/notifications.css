@@ -24,9 +24,11 @@
   padding: 0 16px;
   height: 52px;
   gap: 10px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.10);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   border: 1px solid #e5e7eb;
-  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  transition:
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
 }
 
 .notif-search:focus-within {
@@ -122,10 +124,18 @@
   color: #9ca3af;
 }
 
-.notif-suggestion-icon[data-type="route"]        { color: #3b82f6; }
-.notif-suggestion-icon[data-type="vehicle"]      { color: #6b7280; }
-.notif-suggestion-icon[data-type="alert"]        { color: #f59e0b; }
-.notif-suggestion-icon[data-type="notification"] { color: #8b5cf6; }
+.notif-suggestion-icon[data-type='route'] {
+  color: #3b82f6;
+}
+.notif-suggestion-icon[data-type='vehicle'] {
+  color: #6b7280;
+}
+.notif-suggestion-icon[data-type='alert'] {
+  color: #f59e0b;
+}
+.notif-suggestion-icon[data-type='notification'] {
+  color: #8b5cf6;
+}
 
 .notif-suggestion-label {
   font-size: 14px;
