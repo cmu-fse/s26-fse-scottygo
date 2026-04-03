@@ -34,8 +34,10 @@ jobs:
           touch .env
           echo "MY_VAR=xyz" >> .env
           echo "${{ env.DOT_ENV }}" >> .env
-          echo -- Environment Vars
-          cat .env
+          echo -- Environment File Diagnostics
+          echo "Lines in .env: $(wc -l < .env)"
+          echo "Keys in .env:"
+          grep -E '^[A-Za-z_][A-Za-z0-9_]*=' .env | cut -d= -f1 | sort
       - name: Setup Node.js with version ${{ matrix.node-version }}...
         uses: actions/setup-node@v4
         with:

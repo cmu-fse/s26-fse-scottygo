@@ -144,6 +144,55 @@ const getResponseMessage = (
   return fallback;
 };
 
+const hasSuccessStatus = (status: number): boolean =>
+  status >= 200 && status < 300;
+
+const getAuthenticatedPayload = (
+  data: IResponse | null
+): IAuthenticatedUser | null => {
+  if (data && isSuccess(data) && data.payload && 'user' in data.payload) {
+    return data.payload as IAuthenticatedUser;
+  }
+  return null;
+};
+
+const storeAuthFromResponse = (data: IResponse | null): void => {
+  const payload = getAuthenticatedPayload(data);
+  if (payload?.token && payload?.user) {
+    storeAuth(payload.token, payload.user.credentials.username);
+  }
+};
+
+const redirectToDirectory = (message: string): void => {
+  setStatus(message);
+  window.setTimeout(() => {
+    window.location.href = '/';
+  }, 1200);
+};
+
+const agreeAndRefreshSession = async (
+  username: string,
+  password: string
+): Promise<{ ok: true } | { ok: false; message: string }> => {
+  const agreementResult = await confirmAgreement(username, password);
+  if (!hasSuccessStatus(agreementResult.status)) {
+    return {
+      ok: false,
+      message: getResponseMessage(
+        agreementResult.data,
+        'Agreement update failed.'
+      )
+    };
+  }
+
+  const loginResult = await loginUser(username, password);
+  if (hasSuccessStatus(loginResult.status)) {
+    storeAuthFromResponse(loginResult.data);
+  }
+
+  return { ok: true };
+};
+
 const registerUser = async (
   body: IUser
 ): Promise<{ status: number; data: IResponse | null }> => {
@@ -235,16 +284,12 @@ const handleAgreementAccept = async (): Promise<void> => {
 
   setSubmitting(true);
   try {
-    const agreementResult = await confirmAgreement(
+    const agreementOutcome = await agreeAndRefreshSession(
       pendingAgreementUsername,
       pendingAgreementPassword
     );
-    if (agreementResult.status < 200 || agreementResult.status >= 300) {
-      const agreementMessage = getResponseMessage(
-        agreementResult.data,
-        'Agreement update failed.'
-      );
-      setStatus(agreementMessage, true);
+    if (!agreementOutcome.ok) {
+      setStatus(agreementOutcome.message, true);
       return;
     }
 
@@ -253,29 +298,9 @@ const handleAgreementAccept = async (): Promise<void> => {
     }
     closeModal(termsModal);
 
-    // After agreement, login to get a fresh token
-    const loginResult = await loginUser(
-      pendingAgreementUsername,
-      pendingAgreementPassword
-    );
-    if (loginResult.status >= 200 && loginResult.status < 300) {
-      const loginPayload =
-        loginResult.data &&
-        isSuccess(loginResult.data) &&
-        loginResult.data.payload &&
-        'user' in loginResult.data.payload
-          ? (loginResult.data.payload as IAuthenticatedUser)
-          : null;
-      if (loginPayload?.token && loginPayload?.user) {
-        storeAuth(loginPayload.token, loginPayload.user.credentials.username);
-      }
-    }
-
     setStatus('Agreement accepted. Redirecting to directory...');
     if (pendingRedirectToHome) {
-      window.setTimeout(() => {
-        window.location.href = '/';
-      }, 1200);
+      redirectToDirectory('Agreement accepted. Redirecting to directory...');
     }
   } catch (error) {
     const message =
@@ -329,7 +354,7 @@ form?.addEventListener('submit', async (event: SubmitEvent) => {
       payload.credentials.password
     );
 
-    if (status < 200 || status >= 300) {
+    if (!hasSuccessStatus(status)) {
       const errorName = data && 'name' in data ? data.name : '';
 
       // R5: Inactive accounts cannot log in - show error, don't show ToS modal
@@ -342,44 +367,18 @@ form?.addEventListener('submit', async (event: SubmitEvent) => {
       if (errorName === 'UnauthorizedRequest') {
         // If user already checked the ToS checkbox, process agreement directly
         if (shouldAgree) {
-          const agreementResult = await confirmAgreement(
+          const agreementOutcome = await agreeAndRefreshSession(
             payload.credentials.username,
             payload.credentials.password
           );
-          if (agreementResult.status < 200 || agreementResult.status >= 300) {
-            const agreementMessage = getResponseMessage(
-              agreementResult.data,
-              'Agreement update failed.'
-            );
-            setStatus(agreementMessage, true);
+          if (!agreementOutcome.ok) {
+            setStatus(agreementOutcome.message, true);
             return;
           }
 
-          // After agreement, login to get a fresh token
-          const loginResult = await loginUser(
-            payload.credentials.username,
-            payload.credentials.password
+          redirectToDirectory(
+            'Agreement accepted. Redirecting to directory...'
           );
-          if (loginResult.status >= 200 && loginResult.status < 300) {
-            const loginPayload =
-              loginResult.data &&
-              isSuccess(loginResult.data) &&
-              loginResult.data.payload &&
-              'user' in loginResult.data.payload
-                ? (loginResult.data.payload as IAuthenticatedUser)
-                : null;
-            if (loginPayload?.token && loginPayload?.user) {
-              storeAuth(
-                loginPayload.token,
-                loginPayload.user.credentials.username
-              );
-            }
-          }
-
-          setStatus('Agreement accepted. Redirecting to directory...');
-          window.setTimeout(() => {
-            window.location.href = '/';
-          }, 1200);
           return;
         }
 
@@ -397,12 +396,8 @@ form?.addEventListener('submit', async (event: SubmitEvent) => {
       return;
     }
 
-    const authPayload =
-      data && isSuccess(data) && data.payload && 'user' in data.payload
-        ? (data.payload as IAuthenticatedUser)
-        : null;
+    const authPayload = getAuthenticatedPayload(data);
     const authenticatedUser = authPayload?.user ?? null;
-    const token = authPayload?.token ?? null;
 
     if (authenticatedUser && authenticatedUser.agreed === false) {
       // User hasn't agreed yet - show terms modal with password for PATCH
@@ -414,15 +409,8 @@ form?.addEventListener('submit', async (event: SubmitEvent) => {
       return;
     }
 
-    // Store token in localStorage for RESTful auth
-    if (token && authenticatedUser) {
-      storeAuth(token, authenticatedUser.credentials.username);
-    }
-
-    setStatus('Login successful. Redirecting to directory...');
-    window.setTimeout(() => {
-      window.location.href = '/';
-    }, 1200);
+    storeAuthFromResponse(data);
+    redirectToDirectory('Login successful. Redirecting to directory...');
   } catch (error) {
     const message =
       error instanceof Error
@@ -471,42 +459,16 @@ confirmYes?.addEventListener('click', async () => {
     }
 
     if (shouldAgree) {
-      // User checked ToS checkbox - send PATCH with password
-      const agreementResult = await confirmAgreement(
+      const agreementOutcome = await agreeAndRefreshSession(
         user.credentials.username,
         registerBody.credentials.password
       );
-      if (agreementResult.status < 200 || agreementResult.status >= 300) {
-        const agreementMessage = getResponseMessage(
-          agreementResult.data,
-          'Agreement update failed.'
-        );
-        setStatus(agreementMessage, true);
+      if (!agreementOutcome.ok) {
+        setStatus(agreementOutcome.message, true);
         return;
       }
 
-      // After agreement, login to get a token
-      const loginResult = await loginUser(
-        user.credentials.username,
-        registerBody.credentials.password
-      );
-      if (loginResult.status >= 200 && loginResult.status < 300) {
-        const loginPayload =
-          loginResult.data &&
-          isSuccess(loginResult.data) &&
-          loginResult.data.payload &&
-          'user' in loginResult.data.payload
-            ? (loginResult.data.payload as IAuthenticatedUser)
-            : null;
-        if (loginPayload?.token && loginPayload?.user) {
-          storeAuth(loginPayload.token, loginPayload.user.credentials.username);
-        }
-      }
-
-      setStatus('Registered and agreed. Redirecting to directory...');
-      window.setTimeout(() => {
-        window.location.href = '/';
-      }, 1200);
+      redirectToDirectory('Registered and agreed. Redirecting to directory...');
       return;
     }
 
@@ -553,4 +515,3 @@ declineOk?.addEventListener('click', () => {
   closeModal(declineModal);
   window.location.href = '/';
 });
-

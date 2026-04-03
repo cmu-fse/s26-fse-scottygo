@@ -119,7 +119,7 @@ jest.mock('../../../server/services/gtfs.service', () => ({
 jest.mock('../../../server/services/truetime.service', () => ({
   __esModule: true,
   default: {
-    getRouteColors: jest.fn().mockResolvedValue(new Map()),
+    getRoutes: jest.fn().mockResolvedValue([]),
     getDetours: jest.fn().mockResolvedValue([]),
     getDetourGeometry: jest.fn().mockResolvedValue([])
   }
