@@ -154,93 +154,26 @@ class VehiclePositionsService {
   private async fetchAndStore(): Promise<void> {
     this.fetchInProgress = true;
     try {
-      const response = await fetch(GTFSRT_VEHICLE_URL, {
-        headers: { Accept: 'application/x-protobuf' }
-      });
+      const buffer = await this.fetchFeed();
+      if (!buffer) return; // HTTP error already logged
 
-      if (!response.ok) {
-        this.consecutiveFailures++;
-        this.lastError = `HTTP ${response.status}`;
-        console.error(
-          `${tag()} Feed returned HTTP ${response.status} (failures: ${this.consecutiveFailures})`
-        );
-        return;
-      }
-
-      const buffer = await response.arrayBuffer();
       const feed = transit_realtime.FeedMessage.decode(new Uint8Array(buffer));
 
-      const byRoute = new Map<string, IVehicle[]>();
       const all: IVehicle[] = [];
-
       for (const entity of feed.entity) {
-        const vp = entity.vehicle;
-        if (!vp?.position) continue; // skip entities without a position
-
-        const routeId = vp.trip?.routeId ?? '';
-
-        // Map GTFS-RT VehicleStopStatus enum to string
-        let currentStatus: IVehicle['currentStatus'];
-        if (
-          vp.currentStatus ===
-          transit_realtime.VehiclePosition.VehicleStopStatus.INCOMING_AT
-        ) {
-          currentStatus = 'INCOMING_AT';
-        } else if (
-          vp.currentStatus ===
-          transit_realtime.VehiclePosition.VehicleStopStatus.STOPPED_AT
-        ) {
-          currentStatus = 'STOPPED_AT';
-        } else if (
-          vp.currentStatus ===
-          transit_realtime.VehiclePosition.VehicleStopStatus.IN_TRANSIT_TO
-        ) {
-          currentStatus = 'IN_TRANSIT_TO';
-        }
-
-        const vehicle: IVehicle = {
-          vid: vp.vehicle?.id ?? entity.id,
-          lat: vp.position.latitude,
-          lon: vp.position.longitude,
-          routeId,
-          heading: vp.position.bearing ?? 0,
-          speed: vp.position.speed != null ? vp.position.speed : undefined,
-          source: 'live',
-          lastUpdate: vp.timestamp
-            ? new Date(
-                (typeof vp.timestamp === 'number'
-                  ? vp.timestamp
-                  : vp.timestamp.toNumber()) * 1000
-              ).toISOString()
-            : new Date().toISOString(),
-          isDetoured: false,
-          tripId: vp.trip?.tripId || undefined,
-          currentStatus,
-          currentStopSequence: vp.currentStopSequence ?? undefined,
-          currentStopId: vp.stopId || undefined
-        };
-
-        all.push(vehicle);
-
-        if (routeId) {
-          const list = byRoute.get(routeId);
-          if (list) {
-            list.push(vehicle);
-          } else {
-            byRoute.set(routeId, [vehicle]);
-          }
-        }
+        const vehicle = this.decodeVehicleEntity(entity);
+        if (vehicle) all.push(vehicle);
       }
 
       // Atomic swap — readers never see a half-built index
-      this.vehiclesByRoute = byRoute;
+      this.vehiclesByRoute = this.buildRouteIndex(all);
       this.allVehicles = all;
       this.lastFetched = new Date();
       this.consecutiveFailures = 0;
       this.lastError = null;
 
       console.log(
-        `${tag()} Updated: ${all.length} vehicles across ${byRoute.size} routes`
+        `${tag()} Updated: ${all.length} vehicles across ${this.vehiclesByRoute.size} routes`
       );
       logMemoryUsage();
     } catch (err) {
@@ -257,6 +190,99 @@ class VehiclePositionsService {
         this.fetchAndStore();
       }
     }
+  }
+
+  /**
+   * Fetch the GTFS-RT protobuf feed. Returns the raw ArrayBuffer on success,
+   * or null if the HTTP request failed (error state is recorded internally).
+   */
+  private async fetchFeed(): Promise<ArrayBuffer | null> {
+    const response = await fetch(GTFSRT_VEHICLE_URL, {
+      headers: { Accept: 'application/x-protobuf' }
+    });
+
+    if (!response.ok) {
+      this.consecutiveFailures++;
+      this.lastError = `HTTP ${response.status}`;
+      console.error(
+        `${tag()} Feed returned HTTP ${response.status} (failures: ${this.consecutiveFailures})`
+      );
+      return null;
+    }
+
+    return response.arrayBuffer();
+  }
+
+  /**
+   * Decode a single GTFS-RT FeedEntity into an IVehicle, or return null
+   * if the entity lacks a vehicle position.
+   */
+  private decodeVehicleEntity(
+    entity: transit_realtime.IFeedEntity
+  ): IVehicle | null {
+    const vp = entity.vehicle;
+    if (!vp?.position) return null;
+
+    const routeId = vp.trip?.routeId ?? '';
+
+    // Map GTFS-RT VehicleStopStatus enum to string
+    let currentStatus: IVehicle['currentStatus'];
+    if (
+      vp.currentStatus ===
+      transit_realtime.VehiclePosition.VehicleStopStatus.INCOMING_AT
+    ) {
+      currentStatus = 'INCOMING_AT';
+    } else if (
+      vp.currentStatus ===
+      transit_realtime.VehiclePosition.VehicleStopStatus.STOPPED_AT
+    ) {
+      currentStatus = 'STOPPED_AT';
+    } else if (
+      vp.currentStatus ===
+      transit_realtime.VehiclePosition.VehicleStopStatus.IN_TRANSIT_TO
+    ) {
+      currentStatus = 'IN_TRANSIT_TO';
+    }
+
+    return {
+      vid: vp.vehicle?.id ?? entity.id,
+      lat: vp.position.latitude,
+      lon: vp.position.longitude,
+      routeId,
+      heading: vp.position.bearing ?? 0,
+      speed: vp.position.speed != null ? vp.position.speed : undefined,
+      source: 'live',
+      lastUpdate: vp.timestamp
+        ? new Date(
+            (typeof vp.timestamp === 'number'
+              ? vp.timestamp
+              : vp.timestamp.toNumber()) * 1000
+          ).toISOString()
+        : new Date().toISOString(),
+      isDetoured: false,
+      tripId: vp.trip?.tripId || undefined,
+      currentStatus,
+      currentStopSequence: vp.currentStopSequence ?? undefined,
+      currentStopId: vp.stopId || undefined
+    };
+  }
+
+  /**
+   * Group a flat list of vehicles into a Map keyed by routeId.
+   * Vehicles without a routeId are excluded from the index.
+   */
+  private buildRouteIndex(vehicles: IVehicle[]): Map<string, IVehicle[]> {
+    const byRoute = new Map<string, IVehicle[]>();
+    for (const vehicle of vehicles) {
+      if (!vehicle.routeId) continue;
+      const list = byRoute.get(vehicle.routeId);
+      if (list) {
+        list.push(vehicle);
+      } else {
+        byRoute.set(vehicle.routeId, [vehicle]);
+      }
+    }
+    return byRoute;
   }
 }
 
