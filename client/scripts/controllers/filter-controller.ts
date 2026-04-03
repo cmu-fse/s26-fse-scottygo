@@ -23,6 +23,12 @@ import { VehicleTracker } from '../trackers/vehicle-tracker';
 import { DirectionsController } from './directions-controller';
 import { URLSyncManager } from '../state/url-sync';
 import type { IRouteOption } from '../components/route-selector';
+import {
+  buildRouteOptions,
+  buildServiceBannerMarkup,
+  estimateWalkMinutes,
+  formatRouteName
+} from './filter-controller.helpers';
 
 // Augment the global Window interface with the showModal utility
 declare global {
@@ -74,8 +80,6 @@ export class FilterController {
   /** Route IDs that have nearby stops (used to restore hidden routes) */
   private nearbyRouteIds = new Set<string>();
 
-  /** Earth radius in meters for haversine */
-  private static readonly EARTH_RADIUS_M = 6_371_000;
   /** Walk-time heuristic: 1 km ≈ 15 min (TUC4 R4) */
   private static readonly WALK_MINUTES_PER_KM = 15;
 
@@ -122,10 +126,7 @@ export class FilterController {
 
       // Update route selector with available routes
       if (this.routeSelectorUpdateCallback) {
-        const routeOptions = routes.map((r) => ({
-          id: r.id,
-          name: this.formatRouteName(r)
-        }));
+        const routeOptions = buildRouteOptions(routes);
         this.routeSelectorUpdateCallback(routeOptions);
       }
 
@@ -308,10 +309,7 @@ export class FilterController {
         if (r.system === 'CMU') return updatedState.selectedSystems.cmu;
         return false;
       });
-      const routeOptions = filteredRoutes.map((r) => ({
-        id: r.id,
-        name: this.formatRouteName(r)
-      }));
+      const routeOptions = buildRouteOptions(filteredRoutes);
       this.routeSelectorUpdateCallback(routeOptions);
     }
 
@@ -347,10 +345,7 @@ export class FilterController {
           if (r.system === 'CMU') return state.selectedSystems.cmu;
           return false;
         });
-        const routeOptions = filteredRoutes.map((r) => ({
-          id: r.id,
-          name: this.formatRouteName(r)
-        }));
+        const routeOptions = buildRouteOptions(filteredRoutes);
         this.routeSelectorUpdateCallback(routeOptions);
       }
 
@@ -362,18 +357,6 @@ export class FilterController {
     } catch (error) {
       console.error('Failed to prefetch routes:', error);
     }
-  }
-
-  /**
-   * Format route name for display - removes "Transit" word for CMU routes
-   */
-  private formatRouteName(route: IRoute): string {
-    if (route.system === 'CMU') {
-      // Remove "Transit" from CMU route names
-      return route.name.replace(/\s+Transit\s+/g, ' ').trim();
-    }
-    // For PRT routes, just use the ID
-    return route.id;
   }
 
   /**
@@ -515,10 +498,7 @@ export class FilterController {
 
       // Update route selector with filtered routes
       if (this.routeSelectorUpdateCallback) {
-        const routeOptions = availableRoutes.map((r) => ({
-          id: r.id,
-          name: this.formatRouteName(r)
-        }));
+        const routeOptions = buildRouteOptions(availableRoutes);
         this.routeSelectorUpdateCallback(routeOptions);
       }
 
@@ -1138,27 +1118,15 @@ export class FilterController {
   // -------------------------------------------------------------------
 
   /**
-   * Haversine distance between two points in meters.
-   */
-  private haversine(a: ILatLng, b: ILatLng): number {
-    const toRad = (deg: number) => (deg * Math.PI) / 180;
-    const dLat = toRad(b.lat - a.lat);
-    const dLng = toRad(b.lng - a.lng);
-    const sinDLat = Math.sin(dLat / 2);
-    const sinDLng = Math.sin(dLng / 2);
-    const h =
-      sinDLat * sinDLat +
-      Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * sinDLng * sinDLng;
-    return 2 * FilterController.EARTH_RADIUS_M * Math.asin(Math.sqrt(h));
-  }
-
-  /**
    * Estimate walking time in minutes using the R4 heuristic (1 km ≈ 15 min).
    */
   private estimateWalkMinutes(stopLat: number, stopLon: number): number | null {
-    if (!this.userLocation) return null;
-    const dist = this.haversine(this.userLocation, { lat: stopLat, lng: stopLon });
-    return Math.ceil((dist / 1000) * FilterController.WALK_MINUTES_PER_KM);
+    return estimateWalkMinutes(
+      this.userLocation,
+      stopLat,
+      stopLon,
+      FilterController.WALK_MINUTES_PER_KM
+    );
   }
 
   /**
@@ -1303,16 +1271,7 @@ export class FilterController {
     const banner = document.getElementById('service-status-banner');
     if (!banner) return;
 
-    banner.innerHTML = `
-      <div class="service-status-banner__content">
-        <span class="material-icons-outlined service-status-banner__icon">cloud_off</span>
-        <div class="service-status-banner__text">
-          <strong>Some services are currently unavailable</strong>
-          <ul>${issues.map((i) => `<li>${i}</li>`).join('')}</ul>
-        </div>
-        <button class="service-status-banner__close" aria-label="Dismiss">&times;</button>
-      </div>
-    `;
+    banner.innerHTML = buildServiceBannerMarkup(issues);
     banner.hidden = false;
 
     const closeBtn = banner.querySelector('.service-status-banner__close');
