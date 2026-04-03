@@ -4,6 +4,7 @@ import {
   IMapPolyline,
   IMapMarkerOptions,
   IMapPolylineOptions,
+  IMapIconValue,
   ILatLng,
   IConfig
 } from '../../../common/map.interface';
@@ -69,17 +70,32 @@ export class GoogleMapProvider implements IMapProvider {
   addMarker(options: IMapMarkerOptions): IMapMarker {
     const id = `marker-${this.markerIdCounter++}`;
 
-    let iconOption: google.maps.Icon | string | undefined = options.icon;
-    if (options.icon && options.iconAnchor && options.iconSize) {
+    let iconOption: google.maps.Icon | string | undefined;
+    if (typeof options.icon === 'string') {
+      iconOption = options.icon;
+      if (options.iconAnchor && options.iconSize) {
+        iconOption = {
+          url: options.icon,
+          scaledSize: new google.maps.Size(
+            options.iconSize.width,
+            options.iconSize.height
+          ),
+          anchor: new google.maps.Point(
+            options.iconAnchor.x,
+            options.iconAnchor.y
+          )
+        };
+      }
+    } else if (options.icon) {
       iconOption = {
-        url: options.icon,
+        url: options.icon.url,
         scaledSize: new google.maps.Size(
-          options.iconSize.width,
-          options.iconSize.height
+          options.icon.size.width,
+          options.icon.size.height
         ),
         anchor: new google.maps.Point(
-          options.iconAnchor.x,
-          options.iconAnchor.y
+          options.icon.anchor.x,
+          options.icon.anchor.y
         )
       };
     }
@@ -128,15 +144,7 @@ export class GoogleMapProvider implements IMapProvider {
         requestAnimationFrame(step);
       },
       setVisible: (visible: boolean) => marker.setVisible(visible),
-      setIcon: (
-        icon:
-          | string
-          | {
-              url: string;
-              anchor: { x: number; y: number };
-              size: { width: number; height: number };
-            }
-      ) => {
+      setIcon: (icon: IMapIconValue) => {
         if (typeof icon === 'string') {
           marker.setIcon(icon);
         } else {

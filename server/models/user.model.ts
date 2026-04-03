@@ -492,38 +492,38 @@ export class User implements IUser {
     return DAC.db.getAllUserAccounts();
   }
 
+  private static throwUserNotFound(): never {
+    const error: IAppError = {
+      type: 'ClientError',
+      name: 'UserNotFound',
+      message: 'User not found'
+    };
+    throw error;
+  }
+
+  private static requireAccount(
+    userAccount: IUserAccount | null
+  ): IUserAccount {
+    if (!userAccount) {
+      User.throwUserNotFound();
+    }
+    return userAccount;
+  }
+
   /**
    * Get a user account by userId (immutable _id)
    */
   static async getUserAccountById(userId: string): Promise<IUserAccount> {
-    const userAccount = await DAC.db.findUserAccountById(userId);
-    if (!userAccount) {
-      const error: IAppError = {
-        type: 'ClientError',
-        name: 'UserNotFound',
-        message: 'User not found'
-      };
-      throw error;
-    }
-    return userAccount;
+    return User.requireAccount(await DAC.db.findUserAccountById(userId));
   }
 
   /**
    * Get a user account by username
    */
   static async getUserAccount(username: string): Promise<IUserAccount> {
-    const userAccount = await DAC.db.findUserAccountByUsername(
-      username.toLowerCase()
+    return User.requireAccount(
+      await DAC.db.findUserAccountByUsername(username.toLowerCase())
     );
-    if (!userAccount) {
-      const error: IAppError = {
-        type: 'ClientError',
-        name: 'UserNotFound',
-        message: 'User not found'
-      };
-      throw error;
-    }
-    return userAccount;
   }
 
   /**

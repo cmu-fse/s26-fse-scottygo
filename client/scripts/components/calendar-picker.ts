@@ -4,6 +4,12 @@
  * Used for Calendar Filter in VisRoute feature (Basic Flow steps 11-14)
  */
 
+import {
+  hidePanel,
+  showPanel,
+  togglePanelVisibility
+} from './panel-visibility';
+
 export interface IDateSelection {
   date: Date;
 }
@@ -39,43 +45,45 @@ export class CalendarPickerPanel
    * Show the calendar picker panel
    */
   show(): void {
-    const panel = this.querySelector('.calendar-picker-panel') as HTMLElement;
-    if (panel) {
-      panel.style.display = 'block';
-      panel.style.pointerEvents = 'auto'; // Enable pointer events immediately
-      this.isVisible = true;
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          panel.classList.add('visible');
-        });
-      });
-    }
+    showPanel(
+      this,
+      {
+        selector: '.calendar-picker-panel',
+        managePointerEvents: true,
+        debugName: 'calendar picker panel'
+      },
+      (visible) => {
+        this.isVisible = visible;
+      }
+    );
   }
 
   /**
    * Hide the calendar picker panel
    */
   hide(): void {
-    const panel = this.querySelector('.calendar-picker-panel') as HTMLElement;
-    if (panel) {
-      panel.classList.remove('visible');
-      panel.style.pointerEvents = 'none'; // Disable pointer events
-      setTimeout(() => {
-        panel.style.display = 'none';
-        this.isVisible = false;
-      }, 300);
-    }
+    hidePanel(
+      this,
+      {
+        selector: '.calendar-picker-panel',
+        managePointerEvents: true,
+        debugName: 'calendar picker panel'
+      },
+      (visible) => {
+        this.isVisible = visible;
+      }
+    );
   }
 
   /**
    * Toggle panel visibility
    */
   toggle(): void {
-    if (this.isVisible) {
-      this.hide();
-    } else {
-      this.show();
-    }
+    togglePanelVisibility(
+      this.isVisible,
+      this.hide.bind(this),
+      this.show.bind(this)
+    );
   }
 
   /**

@@ -7,9 +7,9 @@ import { ITokenPayload } from '../../common/user.interface';
 import { NotificationModel } from '../models/notification.model';
 import { User } from '../models/user.model';
 import alertsService from '../services/alerts.service';
-import jwt from 'jsonwebtoken';
-import { JWT_KEY as secretKey } from '../env';
 import * as responses from '../../common/server.responses';
+import { createJwtAuthMiddleware } from '../middleware/auth.middleware';
+import { respondWithAppOrUnexpectedError } from '../utils/controller-error.utils';
 import {
   NotificationSearchStrategyFactory,
   SearchContext
@@ -28,7 +28,7 @@ export default class NotificationController extends Controller {
     );
 
     // All notification API routes require authentication
-    this.router.use(this.authenticateToken.bind(this));
+    this.router.use(createJwtAuthMiddleware({ attachMode: 'user' }));
 
     // Subscription routes
     this.router.get('/subscriptions', this.getSubscriptions.bind(this));
@@ -41,40 +41,6 @@ export default class NotificationController extends Controller {
     // Notification/alert routes
     this.router.get('/notifications', this.searchNotifications.bind(this));
     this.router.get('/alerts', this.getAlerts.bind(this));
-  }
-
-  // ── Auth Middleware ────────────────────────────────────────────────
-
-  private async authenticateToken(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.split(' ')[1];
-
-    if (!token) {
-      const error: responses.IAppError = {
-        type: 'ClientError',
-        name: 'MissingToken',
-        message: 'Authentication token is required'
-      };
-      res.status(401).json(error);
-      return;
-    }
-
-    try {
-      const decoded = jwt.verify(token, secretKey) as ITokenPayload;
-      (req as Request & { user: ITokenPayload }).user = decoded;
-      next();
-    } catch {
-      const error: responses.IAppError = {
-        type: 'ClientError',
-        name: 'InvalidToken',
-        message: 'Invalid or expired token'
-      };
-      res.status(401).json(error);
-    }
   }
 
   // ── Subscriptions ──────────────────────────────────────────────────
@@ -269,38 +235,20 @@ export default class NotificationController extends Controller {
     error: unknown,
     fallbackName: responses.ServerErrorName
   ): void {
-    if (
-      error &&
-      typeof error === 'object' &&
-      'type' in error &&
-      'name' in error
-    ) {
-      const appError = error as responses.IAppError;
-      const statusMap: Record<string, number> = {
-        MissingParameter: 400,
-        EmptyReport: 400,
-        InvalidReportField: 400,
-        MissingToken: 401,
-        InvalidToken: 401,
-        ProximityViolation: 403,
-        RouteNotFound: 404,
-        VehicleNotFound: 404,
-        SubscriptionNotFound: 404,
-        DuplicateSubscription: 409,
-        SubscriptionLimitReached: 409
-      };
-      const statusCode =
-        statusMap[appError.name] ??
-        (appError.type === 'ClientError' ? 400 : 500);
-      res.status(statusCode).json(appError);
-      return;
-    }
-
-    const unexpectedError: responses.IAppError = {
-      type: 'ServerError',
-      name: fallbackName,
-      message: 'An unexpected error occurred'
+    const statusMap: Record<string, number> = {
+      MissingParameter: 400,
+      EmptyReport: 400,
+      InvalidReportField: 400,
+      MissingToken: 401,
+      InvalidToken: 401,
+      ProximityViolation: 403,
+      RouteNotFound: 404,
+      VehicleNotFound: 404,
+      SubscriptionNotFound: 404,
+      DuplicateSubscription: 409,
+      SubscriptionLimitReached: 409
     };
-    res.status(500).json(unexpectedError);
+
+    respondWithAppOrUnexpectedError(res, error, fallbackName, statusMap);
   }
 }

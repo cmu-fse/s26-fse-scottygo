@@ -4,6 +4,12 @@
  * Used for Direction Filter (Inbound/Outbound) and System Filter (PRT/CMU Shuttle)
  */
 
+import {
+  hidePanel,
+  showPanel,
+  togglePanelVisibility
+} from './panel-visibility';
+
 export interface IToggleOption {
   id: string;
   label: string;
@@ -124,46 +130,45 @@ export class TogglePanel extends HTMLElement implements ITogglePanelElement {
    * Show the panel
    */
   show(): void {
-    const panel = this.querySelector('.toggle-filter-panel') as HTMLElement;
-    if (panel) {
-      console.log('Showing panel:', this.config?.eventName);
-      panel.style.display = 'block';
-      this.isVisible = true;
-      // Use requestAnimationFrame to ensure display change is applied before adding visible class
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          panel.classList.add('visible');
-        });
-      });
-    } else {
-      console.error('Panel element not found when trying to show');
-    }
+    showPanel(
+      this,
+      {
+        selector: '.toggle-filter-panel',
+        managePointerEvents: false,
+        debugName: `panel: ${this.config?.eventName ?? 'toggle'}`
+      },
+      (visible) => {
+        this.isVisible = visible;
+      }
+    );
   }
 
   /**
    * Hide the panel
    */
   hide(): void {
-    const panel = this.querySelector('.toggle-filter-panel') as HTMLElement;
-    if (panel) {
-      console.log('Hiding panel:', this.config?.eventName);
-      panel.classList.remove('visible');
-      setTimeout(() => {
-        panel.style.display = 'none';
-        this.isVisible = false;
-      }, 300);
-    }
+    hidePanel(
+      this,
+      {
+        selector: '.toggle-filter-panel',
+        managePointerEvents: false,
+        debugName: `panel: ${this.config?.eventName ?? 'toggle'}`
+      },
+      (visible) => {
+        this.isVisible = visible;
+      }
+    );
   }
 
   /**
    * Toggle panel visibility
    */
   toggle(): void {
-    if (this.isVisible) {
-      this.hide();
-    } else {
-      this.show();
-    }
+    togglePanelVisibility(
+      this.isVisible,
+      this.hide.bind(this),
+      this.show.bind(this)
+    );
   }
 
   /**

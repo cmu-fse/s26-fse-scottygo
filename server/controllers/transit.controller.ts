@@ -950,12 +950,7 @@ export default class BusController extends Controller {
         }
       }
 
-      const successRes: responses.ISuccess = {
-        name: 'RoutesRetrieved',
-        message: `Found ${routes.length} routes`,
-        payload: routes
-      };
-      res.status(200).json(successRes);
+      this.sendRoutesResponse(res, routes);
     } catch (error: unknown) {
       this.handleError(error, res);
     }
@@ -984,12 +979,7 @@ export default class BusController extends Controller {
         ? gtfsService.filterRoutesByDateTime(new Date(date), time)
         : gtfsService.filterRoutesByDate(new Date(date));
 
-      const successRes: responses.ISuccess = {
-        name: 'RoutesRetrieved',
-        message: `Found ${routes.length} routes`,
-        payload: routes
-      };
-      res.status(200).json(successRes);
+      this.sendRoutesResponse(res, routes);
     } catch (error: unknown) {
       this.handleError(error, res);
     }
@@ -1250,6 +1240,15 @@ export default class BusController extends Controller {
   }
 
   // -------------------------------------------------------------------------
+
+  private sendRoutesResponse(res: Response, routes: IRoute[]): void {
+    const successRes: responses.ISuccess = {
+      name: 'RoutesRetrieved',
+      message: `Found ${routes.length} routes`,
+      payload: routes
+    };
+    res.status(200).json(successRes);
+  }
 
   private handleError(error: unknown, res: Response): void {
     // Log the actual error for debugging

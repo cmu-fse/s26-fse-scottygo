@@ -1,11 +1,10 @@
 // Controller serving the subscriptions page
 
 import Controller from './controller';
-import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
-import { JWT_KEY as secretKey } from '../env';
+import { Request, Response } from 'express';
 import * as responses from '../../common/server.responses';
 import { ITokenPayload } from '../../common/user.interface';
+import { createJwtAuthMiddleware } from '../middleware/auth.middleware';
 import {
   SearchContext,
   SubscriptionSearchStrategy
@@ -21,40 +20,8 @@ export default class SubscriptionsController extends Controller {
     this.router.get('/', this.subscriptionsPage.bind(this));
 
     // API routes below require auth token
-    this.router.use(this.authenticateToken.bind(this));
+    this.router.use(createJwtAuthMiddleware({ attachMode: 'user' }));
     this.router.get('/routes/search', this.searchRoutes.bind(this));
-  }
-
-  private async authenticateToken(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.split(' ')[1];
-
-    if (!token) {
-      const error: responses.IAppError = {
-        type: 'ClientError',
-        name: 'MissingToken',
-        message: 'Authentication token is required'
-      };
-      res.status(401).json(error);
-      return;
-    }
-
-    try {
-      const decoded = jwt.verify(token, secretKey) as ITokenPayload;
-      (req as Request & { user: ITokenPayload }).user = decoded;
-      next();
-    } catch {
-      const error: responses.IAppError = {
-        type: 'ClientError',
-        name: 'InvalidToken',
-        message: 'Invalid or expired token'
-      };
-      res.status(401).json(error);
-    }
   }
 
   /**

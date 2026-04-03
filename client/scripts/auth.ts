@@ -144,6 +144,73 @@ const getResponseMessage = (
   return fallback;
 };
 
+const isSuccessfulStatus = (status: number): boolean =>
+  status >= 200 && status < 300;
+
+const applyAgreementAndRedirect = async (
+  username: string,
+  password: string,
+  successMessage: string
+): Promise<boolean> => {
+  const agreement = await acceptAgreementAndStoreAuth(username, password);
+  if (!agreement.ok) {
+    setStatus(agreement.message ?? 'Agreement update failed.', true);
+    return false;
+  }
+  setStatus(successMessage);
+  window.setTimeout(() => {
+    window.location.href = '/map';
+  }, 1200);
+  return true;
+};
+
+const extractAuthenticatedPayload = (
+  data: IResponse | null
+): IAuthenticatedUser | null => {
+  if (!data || !isSuccess(data) || !data.payload || !('user' in data.payload)) {
+    return null;
+  }
+  return data.payload as IAuthenticatedUser;
+};
+
+const getUnknownErrorMessage = (error: unknown): string => {
+  return error instanceof Error
+    ? error.message
+    : 'Network error. Please try again.';
+};
+
+const loginAndStoreAuth = async (
+  username: string,
+  password: string
+): Promise<void> => {
+  const loginResult = await loginUser(username, password);
+  if (!isSuccessfulStatus(loginResult.status)) {
+    return;
+  }
+
+  const loginPayload = extractAuthenticatedPayload(loginResult.data);
+  if (loginPayload?.token && loginPayload?.user) {
+    storeAuth(loginPayload.token, loginPayload.user.credentials.username);
+  }
+};
+
+const acceptAgreementAndStoreAuth = async (
+  username: string,
+  password: string
+): Promise<{ ok: boolean; message?: string }> => {
+  const agreementResult = await confirmAgreement(username, password);
+  if (!isSuccessfulStatus(agreementResult.status)) {
+    return {
+      ok: false,
+      message: getResponseMessage(agreementResult.data, 'Agreement update failed.')
+    };
+  }
+
+  // Best-effort token refresh after agreement.
+  await loginAndStoreAuth(username, password);
+  return { ok: true };
+};
+
 const registerUser = async (
   body: IUser
 ): Promise<{ status: number; data: IResponse | null }> => {
@@ -235,16 +302,12 @@ const handleAgreementAccept = async (): Promise<void> => {
 
   setSubmitting(true);
   try {
-    const agreementResult = await confirmAgreement(
+    const agreement = await acceptAgreementAndStoreAuth(
       pendingAgreementUsername,
       pendingAgreementPassword
     );
-    if (agreementResult.status < 200 || agreementResult.status >= 300) {
-      const agreementMessage = getResponseMessage(
-        agreementResult.data,
-        'Agreement update failed.'
-      );
-      setStatus(agreementMessage, true);
+    if (!agreement.ok) {
+      setStatus(agreement.message ?? 'Agreement update failed.', true);
       return;
     }
 
@@ -253,24 +316,6 @@ const handleAgreementAccept = async (): Promise<void> => {
     }
     closeModal(termsModal);
 
-    // After agreement, login to get a fresh token
-    const loginResult = await loginUser(
-      pendingAgreementUsername,
-      pendingAgreementPassword
-    );
-    if (loginResult.status >= 200 && loginResult.status < 300) {
-      const loginPayload =
-        loginResult.data &&
-        isSuccess(loginResult.data) &&
-        loginResult.data.payload &&
-        'user' in loginResult.data.payload
-          ? (loginResult.data.payload as IAuthenticatedUser)
-          : null;
-      if (loginPayload?.token && loginPayload?.user) {
-        storeAuth(loginPayload.token, loginPayload.user.credentials.username);
-      }
-    }
-
     setStatus('Agreement accepted. Redirecting to directory...');
     if (pendingRedirectToHome) {
       window.setTimeout(() => {
@@ -278,11 +323,7 @@ const handleAgreementAccept = async (): Promise<void> => {
       }, 1200);
     }
   } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : 'Network error. Please try again.';
-    setStatus(message, true);
+    setStatus(getUnknownErrorMessage(error), true);
   } finally {
     pendingAgreementUsername = null;
     pendingAgreementPassword = null;
@@ -342,9 +383,10 @@ form?.addEventListener('submit', async (event: SubmitEvent) => {
       if (errorName === 'UnauthorizedRequest') {
         // If user already checked the ToS checkbox, process agreement directly
         if (shouldAgree) {
-          const agreementResult = await confirmAgreement(
+          await applyAgreementAndRedirect(
             payload.credentials.username,
-            payload.credentials.password
+            payload.credentials.password,
+            'Agreement accepted. Redirecting to directory...'
           );
           if (agreementResult.status < 200 || agreementResult.status >= 300) {
             const agreementMessage = getResponseMessage(
@@ -397,10 +439,7 @@ form?.addEventListener('submit', async (event: SubmitEvent) => {
       return;
     }
 
-    const authPayload =
-      data && isSuccess(data) && data.payload && 'user' in data.payload
-        ? (data.payload as IAuthenticatedUser)
-        : null;
+    const authPayload = extractAuthenticatedPayload(data);
     const authenticatedUser = authPayload?.user ?? null;
     const token = authPayload?.token ?? null;
 
@@ -424,11 +463,7 @@ form?.addEventListener('submit', async (event: SubmitEvent) => {
       window.location.href = '/';
     }, 1200);
   } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : 'Network error. Please try again.';
-    setStatus(message, true);
+    setStatus(getUnknownErrorMessage(error), true);
   } finally {
     setSubmitting(false);
   }
@@ -471,10 +506,10 @@ confirmYes?.addEventListener('click', async () => {
     }
 
     if (shouldAgree) {
-      // User checked ToS checkbox - send PATCH with password
-      const agreementResult = await confirmAgreement(
+      await applyAgreementAndRedirect(
         user.credentials.username,
-        registerBody.credentials.password
+        registerBody.credentials.password,
+        'Registered and agreed. Redirecting to directory...'
       );
       if (agreementResult.status < 200 || agreementResult.status >= 300) {
         const agreementMessage = getResponseMessage(
@@ -517,11 +552,7 @@ confirmYes?.addEventListener('click', async () => {
       true
     );
   } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : 'Network error. Please try again.';
-    setStatus(message, true);
+    setStatus(getUnknownErrorMessage(error), true);
   } finally {
     pendingRegisterPayload = null;
     setSubmitting(false);

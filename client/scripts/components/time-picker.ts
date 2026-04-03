@@ -5,6 +5,14 @@
  */
 //TODO esnure input for se
 
+import {
+  hidePanel,
+  showPanel,
+  togglePanelVisibility,
+  getPanelRenderStyles,
+  restoreVisibleClass
+} from './panel-visibility';
+
 export interface ITimeSelection {
   hour: number;
   minute: number;
@@ -59,45 +67,45 @@ export class TimePickerPanel extends HTMLElement implements ITimePickerElement {
    * Show the time picker panel
    */
   show(): void {
-    const panel = this.querySelector('.time-picker-panel') as HTMLElement;
-    if (panel) {
-      console.log('Showing time picker panel');
-      panel.style.display = 'block';
-      panel.style.pointerEvents = 'auto'; // Enable pointer events immediately
-      this.isVisible = true;
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          panel.classList.add('visible');
-        });
-      });
-    }
+    showPanel(
+      this,
+      {
+        selector: '.time-picker-panel',
+        managePointerEvents: true,
+        debugName: 'time picker panel'
+      },
+      (visible) => {
+        this.isVisible = visible;
+      }
+    );
   }
 
   /**
    * Hide the time picker panel
    */
   hide(): void {
-    const panel = this.querySelector('.time-picker-panel') as HTMLElement;
-    if (panel) {
-      console.log('Hiding time picker panel');
-      panel.classList.remove('visible');
-      panel.style.pointerEvents = 'none'; // Disable pointer events
-      setTimeout(() => {
-        panel.style.display = 'none';
-        this.isVisible = false;
-      }, 300);
-    }
+    hidePanel(
+      this,
+      {
+        selector: '.time-picker-panel',
+        managePointerEvents: true,
+        debugName: 'time picker panel'
+      },
+      (visible) => {
+        this.isVisible = visible;
+      }
+    );
   }
 
   /**
    * Toggle panel visibility
    */
   toggle(): void {
-    if (this.isVisible) {
-      this.hide();
-    } else {
-      this.show();
-    }
+    togglePanelVisibility(
+      this.isVisible,
+      this.hide.bind(this),
+      this.show.bind(this)
+    );
   }
 
   /**
@@ -108,9 +116,7 @@ export class TimePickerPanel extends HTMLElement implements ITimePickerElement {
   }
 
   private render(): void {
-    // Preserve display and pointer-events styles if panel is currently visible
-    const displayStyle = this.isVisible ? 'block' : 'none';
-    const pointerEvents = this.isVisible ? 'auto' : 'none';
+    const { displayStyle, pointerEvents } = getPanelRenderStyles(this.isVisible);
 
     this.innerHTML = `
       <div class="time-picker-panel panel" style="display: ${displayStyle}; pointer-events: ${pointerEvents};">
@@ -142,13 +148,7 @@ export class TimePickerPanel extends HTMLElement implements ITimePickerElement {
       </div>
     `;
 
-    // Re-apply the visible class if panel is currently visible
-    if (this.isVisible) {
-      const panel = this.querySelector('.time-picker-panel') as HTMLElement;
-      if (panel) {
-        panel.classList.add('visible');
-      }
-    }
+    restoreVisibleClass(this, '.time-picker-panel', this.isVisible);
 
     this.attachEvents();
   }

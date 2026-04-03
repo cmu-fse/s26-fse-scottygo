@@ -44,6 +44,7 @@ import { FilterController } from './controllers/filter-controller';
 import { DirectionsController } from './controllers/directions-controller';
 import { RouteRenderer } from './renderers/route-renderer';
 import { VehicleTracker } from './trackers/vehicle-tracker';
+import { showToast as showAppToast } from './utils/toast';
 
 // Export empty object to treat as module
 export {};
@@ -243,24 +244,7 @@ async function syncSubscriptionsFromServer(): Promise<void> {
 }
 
 function showSubscriptionToast(message: string): void {
-  const toast = document.createElement('div');
-  toast.className = 'toast-notification';
-  toast.textContent = message;
-  toast.style.cssText = `
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0, 0, 0, 0.8);
-    color: white;
-    padding: 12px 24px;
-    border-radius: 8px;
-    z-index: 10000;
-    font-size: 14px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  `;
-  document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 5000);
+  showAppToast(message);
 }
 
 // ─── Map provider ──────────────────────────────────────────────────────────────
@@ -474,44 +458,45 @@ function getPanels(): {
   };
 }
 
-// Helper function to close all panels
-function closeAllPanels(): void {
-  const panels = getPanels();
+type PanelKey = keyof ReturnType<typeof getPanels>;
+type ManagedPanel =
+  | ITogglePanelElement
+  | ITimePickerElement
+  | ICalendarPickerElement
+  | IRouteSelectorElement;
+
+function asManagedPanel(panel: HTMLElement | null): ManagedPanel | null {
   if (
-    panels.direction &&
-    'isOpen' in panels.direction &&
-    (panels.direction as ITogglePanelElement).isOpen()
+    panel &&
+    typeof (panel as { isOpen?: unknown }).isOpen === 'function' &&
+    typeof (panel as { hide?: unknown }).hide === 'function' &&
+    typeof (panel as { toggle?: unknown }).toggle === 'function'
   ) {
-    (panels.direction as ITogglePanelElement).hide();
+    return panel as ManagedPanel;
   }
-  if (
-    panels.system &&
-    'isOpen' in panels.system &&
-    (panels.system as ITogglePanelElement).isOpen()
-  ) {
-    (panels.system as ITogglePanelElement).hide();
+  return null;
+}
+
+function hidePanelIfOpen(panel: HTMLElement | null): void {
+  const managedPanel = asManagedPanel(panel);
+  if (managedPanel?.isOpen()) {
+    managedPanel.hide();
   }
-  if (
-    panels.time &&
-    'isOpen' in panels.time &&
-    (panels.time as ITimePickerElement).isOpen()
-  ) {
-    (panels.time as ITimePickerElement).hide();
-  }
-  if (
-    panels.calendar &&
-    'isOpen' in panels.calendar &&
-    (panels.calendar as ICalendarPickerElement).isOpen()
-  ) {
-    (panels.calendar as ICalendarPickerElement).hide();
-  }
-  if (
-    panels.route &&
-    'isOpen' in panels.route &&
-    (panels.route as IRouteSelectorElement).isOpen()
-  ) {
-    (panels.route as IRouteSelectorElement).hide();
-  }
+}
+
+function togglePanel(panel: HTMLElement | null): void {
+  asManagedPanel(panel)?.toggle();
+}
+
+function closePanels(
+  panels: ReturnType<typeof getPanels>,
+  except: PanelKey[] = []
+): void {
+  (Object.keys(panels) as PanelKey[]).forEach((key) => {
+    if (!except.includes(key)) {
+      hidePanelIfOpen(panels[key]);
+    }
+  });
 }
 
 // Setup event listeners for web components
@@ -573,209 +558,61 @@ function setupMapEventListeners(): void {
   });
 
   // Map Control Events (Filters)
-  document.addEventListener('filterRoute', () => {
-    console.log('Route filter clicked');
-    const panels = getPanels();
-    console.log('Route selector panel found:', panels.route);
+  const filterPanelHandlers: Array<{
+    eventName:
+      | 'filterRoute'
+      | 'filterCalendar'
+      | 'filterTime'
+      | 'filterSystem'
+      | 'filterDirection';
+    panelKey: PanelKey;
+    clickLog: string;
+    foundLog: string;
+  }> = [
+    {
+      eventName: 'filterRoute',
+      panelKey: 'route',
+      clickLog: 'Route filter clicked',
+      foundLog: 'Route selector panel found:'
+    },
+    {
+      eventName: 'filterCalendar',
+      panelKey: 'calendar',
+      clickLog: 'Calendar filter clicked',
+      foundLog: 'Calendar panel found:'
+    },
+    {
+      eventName: 'filterTime',
+      panelKey: 'time',
+      clickLog: 'Time filter clicked',
+      foundLog: 'Time picker panel found:'
+    },
+    {
+      eventName: 'filterSystem',
+      panelKey: 'system',
+      clickLog: 'System filter clicked',
+      foundLog: 'System panel found:'
+    },
+    {
+      eventName: 'filterDirection',
+      panelKey: 'direction',
+      clickLog: 'Direction filter clicked',
+      foundLog: 'Direction panel found:'
+    }
+  ];
 
-    // Close other panels if open
-    if (
-      panels.direction &&
-      'isOpen' in panels.direction &&
-      (panels.direction as ITogglePanelElement).isOpen()
-    ) {
-      (panels.direction as ITogglePanelElement).hide();
+  filterPanelHandlers.forEach(
+    ({ eventName, panelKey, clickLog, foundLog }) => {
+      document.addEventListener(eventName, () => {
+        console.log(clickLog);
+        const panels = getPanels();
+        const targetPanel = panels[panelKey];
+        console.log(foundLog, targetPanel);
+        closePanels(panels, [panelKey]);
+        togglePanel(targetPanel);
+      });
     }
-    if (
-      panels.system &&
-      'isOpen' in panels.system &&
-      (panels.system as ITogglePanelElement).isOpen()
-    ) {
-      (panels.system as ITogglePanelElement).hide();
-    }
-    if (
-      panels.time &&
-      'isOpen' in panels.time &&
-      (panels.time as ITimePickerElement).isOpen()
-    ) {
-      (panels.time as ITimePickerElement).hide();
-    }
-    if (
-      panels.calendar &&
-      'isOpen' in panels.calendar &&
-      (panels.calendar as ICalendarPickerElement).isOpen()
-    ) {
-      (panels.calendar as ICalendarPickerElement).hide();
-    }
-
-    // Toggle route selector panel
-    if (panels.route && 'toggle' in panels.route) {
-      (panels.route as IRouteSelectorElement).toggle();
-    }
-  });
-
-  document.addEventListener('filterCalendar', () => {
-    console.log('Calendar filter clicked');
-    const panels = getPanels();
-
-    // Close other panels if open
-    if (
-      panels.direction &&
-      'isOpen' in panels.direction &&
-      (panels.direction as ITogglePanelElement).isOpen()
-    ) {
-      (panels.direction as ITogglePanelElement).hide();
-    }
-    if (
-      panels.system &&
-      'isOpen' in panels.system &&
-      (panels.system as ITogglePanelElement).isOpen()
-    ) {
-      (panels.system as ITogglePanelElement).hide();
-    }
-    if (
-      panels.time &&
-      'isOpen' in panels.time &&
-      (panels.time as ITimePickerElement).isOpen()
-    ) {
-      (panels.time as ITimePickerElement).hide();
-    }
-    if (
-      panels.route &&
-      'isOpen' in panels.route &&
-      (panels.route as IRouteSelectorElement).isOpen()
-    ) {
-      (panels.route as IRouteSelectorElement).hide();
-    }
-
-    // Toggle calendar picker panel
-    if (panels.calendar && 'toggle' in panels.calendar) {
-      (panels.calendar as ICalendarPickerElement).toggle();
-    }
-  });
-
-  document.addEventListener('filterTime', () => {
-    console.log('Time filter clicked');
-    const panels = getPanels();
-    console.log('Time picker panel found:', panels.time);
-
-    // Close other panels if open
-    if (
-      panels.direction &&
-      'isOpen' in panels.direction &&
-      (panels.direction as ITogglePanelElement).isOpen()
-    ) {
-      (panels.direction as ITogglePanelElement).hide();
-    }
-    if (
-      panels.system &&
-      'isOpen' in panels.system &&
-      (panels.system as ITogglePanelElement).isOpen()
-    ) {
-      (panels.system as ITogglePanelElement).hide();
-    }
-    if (
-      panels.calendar &&
-      'isOpen' in panels.calendar &&
-      (panels.calendar as ICalendarPickerElement).isOpen()
-    ) {
-      (panels.calendar as ICalendarPickerElement).hide();
-    }
-    if (
-      panels.route &&
-      'isOpen' in panels.route &&
-      (panels.route as IRouteSelectorElement).isOpen()
-    ) {
-      (panels.route as IRouteSelectorElement).hide();
-    }
-
-    // Toggle time picker panel
-    if (panels.time && 'toggle' in panels.time) {
-      (panels.time as ITimePickerElement).toggle();
-    }
-  });
-
-  document.addEventListener('filterSystem', () => {
-    console.log('System filter clicked');
-    const panels = getPanels();
-    console.log('System panel found:', panels.system);
-
-    // Close other panels if open
-    if (
-      panels.direction &&
-      'isOpen' in panels.direction &&
-      (panels.direction as ITogglePanelElement).isOpen()
-    ) {
-      (panels.direction as ITogglePanelElement).hide();
-    }
-    if (
-      panels.time &&
-      'isOpen' in panels.time &&
-      (panels.time as ITimePickerElement).isOpen()
-    ) {
-      (panels.time as ITimePickerElement).hide();
-    }
-    if (
-      panels.calendar &&
-      'isOpen' in panels.calendar &&
-      (panels.calendar as ICalendarPickerElement).isOpen()
-    ) {
-      (panels.calendar as ICalendarPickerElement).hide();
-    }
-    if (
-      panels.route &&
-      'isOpen' in panels.route &&
-      (panels.route as IRouteSelectorElement).isOpen()
-    ) {
-      (panels.route as IRouteSelectorElement).hide();
-    }
-
-    // Toggle system panel
-    if (panels.system && 'toggle' in panels.system) {
-      (panels.system as ITogglePanelElement).toggle();
-    }
-  });
-
-  document.addEventListener('filterDirection', () => {
-    console.log('Direction filter clicked');
-    const panels = getPanels();
-    console.log('Direction panel found:', panels.direction);
-
-    // Close other panels if open
-    if (
-      panels.system &&
-      'isOpen' in panels.system &&
-      (panels.system as ITogglePanelElement).isOpen()
-    ) {
-      (panels.system as ITogglePanelElement).hide();
-    }
-    if (
-      panels.time &&
-      'isOpen' in panels.time &&
-      (panels.time as ITimePickerElement).isOpen()
-    ) {
-      (panels.time as ITimePickerElement).hide();
-    }
-    if (
-      panels.calendar &&
-      'isOpen' in panels.calendar &&
-      (panels.calendar as ICalendarPickerElement).isOpen()
-    ) {
-      (panels.calendar as ICalendarPickerElement).hide();
-    }
-    if (
-      panels.route &&
-      'isOpen' in panels.route &&
-      (panels.route as IRouteSelectorElement).isOpen()
-    ) {
-      (panels.route as IRouteSelectorElement).hide();
-    }
-
-    // Toggle direction panel
-    if (panels.direction && 'toggle' in panels.direction) {
-      (panels.direction as ITogglePanelElement).toggle();
-    }
-  });
+  );
 
   // Zoom Control Events
   document.addEventListener('zoomIn', () => {

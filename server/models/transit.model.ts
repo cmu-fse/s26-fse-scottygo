@@ -19,6 +19,7 @@ import {
   INearbyStop,
   INearbyStopsPayload
 } from '../../common/transit.interface';
+import { haversineDistanceMeters } from '../../common/geo.utils';
 
 /** How long a cache entry is considered fresh (24 hours in ms). */
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -43,39 +44,11 @@ const WALK_MINUTES_PER_KM = 15;
 /** Meters per kilometer — used to convert distance to walk-time estimate. */
 const METERS_PER_KM = 1000;
 
-/** Mean Earth radius in meters — used in haversine distance formula. */
-const EARTH_RADIUS_M = 6_371_000;
-
 // ── Helpers ────────────────────────────────────────────────────────────
 
 /** Build a Date that is `ttl` ms from now. */
 function expiresAt(ttl: number = CACHE_TTL_MS): Date {
   return new Date(Date.now() + ttl);
-}
-
-/**
- * Haversine formula — computes the great-circle distance between two
- * geographic coordinates on the Earth's surface, returned in meters.
- *
- * Formula:
- *   a = sin²(Δlat/2) + cos(lat1) · cos(lat2) · sin²(Δlon/2)
- *   distance = 2 · R · atan2(√a, √(1−a))
- *
- * where R is the mean Earth radius (6 371 000 m).
- */
-function haversineDistanceMeters(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number
-): number {
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  return EARTH_RADIUS_M * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 /** Try to read a non-expired cache entry from MongoDB. */

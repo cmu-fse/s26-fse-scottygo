@@ -2,13 +2,14 @@ export {};
 
 import './components/app-header';
 import './components/live-notifications';
+import {
+  getMutedRoutes,
+  normalizeRouteId,
+  saveMutedRoutes
+} from './utils/mute-routes';
+import { showToast as showAppToast } from './utils/toast';
 
 const MAX_SUBSCRIPTIONS = 10;
-const MUTED_ROUTES_KEY = 'scottygo_muted_routes';
-
-function normalizeRouteId(routeId: string): string {
-  return routeId.trim().toLowerCase();
-}
 
 function routeIdsEqual(a: string, b: string): boolean {
   return normalizeRouteId(a) === normalizeRouteId(b);
@@ -25,21 +26,6 @@ interface Route {
   name: string;
 }
 
-// ── Mute helpers (mirrors live-notifications.ts) ───────────────────────────────
-
-function getMutedRoutes(): Set<string> {
-  try {
-    const arr = JSON.parse(localStorage.getItem(MUTED_ROUTES_KEY) ?? '[]');
-    return new Set(Array.isArray(arr) ? arr : []);
-  } catch {
-    return new Set();
-  }
-}
-
-function saveMutedRoutes(routes: Set<string>): void {
-  localStorage.setItem(MUTED_ROUTES_KEY, JSON.stringify([...routes]));
-}
-
 // ── Auth ───────────────────────────────────────────────────────────────────────
 
 function getToken(): string {
@@ -53,17 +39,7 @@ function authHeaders(): Record<string, string> {
 // ── Toast ──────────────────────────────────────────────────────────────────────
 
 function showToast(message: string): void {
-  const toast = document.createElement('div');
-  toast.className = 'toast-notification';
-  toast.textContent = message;
-  toast.style.cssText = `
-    position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
-    background:rgba(0,0,0,0.8);color:#fff;padding:12px 24px;
-    border-radius:8px;z-index:10000;font-size:14px;
-    box-shadow:0 4px 12px rgba(0,0,0,0.3);
-  `;
-  document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 4000);
+  showAppToast(message, { durationMs: 4000 });
 }
 
 // ── State ──────────────────────────────────────────────────────────────────────

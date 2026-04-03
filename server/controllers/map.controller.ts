@@ -5,9 +5,10 @@ import { IUser, ILogin } from '../../common/user.interface';
 import { User } from '../models/user.model';
 import Controller from './controller';
 import { NextFunction, Request, Response } from 'express';
-import jwt from 'jsonwebtoken';
-import { JWT_KEY as secretKey, GOOGLE_MAPS_KEY } from '../env';
+import { GOOGLE_MAPS_KEY } from '../env';
 import * as responses from '../../common/server.responses';
+import { createJwtAuthMiddleware } from '../middleware/auth.middleware';
+import { respondWithAppOrUnexpectedError } from '../utils/controller-error.utils';
 import {
   RouteSearchStrategy,
   TransitSearchStrategy,
@@ -19,65 +20,50 @@ import type {
 } from '../../common/transit.interface';
 
 export default class MapController extends Controller {
+  private readonly authorizeMiddleware = createJwtAuthMiddleware({
+    attachMode: 'bodyUserOnToken',
+    missingTokenMessage: 'Token is required',
+    invalidTokenMessage: 'Invalid token'
+  });
+
   public constructor(path: string) {
     super(path);
   }
 
   public initializeRoutes(): void {
     this.router.get('/', this.mapPage.bind(this));
-    this.router.get('/users/:username?', this.authorize, this.getUser);
-    this.router.get('/config', this.authorize, this.getMapConfig.bind(this));
+    this.router.get('/users/:username?', this.authorize.bind(this), this.getUser);
+    this.router.get(
+      '/config',
+      this.authorize.bind(this),
+      this.getMapConfig.bind(this)
+    );
 
     // Search endpoints (SearchInfo UC — R1 contextual search)
     // Auth middleware is applied inline so the page route above stays open.
     this.router.get(
       '/routes/search',
-      this.authorize,
+      this.authorize.bind(this),
       this.searchRoutes.bind(this)
     );
-    this.router.get('/search', this.authorize, this.searchTransit.bind(this));
+    this.router.get(
+      '/search',
+      this.authorize.bind(this),
+      this.searchTransit.bind(this)
+    );
   }
 
   public mapPage(req: Request, res: Response): void {
     this.sendPage(res, 'map.html');
   }
 
-  // Check if the user is logged in by validating token
+  // Keep public method for existing tests and route middleware usage.
   public async authorize(
     req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> {
-    // Extracts token from header's authorization field ("Bearer <token>")
-    const token = req.headers.authorization?.split(' ')[1];
-
-    // Handle missing token
-    if (!token) {
-      const errorRes: responses.IAppError = {
-        type: 'ClientError',
-        name: 'MissingToken',
-        message: 'Token is required'
-      };
-      res.status(401).json(errorRes);
-      return; // Stop execution
-    }
-
-    // Verify and decode token with secretKey
-    try {
-      const decodedToken: ILogin = jwt.verify(token, secretKey) as ILogin;
-      const userOnToken = decodedToken.username; // Extract username from decoded token
-      req.body.userOnToken = userOnToken; // Attach username to request object
-      next(); // Continue to next middleware
-    } catch (error) {
-      // Handle JWT verification error (invalid token)
-      const errorRes: responses.IAppError = {
-        type: 'ClientError',
-        name: 'InvalidToken',
-        message: 'Invalid token'
-      };
-      res.status(401).json(errorRes);
-      return;
-    }
+    await this.authorizeMiddleware(req, res, next);
   }
 
   // Get a User by username
@@ -108,24 +94,8 @@ export default class MapController extends Controller {
       };
       return res.status(200).json(successRes);
     } catch (error: unknown) {
-      if (
-        error &&
-        typeof error === 'object' &&
-        'type' in error &&
-        'name' in error
-      ) {
-        // Handle errors raised as IAppError by model/database
-        const appError = error as responses.IAppError;
-        const statusCode = appError.type === 'ClientError' ? 400 : 500;
-        return res.status(statusCode).json(appError);
-      }
-      // Handle error not raised as IAppError - create one to wrap unexpected error
-      const unexpectedError: responses.IAppError = {
-        type: 'ServerError',
-        name: 'MongoDBError',
-        message: 'An unexpected error occurred in the database'
-      };
-      return res.status(500).json(unexpectedError);
+      respondWithAppOrUnexpectedError(res, error, 'MongoDBError');
+      return;
     }
   }
 
@@ -138,14 +108,8 @@ export default class MapController extends Controller {
    * Applies stop word filtering (R2).
    */
   public async searchRoutes(req: Request, res: Response): Promise<void> {
-    const q = (req.query.q as string | undefined)?.trim();
+    const q = this.getRequiredSearchQuery(req, res);
     if (!q) {
-      const error: responses.IAppError = {
-        type: 'ClientError',
-        name: 'MissingSearchQuery',
-        message: 'Query parameter "q" is required'
-      };
-      res.status(400).json(error);
       return;
     }
 
@@ -161,12 +125,7 @@ export default class MapController extends Controller {
       };
       res.status(200).json(success);
     } catch (error: unknown) {
-      const err: responses.IAppError = {
-        type: 'ServerError',
-        name: 'GetRequestFailure',
-        message: 'Unexpected error during route search'
-      };
-      res.status(500).json(err);
+      this.sendSearchFailure(res, 'Unexpected error during route search');
     }
   }
 
@@ -177,14 +136,8 @@ export default class MapController extends Controller {
    * Applies stop word filtering (R2).
    */
   public async searchTransit(req: Request, res: Response): Promise<void> {
-    const q = (req.query.q as string | undefined)?.trim();
+    const q = this.getRequiredSearchQuery(req, res);
     if (!q) {
-      const error: responses.IAppError = {
-        type: 'ClientError',
-        name: 'MissingSearchQuery',
-        message: 'Query parameter "q" is required'
-      };
-      res.status(400).json(error);
       return;
     }
 
@@ -204,13 +157,32 @@ export default class MapController extends Controller {
       };
       res.status(200).json(success);
     } catch (error: unknown) {
-      const err: responses.IAppError = {
-        type: 'ServerError',
-        name: 'GetRequestFailure',
-        message: 'Unexpected error during transit search'
-      };
-      res.status(500).json(err);
+      this.sendSearchFailure(res, 'Unexpected error during transit search');
     }
+  }
+
+  private getRequiredSearchQuery(req: Request, res: Response): string | null {
+    const q = (req.query.q as string | undefined)?.trim();
+    if (q) {
+      return q;
+    }
+
+    const error: responses.IAppError = {
+      type: 'ClientError',
+      name: 'MissingSearchQuery',
+      message: 'Query parameter "q" is required'
+    };
+    res.status(400).json(error);
+    return null;
+  }
+
+  private sendSearchFailure(res: Response, message: string): void {
+    const err: responses.IAppError = {
+      type: 'ServerError',
+      name: 'GetRequestFailure',
+      message
+    };
+    res.status(500).json(err);
   }
 
   // Return Google Maps config to the client (API key, default center, zoom)

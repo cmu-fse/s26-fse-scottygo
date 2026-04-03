@@ -405,28 +405,34 @@ class GTFSService {
   }
 
   /**
+   * Collect route IDs whose trips match the given predicate and belong to
+   * one of the supplied active services.
+   */
+  private getActiveRouteIds(
+    activeServices: Set<string>,
+    tripFilter?: (tripId: string) => boolean
+  ): Set<string> {
+    const activeRouteIds = new Set<string>();
+
+    for (const [tripId, serviceId] of this.tripService) {
+      if (!activeServices.has(serviceId)) continue;
+      if (tripFilter && !tripFilter(tripId)) continue;
+      const routeId = this.tripRoute.get(tripId);
+      if (routeId) activeRouteIds.add(routeId);
+    }
+
+    return activeRouteIds;
+  }
+
+  /**
    * Return routes that have at least one trip running on the given date,
    * based on GTFS calendar.txt and calendar_dates.txt.
    */
   filterRoutesByDate(date: Date): IRoute[] {
-    if (!this.loaded) {
-      const err: IAppError = {
-        type: 'ServerError',
-        name: 'GetRequestFailure',
-        message: 'GTFS schedule data is not yet loaded'
-      };
-      throw err;
-    }
+    this.assertLoaded();
 
     const activeServices = this.getActiveServiceIds(date);
-    const activeRouteIds = new Set<string>();
-
-    for (const [tripId, serviceId] of this.tripService) {
-      if (activeServices.has(serviceId)) {
-        const routeId = this.tripRoute.get(tripId);
-        if (routeId) activeRouteIds.add(routeId);
-      }
-    }
+    const activeRouteIds = this.getActiveRouteIds(activeServices);
 
     return [...this.routeMap.values()].filter((r) => activeRouteIds.has(r.id));
   }
@@ -437,31 +443,16 @@ class GTFSService {
    * @param time "HH:MM" in 24-hour format
    */
   filterRoutesByDateTime(date: Date, time: string): IRoute[] {
-    if (!this.loaded) {
-      const err: IAppError = {
-        type: 'ServerError',
-        name: 'GetRequestFailure',
-        message: 'GTFS schedule data is not yet loaded'
-      };
-      throw err;
-    }
+    this.assertLoaded();
 
     const [h, m] = time.split(':').map(Number);
     const queryMinutes = h * 60 + m;
 
     const activeServices = this.getActiveServiceIds(date);
-    const activeRouteIds = new Set<string>();
-
-    // A trip is considered active if the query time falls within its first–last departure window
-    for (const [tripId, range] of this.tripTimeRange) {
-      if (range.first <= queryMinutes && range.last >= queryMinutes) {
-        const serviceId = this.tripService.get(tripId);
-        if (serviceId && activeServices.has(serviceId)) {
-          const routeId = this.tripRoute.get(tripId);
-          if (routeId) activeRouteIds.add(routeId);
-        }
-      }
-    }
+    const activeRouteIds = this.getActiveRouteIds(activeServices, (tripId) => {
+      const range = this.tripTimeRange.get(tripId);
+      return !!range && range.first <= queryMinutes && range.last >= queryMinutes;
+    });
 
     return [...this.routeMap.values()].filter((r) => activeRouteIds.has(r.id));
   }
@@ -474,6 +465,17 @@ class GTFSService {
    * Compute the set of service_ids active on a given date by applying
    * calendar.txt (regular schedule) and calendar_dates.txt (exceptions).
    */
+  private assertLoaded(): void {
+    if (!this.loaded) {
+      const err: IAppError = {
+        type: 'ServerError',
+        name: 'GetRequestFailure',
+        message: 'GTFS schedule data is not yet loaded'
+      };
+      throw err;
+    }
+  }
+
   private getActiveServiceIds(date: Date): Set<string> {
     const dateStr = toGtfsDate(date);
     const dayIdx = date.getDay(); // 0=Sun...6=Sat

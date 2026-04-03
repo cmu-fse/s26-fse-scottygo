@@ -4,28 +4,17 @@
  * Polls backend every 30 seconds to match the GTFS-RT feed refresh rate
  */
 
-/** Haversine distance in miles between two lat/lon points (R9). */
-function haversineDistanceMiles(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number
-): number {
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const R = 3958.8;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
 import axios from 'axios';
-import type { IMapProvider, IMapMarker } from '../../../common/map.interface';
+import { haversineDistanceMiles } from '../../../common/geo.utils';
+import type {
+  IMapProvider,
+  IMapMarker,
+  IMapIcon
+} from '../../../common/map.interface';
 import type { IVehicle } from '../../../common/transit.interface';
 import { MapStateManager } from '../state/map-state';
 import { MAP_POPUP_ID, closeMapPopup } from '../utils/map-popup';
+import { showToast as showAppToast } from '../utils/toast';
 
 export class VehicleTracker {
   private static instance: VehicleTracker;
@@ -274,11 +263,7 @@ export class VehicleTracker {
    * Create bus icon with heading rotation and directional triangle.
    * Returns icon data with proper anchor so bus center sits on the route.
    */
-  private createBusIcon(vehicle: IVehicle): {
-    url: string;
-    anchor: { x: number; y: number };
-    size: { width: number; height: number };
-  } {
+  private createBusIcon(vehicle: IVehicle): IMapIcon {
     const color = vehicle.isDetoured ? '#FFA500' : '#FFB84D';
     const scale = Math.max(
       0.5,
@@ -359,30 +344,7 @@ export class VehicleTracker {
    * Show toast notification
    */
   private showToast(message: string): void {
-    // Create toast element
-    const toast = document.createElement('div');
-    toast.className = 'toast-notification';
-    toast.textContent = message;
-    toast.style.cssText = `
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(0, 0, 0, 0.8);
-      color: white;
-      padding: 12px 24px;
-      border-radius: 8px;
-      z-index: 10000;
-      font-size: 14px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    `;
-
-    document.body.appendChild(toast);
-
-    // Remove after 5 seconds
-    setTimeout(() => {
-      toast.remove();
-    }, 5000);
+    showAppToast(message);
   }
 
   /**

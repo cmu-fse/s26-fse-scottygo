@@ -12,6 +12,7 @@ import {
   STAGE as appStage
 } from '../env';
 import * as responses from '../../common/server.responses';
+import { respondWithAppOrUnexpectedError } from '../utils/controller-error.utils';
 
 export default class AuthController extends Controller {
   public constructor(path: string) {
@@ -82,26 +83,8 @@ export default class AuthController extends Controller {
         payload: sanitizedUser
       });
     } catch (error: unknown) {
-      // Handle errors from model/database
-      // Check if it's an IAppError by checking properties
-      if (
-        error &&
-        typeof error === 'object' &&
-        'type' in error &&
-        'name' in error
-      ) {
-        const appError = error as responses.IAppError;
-        const statusCode = appError.type === 'ClientError' ? 400 : 500;
-        return res.status(statusCode).json(appError);
-      }
-
-      // Handle error not raised as IAppError - create one to wrap unexpected error
-      const unexpectedError: responses.IAppError = {
-        type: 'ServerError',
-        name: 'MongoDBError',
-        message: 'An unexpected error occurred during registration'
-      };
-      return res.status(500).json(unexpectedError);
+      respondWithAppOrUnexpectedError(res, error, 'MongoDBError');
+      return;
     }
   }
 
@@ -195,25 +178,8 @@ export default class AuthController extends Controller {
       };
       return res.status(200).json(successRes);
     } catch (error: unknown) {
-      // Handle errors from model (UserNotFound, IncorrectPassword)
-      if (
-        error &&
-        typeof error === 'object' &&
-        'type' in error &&
-        'name' in error
-      ) {
-        const appError = error as responses.IAppError;
-        const statusCode = appError.type === 'ClientError' ? 400 : 500;
-        return res.status(statusCode).json(appError);
-      }
-
-      // Unexpected error
-      const unexpectedError: responses.IAppError = {
-        type: 'ServerError',
-        name: 'MongoDBError',
-        message: 'An unexpected error occurred during login'
-      };
-      return res.status(500).json(unexpectedError);
+      respondWithAppOrUnexpectedError(res, error, 'MongoDBError');
+      return;
     }
   }
 
@@ -247,24 +213,8 @@ export default class AuthController extends Controller {
     try {
       userToUpdate = await User.validateUser(credentials);
     } catch (error: unknown) {
-      // Handle errors from model and database
-      if (
-        error &&
-        typeof error === 'object' &&
-        'type' in error &&
-        'name' in error
-      ) {
-        const appError = error as responses.IAppError;
-        const statusCode = appError.type === 'ClientError' ? 400 : 500;
-        return res.status(statusCode).json(appError);
-      }
-      // Handle error not raised as IAppError
-      const unexpectedError: responses.IAppError = {
-        type: 'ServerError',
-        name: 'MongoDBError',
-        message: 'An unexpected error occurred in the database'
-      };
-      return res.status(500).json(unexpectedError);
+      respondWithAppOrUnexpectedError(res, error, 'MongoDBError');
+      return;
     }
     // Now try to update user agreed status and return response
     try {
@@ -285,24 +235,8 @@ export default class AuthController extends Controller {
       };
       return res.status(200).json(successRes);
     } catch (error: unknown) {
-      // Handle errors from model/database
-      if (
-        error &&
-        typeof error === 'object' &&
-        'type' in error &&
-        'name' in error
-      ) {
-        const appError = error as responses.IAppError;
-        const statusCode = appError.type === 'ClientError' ? 400 : 500;
-        return res.status(statusCode).json(appError);
-      }
-      // Handle error not raised as IAppError
-      const unexpectedError: responses.IAppError = {
-        type: 'ServerError',
-        name: 'MongoDBError',
-        message: 'An unexpected error occurred in the database'
-      };
-      return res.status(500).json(unexpectedError);
+      respondWithAppOrUnexpectedError(res, error, 'MongoDBError');
+      return;
     }
   }
 }

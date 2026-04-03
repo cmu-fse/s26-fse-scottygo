@@ -21,42 +21,22 @@ import type {
   ClientToServerEvents
 } from '../../../common/socket.interface';
 import type { INotification } from '../../../common/transit.interface';
-
-const MUTED_ROUTES_KEY = 'scottygo_muted_routes';
-
-function normalizeRouteId(routeId: string): string {
-  return routeId.trim().toLowerCase();
-}
-
-// ── Mute helpers ──────────────────────────────────────────────────────────────
-
-function getMutedRoutes(): Set<string> {
-  try {
-    const arr = JSON.parse(localStorage.getItem(MUTED_ROUTES_KEY) ?? '[]');
-    return new Set(Array.isArray(arr) ? arr : []);
-  } catch {
-    return new Set();
-  }
-}
-
-function saveMutedRoutes(routes: Set<string>): void {
-  localStorage.setItem(MUTED_ROUTES_KEY, JSON.stringify([...routes]));
-}
+import {
+  isRouteMuted as isRouteMutedInStorage,
+  muteRoute as muteRouteInStorage,
+  unmuteRoute as unmuteRouteInStorage
+} from '../utils/mute-routes';
 
 export function muteRoute(routeId: string): void {
-  const muted = getMutedRoutes();
-  muted.add(normalizeRouteId(routeId));
-  saveMutedRoutes(muted);
+  muteRouteInStorage(routeId);
 }
 
 export function unmuteRoute(routeId: string): void {
-  const muted = getMutedRoutes();
-  muted.delete(normalizeRouteId(routeId));
-  saveMutedRoutes(muted);
+  unmuteRouteInStorage(routeId);
 }
 
 export function isRouteMuted(routeId: string): boolean {
-  return getMutedRoutes().has(normalizeRouteId(routeId));
+  return isRouteMutedInStorage(routeId);
 }
 
 // ── Socket management ─────────────────────────────────────────────────────────

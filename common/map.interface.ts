@@ -24,10 +24,18 @@ export interface ILatLng {
   lng: number;
 }
 
+export interface IMapIcon {
+  url: string;
+  anchor: { x: number; y: number };
+  size: { width: number; height: number };
+}
+
+export type IMapIconValue = string | IMapIcon;
+
 export interface IMapMarkerOptions {
   position: ILatLng;
   title?: string;
-  icon?: string;
+  icon?: IMapIconValue;
   iconAnchor?: { x: number; y: number };
   iconSize?: { width: number; height: number };
   zIndex?: number;
@@ -45,17 +53,8 @@ export interface IMapMarker {
   id: string;
   setPosition(position: ILatLng): void;
   animatePosition(position: ILatLng, durationMs?: number): void;
-  setIcon(icon: string): void;
   setVisible(visible: boolean): void;
-  setIcon(
-    icon:
-      | string
-      | {
-          url: string;
-          anchor: { x: number; y: number };
-          size: { width: number; height: number };
-        }
-  ): void;
+  setIcon(icon: IMapIconValue): void;
   onClick(callback: () => void): void;
   remove(): void;
 }

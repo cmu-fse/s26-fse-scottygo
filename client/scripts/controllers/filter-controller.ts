@@ -146,6 +146,16 @@ export class FilterController {
     }
   }
 
+  private showConnectionErrorModal(): void {
+    const showModal = window.showModal;
+    if (showModal && typeof showModal === 'function') {
+      showModal(
+        'Connection Lost',
+        'Unable to connect to the server. Please check your internet connection.'
+      );
+    }
+  }
+
   /**
    * Fetch all available routes from backend
    */
@@ -178,13 +188,7 @@ export class FilterController {
     } catch (error) {
       console.error('Error fetching routes:', error);
       // A1: No Network Access
-      const showModal = window.showModal;
-      if (showModal && typeof showModal === 'function') {
-        showModal(
-          'Connection Lost',
-          'Unable to connect to the server. Please check your internet connection.'
-        );
-      }
+      this.showConnectionErrorModal();
       return [];
     }
   }
@@ -232,13 +236,7 @@ export class FilterController {
       }
     } catch (error) {
       console.error('Error fetching bulk data:', error);
-      const showModal = window.showModal;
-      if (showModal && typeof showModal === 'function') {
-        showModal(
-          'Connection Lost',
-          'Unable to connect to the server. Please check your internet connection.'
-        );
-      }
+      this.showConnectionErrorModal();
       return [];
     }
   }

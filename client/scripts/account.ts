@@ -530,6 +530,29 @@ const handleSave = async (): Promise<void> => {
   let saveCount = 0;
   let lastError = '';
 
+  const applyAccountPatch = async (
+    username: string,
+    field: string,
+    body: Record<string, unknown>,
+    failureFallback: string,
+    onFailure: (message: string) => void
+  ): Promise<boolean> => {
+    const { status, data } = await patchAccount(username, field, body);
+    if (status >= 200 && status < 300) {
+      saveCount++;
+      if (data && isSuccess(data) && data.payload) {
+        viewingAccount = data.payload as IUserAccount;
+      }
+      return true;
+    }
+
+    const msg = getResponseMessage(data, failureFallback);
+    onFailure(msg);
+    hasError = true;
+    lastError = msg;
+    return false;
+  };
+
   // --- Username ---
   if (!(adminUser && !ownAcct)) {
     const newUsername = fieldUsername.value.trim();
@@ -550,25 +573,18 @@ const handleSave = async (): Promise<void> => {
         fieldUsername.classList.add('form-input--error');
         hasError = true;
       } else {
-        const { status, data } = await patchAccount(
+        const updated = await applyAccountPatch(
           targetUsername,
           'username',
-          {
-            newUsername
+          { newUsername },
+          'Username update failed.',
+          (msg) => {
+            setFieldError(usernameError, msg);
+            fieldUsername.classList.add('form-input--error');
           }
         );
-        if (status >= 200 && status < 300) {
-          saveCount++;
+        if (updated) {
           if (ownAcct) localStorage.setItem('username', newUsername);
-          if (data && isSuccess(data) && data.payload) {
-            viewingAccount = data.payload as IUserAccount;
-          }
-        } else {
-          const msg = getResponseMessage(data, 'Username update failed.');
-          setFieldError(usernameError, msg);
-          fieldUsername.classList.add('form-input--error');
-          hasError = true;
-          lastError = msg;
         }
       }
     }
@@ -589,23 +605,16 @@ const handleSave = async (): Promise<void> => {
         }
         // If was empty and stays empty, no error
       } else {
-        const { status, data } = await patchAccount(
+        await applyAccountPatch(
           viewingAccount.credentials.username,
           'email',
-          { email: newEmail }
-        );
-        if (status >= 200 && status < 300) {
-          saveCount++;
-          if (data && isSuccess(data) && data.payload) {
-            viewingAccount = data.payload as IUserAccount;
+          { email: newEmail },
+          'Email update failed.',
+          (msg) => {
+            setFieldError(emailError, msg);
+            fieldEmail.classList.add('form-input--error');
           }
-        } else {
-          const msg = getResponseMessage(data, 'Email update failed.');
-          setFieldError(emailError, msg);
-          fieldEmail.classList.add('form-input--error');
-          hasError = true;
-          lastError = msg;
-        }
+        );
       }
     }
   }
@@ -618,23 +627,16 @@ const handleSave = async (): Promise<void> => {
       fieldPassword.classList.add('form-input--error');
       hasError = true;
     } else {
-      const { status, data } = await patchAccount(
+      await applyAccountPatch(
         viewingAccount.credentials.username,
         'password',
-        { newPassword }
-      );
-      if (status >= 200 && status < 300) {
-        saveCount++;
-        if (data && isSuccess(data) && data.payload) {
-          viewingAccount = data.payload as IUserAccount;
+        { newPassword },
+        'Password update failed.',
+        (msg) => {
+          setFieldError(passwordError, msg);
+          fieldPassword.classList.add('form-input--error');
         }
-      } else {
-        const msg = getResponseMessage(data, 'Password update failed.');
-        setFieldError(passwordError, msg);
-        fieldPassword.classList.add('form-input--error');
-        hasError = true;
-        lastError = msg;
-      }
+      );
     }
   }
 
@@ -642,22 +644,15 @@ const handleSave = async (): Promise<void> => {
   if (adminUser) {
     const newPrivilege = fieldPrivilege.value as IPrivilegeLevel;
     if (newPrivilege !== viewingAccount.privilegeLevel) {
-      const { status, data } = await patchAccount(
+      await applyAccountPatch(
         viewingAccount.credentials.username,
         'privilege',
-        { privilegeLevel: newPrivilege }
-      );
-      if (status >= 200 && status < 300) {
-        saveCount++;
-        if (data && isSuccess(data) && data.payload) {
-          viewingAccount = data.payload as IUserAccount;
+        { privilegeLevel: newPrivilege },
+        'Privilege update failed.',
+        (msg) => {
+          setFieldError(privilegeError, msg);
         }
-      } else {
-        const msg = getResponseMessage(data, 'Privilege update failed.');
-        setFieldError(privilegeError, msg);
-        hasError = true;
-        lastError = msg;
-      }
+      );
     }
   }
 
@@ -696,22 +691,15 @@ const handleSave = async (): Promise<void> => {
         return;
       }
 
-      const { status, data } = await patchAccount(
+      await applyAccountPatch(
         viewingAccount.credentials.username,
         'status',
-        { status: newStatus }
-      );
-      if (status >= 200 && status < 300) {
-        saveCount++;
-        if (data && isSuccess(data) && data.payload) {
-          viewingAccount = data.payload as IUserAccount;
+        { status: newStatus },
+        'Status update failed.',
+        (msg) => {
+          setFieldError(statusError, msg);
         }
-      } else {
-        const msg = getResponseMessage(data, 'Status update failed.');
-        setFieldError(statusError, msg);
-        hasError = true;
-        lastError = msg;
-      }
+      );
     }
   }
 
