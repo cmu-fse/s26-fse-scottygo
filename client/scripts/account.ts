@@ -515,6 +515,291 @@ const enterEditMode = (): void => {
 // Save changes — sends only changed fields individually
 // ---------------------------------------------------------------------------
 
+interface ISaveState {
+  hasError: boolean;
+  saveCount: number;
+  lastError: string;
+}
+
+interface IStatusUpdateResult {
+  account: IUserAccount;
+  deferredConfirmation: boolean;
+}
+
+const createSaveState = (): ISaveState => ({
+  hasError: false,
+  saveCount: 0,
+  lastError: ''
+});
+
+const applyPatchSuccess = (
+  state: ISaveState,
+  current: IUserAccount,
+  data: IResponse | null
+): IUserAccount => {
+  state.saveCount += 1;
+  if (data && isSuccess(data) && data.payload) {
+    return data.payload as IUserAccount;
+  }
+  return current;
+};
+
+const markSaveError = (state: ISaveState, message: string): void => {
+  state.hasError = true;
+  state.lastError = message;
+};
+
+const setSaveFieldError = (
+  state: ISaveState,
+  errorEl: HTMLParagraphElement,
+  message: string,
+  input?: HTMLInputElement
+): void => {
+  setFieldError(errorEl, message);
+  if (input) {
+    input.classList.add('form-input--error');
+  }
+  markSaveError(state, message);
+};
+
+const updateUsernameIfChanged = async (
+  account: IUserAccount,
+  state: ISaveState,
+  adminUser: boolean,
+  ownAcct: boolean
+): Promise<IUserAccount> => {
+  if (adminUser && !ownAcct) {
+    return account;
+  }
+
+  const newUsername = fieldUsername.value.trim();
+  const usernameChanged =
+    newUsername.toLowerCase() !== account.credentials.username.toLowerCase();
+
+  if (!usernameChanged) {
+    return account;
+  }
+
+  if (!newUsername) {
+    setSaveFieldError(state, usernameError, 'Missing Username', fieldUsername);
+    return account;
+  }
+
+  if (newUsername.length < 4) {
+    setSaveFieldError(
+      state,
+      usernameError,
+      'Username less than 4 characters or invalid',
+      fieldUsername
+    );
+    return account;
+  }
+
+  const { status, data } = await patchAccount(
+    account.credentials.username,
+    'username',
+    {
+      newUsername
+    }
+  );
+
+  if (status >= 200 && status < 300) {
+    if (ownAcct) {
+      localStorage.setItem('username', newUsername);
+    }
+    return applyPatchSuccess(state, account, data);
+  }
+
+  const msg = getResponseMessage(data, 'Username update failed.');
+  setSaveFieldError(state, usernameError, msg, fieldUsername);
+  return account;
+};
+
+const updateEmailIfChanged = async (
+  account: IUserAccount,
+  state: ISaveState,
+  adminUser: boolean,
+  ownAcct: boolean
+): Promise<IUserAccount> => {
+  if (adminUser && !ownAcct) {
+    return account;
+  }
+
+  const newEmail = fieldEmail.value.trim();
+  const emailChanged = newEmail !== (account.email || '');
+
+  if (!emailChanged) {
+    return account;
+  }
+
+  if (!newEmail) {
+    if (account.email) {
+      setSaveFieldError(state, emailError, 'Missing Email', fieldEmail);
+    }
+    return account;
+  }
+
+  const { status, data } = await patchAccount(
+    account.credentials.username,
+    'email',
+    {
+      email: newEmail
+    }
+  );
+
+  if (status >= 200 && status < 300) {
+    return applyPatchSuccess(state, account, data);
+  }
+
+  const msg = getResponseMessage(data, 'Email update failed.');
+  setSaveFieldError(state, emailError, msg, fieldEmail);
+  return account;
+};
+
+const updatePasswordIfProvided = async (
+  account: IUserAccount,
+  state: ISaveState
+): Promise<IUserAccount> => {
+  const newPassword = fieldPassword.value;
+  if (!newPassword) {
+    return account;
+  }
+
+  if (newPassword.length < 4) {
+    setSaveFieldError(
+      state,
+      passwordError,
+      'Password should be at least 4 characters',
+      fieldPassword
+    );
+    return account;
+  }
+
+  const { status, data } = await patchAccount(
+    account.credentials.username,
+    'password',
+    {
+      newPassword
+    }
+  );
+
+  if (status >= 200 && status < 300) {
+    return applyPatchSuccess(state, account, data);
+  }
+
+  const msg = getResponseMessage(data, 'Password update failed.');
+  setSaveFieldError(state, passwordError, msg, fieldPassword);
+  return account;
+};
+
+const updatePrivilegeIfChanged = async (
+  account: IUserAccount,
+  state: ISaveState,
+  adminUser: boolean
+): Promise<IUserAccount> => {
+  if (!adminUser) {
+    return account;
+  }
+
+  const newPrivilege = fieldPrivilege.value as IPrivilegeLevel;
+  if (newPrivilege === account.privilegeLevel) {
+    return account;
+  }
+
+  const { status, data } = await patchAccount(
+    account.credentials.username,
+    'privilege',
+    {
+      privilegeLevel: newPrivilege
+    }
+  );
+
+  if (status >= 200 && status < 300) {
+    return applyPatchSuccess(state, account, data);
+  }
+
+  const msg = getResponseMessage(data, 'Privilege update failed.');
+  setFieldError(privilegeError, msg);
+  markSaveError(state, msg);
+  return account;
+};
+
+const updateAdminStatusIfChanged = async (
+  account: IUserAccount,
+  state: ISaveState,
+  adminUser: boolean,
+  ownAcct: boolean
+): Promise<IStatusUpdateResult> => {
+  if (!adminUser) {
+    return { account, deferredConfirmation: false };
+  }
+
+  const newStatus = fieldStatus.value as IAccountStatus;
+  if (newStatus === account.status) {
+    return { account, deferredConfirmation: false };
+  }
+
+  if (ownAcct && newStatus === 'Inactive') {
+    const capturedUsername = account.credentials.username;
+    showConfirm(
+      "Do you really want to inactivate your account?\n\nIf you confirm, you'll be logged out and unable to log back in. Only another Administrator can reactivate your account.",
+      async () => {
+        const { status: s, data: d } = await patchAccount(
+          capturedUsername,
+          'status',
+          {
+            status: 'Inactive' as IAccountStatus
+          }
+        );
+        if (s >= 200 && s < 300) {
+          handleLogout();
+        } else {
+          const msg = getResponseMessage(d, 'Status update failed.');
+          setFormStatus(msg, true);
+        }
+      }
+    );
+    return { account, deferredConfirmation: true };
+  }
+
+  const { status, data } = await patchAccount(
+    account.credentials.username,
+    'status',
+    {
+      status: newStatus
+    }
+  );
+
+  if (status >= 200 && status < 300) {
+    return {
+      account: applyPatchSuccess(state, account, data),
+      deferredConfirmation: false
+    };
+  }
+
+  const msg = getResponseMessage(data, 'Status update failed.');
+  setFieldError(statusError, msg);
+  markSaveError(state, msg);
+  return { account, deferredConfirmation: false };
+};
+
+const showSaveResult = (state: ISaveState): void => {
+  if (!state.hasError) {
+    renderReadMode();
+    if (state.saveCount > 0) {
+      setFormStatus('Changes saved!');
+    }
+    return;
+  }
+
+  if (state.saveCount > 0) {
+    setFormStatus('Some changes saved, but errors remain.', true);
+    return;
+  }
+
+  setFormStatus(state.lastError || 'Please fix the errors above.', true);
+};
+
 const handleSave = async (): Promise<void> => {
   if (!viewingAccount) return;
 
@@ -523,208 +808,46 @@ const handleSave = async (): Promise<void> => {
 
   const adminUser = isAdmin();
   const ownAcct = isOwnAccount();
-  const targetUsername = viewingAccount.credentials.username;
+  const saveState = createSaveState();
+  let nextAccount = viewingAccount;
 
-  let hasError = false;
-  let saveCount = 0;
-  let lastError = '';
+  nextAccount = await updateUsernameIfChanged(
+    nextAccount,
+    saveState,
+    adminUser,
+    ownAcct
+  );
+  nextAccount = await updateEmailIfChanged(
+    nextAccount,
+    saveState,
+    adminUser,
+    ownAcct
+  );
+  nextAccount = await updatePasswordIfProvided(nextAccount, saveState);
+  nextAccount = await updatePrivilegeIfChanged(
+    nextAccount,
+    saveState,
+    adminUser
+  );
 
-  // --- Username ---
-  if (!(adminUser && !ownAcct)) {
-    const newUsername = fieldUsername.value.trim();
-    const usernameChanged =
-      newUsername.toLowerCase() !==
-      viewingAccount.credentials.username.toLowerCase();
+  const statusUpdate = await updateAdminStatusIfChanged(
+    nextAccount,
+    saveState,
+    adminUser,
+    ownAcct
+  );
+  nextAccount = statusUpdate.account;
+  viewingAccount = nextAccount;
 
-    if (usernameChanged) {
-      if (!newUsername) {
-        setFieldError(usernameError, 'Missing Username');
-        fieldUsername.classList.add('form-input--error');
-        hasError = true;
-      } else if (newUsername.length < 4) {
-        setFieldError(
-          usernameError,
-          'Username less than 4 characters or invalid'
-        );
-        fieldUsername.classList.add('form-input--error');
-        hasError = true;
-      } else {
-        const { status, data } = await patchAccount(
-          targetUsername,
-          'username',
-          {
-            newUsername
-          }
-        );
-        if (status >= 200 && status < 300) {
-          saveCount++;
-          if (ownAcct) localStorage.setItem('username', newUsername);
-          if (data && isSuccess(data) && data.payload) {
-            viewingAccount = data.payload as IUserAccount;
-          }
-        } else {
-          const msg = getResponseMessage(data, 'Username update failed.');
-          setFieldError(usernameError, msg);
-          fieldUsername.classList.add('form-input--error');
-          hasError = true;
-          lastError = msg;
-        }
-      }
+  if (statusUpdate.deferredConfirmation) {
+    if (!saveState.hasError && saveState.saveCount > 0) {
+      setFormStatus('Some changes saved. Confirm inactivation in the dialog.');
     }
+    saveBtn.disabled = false;
+    return;
   }
 
-  // --- Email ---
-  if (!(adminUser && !ownAcct)) {
-    const newEmail = fieldEmail.value.trim();
-    const emailChanged = newEmail !== (viewingAccount.email || '');
-
-    if (emailChanged) {
-      if (!newEmail) {
-        // Only error if previously had email and now clearing it
-        if (viewingAccount.email) {
-          setFieldError(emailError, 'Missing Email');
-          fieldEmail.classList.add('form-input--error');
-          hasError = true;
-        }
-        // If was empty and stays empty, no error
-      } else {
-        const { status, data } = await patchAccount(
-          viewingAccount.credentials.username,
-          'email',
-          { email: newEmail }
-        );
-        if (status >= 200 && status < 300) {
-          saveCount++;
-          if (data && isSuccess(data) && data.payload) {
-            viewingAccount = data.payload as IUserAccount;
-          }
-        } else {
-          const msg = getResponseMessage(data, 'Email update failed.');
-          setFieldError(emailError, msg);
-          fieldEmail.classList.add('form-input--error');
-          hasError = true;
-          lastError = msg;
-        }
-      }
-    }
-  }
-
-  // --- Password ---
-  const newPassword = fieldPassword.value;
-  if (newPassword) {
-    if (newPassword.length < 4) {
-      setFieldError(passwordError, 'Password should be at least 4 characters');
-      fieldPassword.classList.add('form-input--error');
-      hasError = true;
-    } else {
-      const { status, data } = await patchAccount(
-        viewingAccount.credentials.username,
-        'password',
-        { newPassword }
-      );
-      if (status >= 200 && status < 300) {
-        saveCount++;
-        if (data && isSuccess(data) && data.payload) {
-          viewingAccount = data.payload as IUserAccount;
-        }
-      } else {
-        const msg = getResponseMessage(data, 'Password update failed.');
-        setFieldError(passwordError, msg);
-        fieldPassword.classList.add('form-input--error');
-        hasError = true;
-        lastError = msg;
-      }
-    }
-  }
-
-  // --- Privilege ---
-  if (adminUser) {
-    const newPrivilege = fieldPrivilege.value as IPrivilegeLevel;
-    if (newPrivilege !== viewingAccount.privilegeLevel) {
-      const { status, data } = await patchAccount(
-        viewingAccount.credentials.username,
-        'privilege',
-        { privilegeLevel: newPrivilege }
-      );
-      if (status >= 200 && status < 300) {
-        saveCount++;
-        if (data && isSuccess(data) && data.payload) {
-          viewingAccount = data.payload as IUserAccount;
-        }
-      } else {
-        const msg = getResponseMessage(data, 'Privilege update failed.');
-        setFieldError(privilegeError, msg);
-        hasError = true;
-        lastError = msg;
-      }
-    }
-  }
-
-  // --- Status (Admin dropdown only; Member uses toggle which saves immediately) ---
-  if (adminUser) {
-    const newStatus = fieldStatus.value as IAccountStatus;
-    if (newStatus !== viewingAccount.status) {
-      // Admin self-inactivation: show confirmation modal instead of saving immediately
-      if (ownAcct && newStatus === 'Inactive') {
-        const capturedUsername = viewingAccount.credentials.username;
-        const currentSaveCount = saveCount;
-        const currentHasError = hasError;
-        showConfirm(
-          "Do you really want to inactivate your account?\n\nIf you confirm, you'll be logged out and unable to log back in. Only another Administrator can reactivate your account.",
-          async () => {
-            const { status: s, data: d } = await patchAccount(
-              capturedUsername,
-              'status',
-              { status: 'Inactive' as IAccountStatus }
-            );
-            if (s >= 200 && s < 300) {
-              handleLogout();
-            } else {
-              const msg = getResponseMessage(d, 'Status update failed.');
-              setFormStatus(msg, true);
-            }
-          }
-        );
-        // Show partial results so far
-        if (!currentHasError && currentSaveCount > 0) {
-          setFormStatus(
-            'Some changes saved. Confirm inactivation in the dialog.'
-          );
-        }
-        saveBtn.disabled = false;
-        return;
-      }
-
-      const { status, data } = await patchAccount(
-        viewingAccount.credentials.username,
-        'status',
-        { status: newStatus }
-      );
-      if (status >= 200 && status < 300) {
-        saveCount++;
-        if (data && isSuccess(data) && data.payload) {
-          viewingAccount = data.payload as IUserAccount;
-        }
-      } else {
-        const msg = getResponseMessage(data, 'Status update failed.');
-        setFieldError(statusError, msg);
-        hasError = true;
-        lastError = msg;
-      }
-    }
-  }
-
-  // Show result
-  if (!hasError) {
-    renderReadMode();
-    if (saveCount > 0) {
-      setFormStatus('Changes saved!');
-    }
-  } else if (saveCount > 0) {
-    setFormStatus('Some changes saved, but errors remain.', true);
-  } else {
-    setFormStatus(lastError || 'Please fix the errors above.', true);
-  }
+  showSaveResult(saveState);
 };
 
 // ---------------------------------------------------------------------------
@@ -1026,4 +1149,3 @@ document.addEventListener('DOMContentLoaded', async () => {
     setFormStatus(message, true);
   }
 });
-
