@@ -10,6 +10,11 @@ import alertsService from '../services/alerts.service';
 import jwt from 'jsonwebtoken';
 import { JWT_KEY as secretKey } from '../env';
 import * as responses from '../../common/server.responses';
+import {
+  NotificationSearchStrategyFactory,
+  SearchContext
+} from '../search/search-strategy';
+import type { INotification } from '../../common/transit.interface';
 
 export default class NotificationController extends Controller {
   public constructor(path: string) {
@@ -196,8 +201,11 @@ export default class NotificationController extends Controller {
       const notifications = await NotificationModel.searchNotifications({ route, bus, q });
 
       const success: responses.ISuccess = {
-        name: 'NotificationsRetrieved',
+        name: 'SearchNotificationsCompleted',
         message: `Found ${notifications.length} notifications`,
+        metadata: {
+          totalItems: notifications.length
+        },
         payload: notifications
       };
       res.status(200).json(success);

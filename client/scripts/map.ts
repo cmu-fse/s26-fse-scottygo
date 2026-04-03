@@ -527,6 +527,37 @@ function setupMapEventListeners(): void {
     void filterController.showStopDetailsFromSearch(stop);
   });
 
+  document.addEventListener('searchSelectRoute', async (e: Event) => {
+    const customEvent = e as CustomEvent<{ routeId: string }>;
+    const routeId = customEvent.detail?.routeId;
+    if (!routeId) return;
+
+    mapStateManager.updateFilter('selectedRouteId', routeId);
+    await filterController.applyRouteFilter(routeId);
+  });
+
+  document.addEventListener('searchSelectStop', async (e: Event) => {
+    const customEvent = e as CustomEvent<{ stopId: string; stop?: IStop }>;
+    const stop = customEvent.detail?.stop;
+    if (!stop) return;
+
+    const state = mapStateManager.getState();
+    const candidateRoutes = stop.routes ?? [];
+    const routeId =
+      candidateRoutes.find((id) => id === state.selectedRouteId) ??
+      candidateRoutes[0] ??
+      state.selectedRouteId;
+
+    if (routeId) {
+      mapStateManager.updateFilter('selectedRouteId', routeId);
+      await filterController.applyRouteFilter(routeId);
+    }
+
+    mapProvider.setCenter({ lat: stop.lat, lng: stop.lon });
+    mapProvider.setZoom(15);
+    await filterController.showStopDetailsFromSearch(stop);
+  });
+
   document.addEventListener('toggleLayers', () => {
     const mode = mapProvider.toggleLayers();
     showSubscriptionToast(`Map layer: ${mode}`);

@@ -72,6 +72,7 @@ let subscriptions: Subscription[] = [];
 let allRoutes: Route[] = [];
 /** Most recent notification createdAt per routeId (from last 30 min). */
 const latestNotifTime = new Map<string, string>();
+let sheetSearchRequestId = 0;
 
 // ── API helpers ────────────────────────────────────────────────────────────────
 
@@ -96,15 +97,33 @@ async function fetchRecentNotifications(): Promise<void> {
   }
 }
 
-async function fetchRoutes(): Promise<void> {
-  const res = await fetch('/transit/routes', { headers: authHeaders() });
-  if (!res.ok) return;
+function toRouteList(payload: unknown): Route[] {
+  return ((payload as Array<{ id: string; name: string }> | undefined) ?? []).map(
+    (r) => ({
+      id: r.id,
+      name: r.name ?? `Route ${r.id}`
+    })
+  );
+}
+
+async function searchRoutes(query: string): Promise<Route[]> {
+  const trimmed = query.trim();
+  const url = trimmed
+    ? `/subscriptions/routes/search?q=${encodeURIComponent(trimmed)}`
+    : '/subscriptions/routes/search';
+
+  const res = await fetch(url, { headers: authHeaders() });
+  if (!res.ok) return [];
   const data = await res.json();
-  // Payload is IRoute[] — extract id and name
-  allRoutes = (data.payload ?? []).map((r: { id: string; name: string }) => ({
-    id: r.id,
-    name: r.name ?? `Route ${r.id}`
-  }));
+  return toRouteList(data.payload);
+}
+
+async function fetchRoutes(): Promise<void> {
+  try {
+    allRoutes = await searchRoutes('');
+  } catch {
+    allRoutes = [];
+  }
 }
 
 async function apiSubscribe(routeId: string): Promise<{ ok: boolean; error?: string }> {
@@ -218,13 +237,13 @@ function createCard(sub: Subscription): HTMLLIElement {
     if (!ok || stillSubscribed) {
       showToast('Failed to remove subscription. Please try again.');
       renderList();
-      renderSheetResults((document.getElementById('route-search-input') as HTMLInputElement).value);
+      await renderSheetResults((document.getElementById('route-search-input') as HTMLInputElement).value);
       return;
     }
 
     document.dispatchEvent(new CustomEvent('notifRouteLeave', { detail: { routeId: sub.routeId } }));
     renderList();
-    renderSheetResults((document.getElementById('route-search-input') as HTMLInputElement).value);
+    await renderSheetResults((document.getElementById('route-search-input') as HTMLInputElement).value);
   });
 
   // Bell toggle — mute/unmute popups (A6), no server call
@@ -272,14 +291,23 @@ function renderList(): void {
   renderEmptyState();
 }
 
-function renderSheetResults(query: string): void {
+async function renderSheetResults(query: string): Promise<void> {
+  const requestId = ++sheetSearchRequestId;
   const results = document.getElementById('sheet-results')!;
-  const lowerQ = query.toLowerCase();
-  const filtered = query
-    ? allRoutes.filter(
-        (r) => r.id.toLowerCase().includes(lowerQ) || r.name.toLowerCase().includes(lowerQ)
-      )
-    : allRoutes;
+  const trimmed = query.trim();
+
+  let filtered: Route[] = allRoutes;
+  if (trimmed) {
+    try {
+      filtered = await searchRoutes(trimmed);
+    } catch {
+      filtered = [];
+    }
+  }
+
+  if (requestId !== sheetSearchRequestId) {
+    return;
+  }
 
   results.innerHTML = '';
   filtered.forEach((route) => {
@@ -323,7 +351,7 @@ function renderSheetResults(query: string): void {
         }
       }
       renderList();
-      renderSheetResults(query);
+      await renderSheetResults(query);
     });
 
     results.appendChild(li);
@@ -341,7 +369,7 @@ function initSheet(): void {
   function openSheet(): void {
     overlay.classList.add('is-active');
     sheet.classList.add('is-active');
-    renderSheetResults('');
+    void renderSheetResults('');
     input.focus();
   }
 
@@ -356,7 +384,9 @@ function initSheet(): void {
     openSheet();
   });
   overlay.addEventListener('click', closeSheet);
-  input.addEventListener('input', () => renderSheetResults(input.value.trim()));
+  input.addEventListener('input', () => {
+    void renderSheetResults(input.value.trim());
+  });
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────────

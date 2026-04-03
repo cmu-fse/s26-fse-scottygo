@@ -328,37 +328,13 @@ export class NotificationModel {
   // ── Notifications (Strategy Pattern — R13) ─────────────────────────
 
   /**
-   * Search notifications from the last 30 minutes using Strategy Pattern.
-   * Strategy selection per REST_LiveNotification.md §3.5.
+   * Returns notifications from the last 30 minutes, newest first.
+   * Optional filter supports routeId and/or vehicle id.
    */
-  static async searchNotifications(params: {
-    route?: string;
-    bus?: string;
-    q?: string;
-  }): Promise<INotification[]> {
-    const { route, bus, q } = params;
-    const hasRoute = !!route;
-    const hasBus = !!bus;
-    const hasQ = !!q;
-
-    // Build filter based on strategy
-    const filter: Record<string, unknown> = {};
-
-    if (hasRoute || hasBus) {
-      if (hasRoute) filter.routeId = route;
-      if (hasBus) filter.vid = bus;
-    }
-
-    let notifications = await DAC.db.getRecentNotifications(filter);
-
-    // TextSearchStrategy / CompositeSearchStrategy: filter by message content
-    if (hasQ) {
-      const lowerQ = q!.toLowerCase();
-      notifications = notifications.filter((n) =>
-        n.message.toLowerCase().includes(lowerQ)
-      );
-    }
-
-    return notifications;
+  static async getRecentNotifications(filter: {
+    routeId?: string;
+    vid?: string;
+  } = {}): Promise<INotification[]> {
+    return DAC.db.getRecentNotifications(filter);
   }
 }
