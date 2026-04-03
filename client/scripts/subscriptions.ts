@@ -72,23 +72,18 @@ let subscriptions: Subscription[] = [];
 let allRoutes: Route[] = [];
 /** Most recent notification createdAt per routeId (from last 30 min). */
 const latestNotifTime = new Map<string, string>();
-let sheetSearchRequestId = 0;
 
 // ── API helpers ────────────────────────────────────────────────────────────────
 
 async function fetchSubscriptions(): Promise<void> {
-  const res = await fetch('/notifications/subscriptions', {
-    headers: authHeaders()
-  });
+  const res = await fetch('/notifications/subscriptions', { headers: authHeaders() });
   if (!res.ok) return;
   const data = await res.json();
   subscriptions = data.payload ?? [];
 }
 
 async function fetchRecentNotifications(): Promise<void> {
-  const res = await fetch('/notifications/notifications', {
-    headers: authHeaders()
-  });
+  const res = await fetch('/notifications/notifications', { headers: authHeaders() });
   if (!res.ok) return;
   const data = await res.json();
   const notifs: { routeId: string; createdAt: string }[] = data.payload ?? [];
@@ -101,38 +96,18 @@ async function fetchRecentNotifications(): Promise<void> {
   }
 }
 
-function toRouteList(payload: unknown): Route[] {
-  return (
-    (payload as Array<{ id: string; name: string }> | undefined) ?? []
-  ).map((r) => ({
+async function fetchRoutes(): Promise<void> {
+  const res = await fetch('/transit/routes', { headers: authHeaders() });
+  if (!res.ok) return;
+  const data = await res.json();
+  // Payload is IRoute[] — extract id and name
+  allRoutes = (data.payload ?? []).map((r: { id: string; name: string }) => ({
     id: r.id,
     name: r.name ?? `Route ${r.id}`
   }));
 }
 
-async function searchRoutes(query: string): Promise<Route[]> {
-  const trimmed = query.trim();
-  const url = trimmed
-    ? `/subscriptions/routes/search?q=${encodeURIComponent(trimmed)}`
-    : '/subscriptions/routes/search';
-
-  const res = await fetch(url, { headers: authHeaders() });
-  if (!res.ok) return [];
-  const data = await res.json();
-  return toRouteList(data.payload);
-}
-
-async function fetchRoutes(): Promise<void> {
-  try {
-    allRoutes = await searchRoutes('');
-  } catch {
-    allRoutes = [];
-  }
-}
-
-async function apiSubscribe(
-  routeId: string
-): Promise<{ ok: boolean; error?: string }> {
+async function apiSubscribe(routeId: string): Promise<{ ok: boolean; error?: string }> {
   const res = await fetch('/notifications/subscriptions', {
     method: 'POST',
     headers: { ...authHeaders(), 'Content-Type': 'application/json' },
@@ -144,13 +119,10 @@ async function apiSubscribe(
 }
 
 async function apiUnsubscribe(routeId: string): Promise<{ ok: boolean }> {
-  const res = await fetch(
-    `/notifications/subscriptions/${encodeURIComponent(routeId)}`,
-    {
-      method: 'DELETE',
-      headers: authHeaders()
-    }
-  );
+  const res = await fetch(`/notifications/subscriptions/${encodeURIComponent(routeId)}`, {
+    method: 'DELETE',
+    headers: authHeaders()
+  });
   return { ok: res.ok || res.status === 404 };
 }
 
@@ -201,9 +173,7 @@ function updateCount(): void {
 }
 
 function formatAgo(isoTimestamp: string): string {
-  const mins = Math.round(
-    (Date.now() - new Date(isoTimestamp).getTime()) / 60_000
-  );
+  const mins = Math.round((Date.now() - new Date(isoTimestamp).getTime()) / 60_000);
   if (mins < 1) return 'just now';
   if (mins < 60) return `${mins}m ago`;
   return `${Math.floor(mins / 60)}h ago`;
@@ -240,35 +210,22 @@ function createCard(sub: Subscription): HTMLLIElement {
   `;
 
   // Remove subscription (A7)
-  li.querySelector<HTMLButtonElement>('.card-remove')!.addEventListener(
-    'click',
-    async () => {
-      const { ok } = await apiUnsubscribe(sub.routeId);
-      await fetchSubscriptions();
-      const stillSubscribed = subscriptions.some((s) =>
-        routeIdsEqual(s.routeId, sub.routeId)
-      );
+  li.querySelector<HTMLButtonElement>('.card-remove')!.addEventListener('click', async () => {
+    const { ok } = await apiUnsubscribe(sub.routeId);
+    await fetchSubscriptions();
+    const stillSubscribed = subscriptions.some((s) => routeIdsEqual(s.routeId, sub.routeId));
 
-      if (!ok || stillSubscribed) {
-        showToast('Failed to remove subscription. Please try again.');
-        renderList();
-        await renderSheetResults(
-          (document.getElementById('route-search-input') as HTMLInputElement)
-            .value
-        );
-        return;
-      }
-
-      document.dispatchEvent(
-        new CustomEvent('notifRouteLeave', { detail: { routeId: sub.routeId } })
-      );
+    if (!ok || stillSubscribed) {
+      showToast('Failed to remove subscription. Please try again.');
       renderList();
-      await renderSheetResults(
-        (document.getElementById('route-search-input') as HTMLInputElement)
-          .value
-      );
+      renderSheetResults((document.getElementById('route-search-input') as HTMLInputElement).value);
+      return;
     }
-  );
+
+    document.dispatchEvent(new CustomEvent('notifRouteLeave', { detail: { routeId: sub.routeId } }));
+    renderList();
+    renderSheetResults((document.getElementById('route-search-input') as HTMLInputElement).value);
+  });
 
   // Bell toggle — mute/unmute popups (A6), no server call
   const bellBtn = li.querySelector<HTMLButtonElement>('.card-bell')!;
@@ -277,24 +234,15 @@ function createCard(sub: Subscription): HTMLLIElement {
     const nowMuted = !mutedRoutes.has(normalizedRouteId);
     if (nowMuted) {
       mutedRoutes.add(normalizedRouteId);
-      document.dispatchEvent(
-        new CustomEvent('notifRouteMute', { detail: { routeId: sub.routeId } })
-      );
+      document.dispatchEvent(new CustomEvent('notifRouteMute', { detail: { routeId: sub.routeId } }));
     } else {
       mutedRoutes.delete(normalizedRouteId);
-      document.dispatchEvent(
-        new CustomEvent('notifRouteUnmute', {
-          detail: { routeId: sub.routeId }
-        })
-      );
+      document.dispatchEvent(new CustomEvent('notifRouteUnmute', { detail: { routeId: sub.routeId } }));
     }
     saveMutedRoutes(mutedRoutes);
     bellBtn.classList.toggle('muted', nowMuted);
     bellBtn.innerHTML = nowMuted ? bellOffSVG : bellOnSVG;
-    bellBtn.setAttribute(
-      'aria-label',
-      `${nowMuted ? 'Unmute' : 'Mute'} notifications`
-    );
+    bellBtn.setAttribute('aria-label', `${nowMuted ? 'Unmute' : 'Mute'} notifications`);
   });
 
   return li;
@@ -308,8 +256,7 @@ function renderEmptyState(): void {
       empty = document.createElement('p');
       empty.id = 'subscription-empty';
       empty.className = 'subscription-empty';
-      empty.textContent =
-        'No subscriptions yet. Use the map to subscribe to routes, or tap + to add one.';
+      empty.textContent = 'No subscriptions yet. Use the map to subscribe to routes, or tap + to add one.';
       list.insertAdjacentElement('afterend', empty);
     }
   } else {
@@ -325,23 +272,14 @@ function renderList(): void {
   renderEmptyState();
 }
 
-async function renderSheetResults(query: string): Promise<void> {
-  const requestId = ++sheetSearchRequestId;
+function renderSheetResults(query: string): void {
   const results = document.getElementById('sheet-results')!;
-  const trimmed = query.trim();
-
-  let filtered: Route[] = allRoutes;
-  if (trimmed) {
-    try {
-      filtered = await searchRoutes(trimmed);
-    } catch {
-      filtered = [];
-    }
-  }
-
-  if (requestId !== sheetSearchRequestId) {
-    return;
-  }
+  const lowerQ = query.toLowerCase();
+  const filtered = query
+    ? allRoutes.filter(
+        (r) => r.id.toLowerCase().includes(lowerQ) || r.name.toLowerCase().includes(lowerQ)
+      )
+    : allRoutes;
 
   results.innerHTML = '';
   filtered.forEach((route) => {
@@ -361,19 +299,13 @@ async function renderSheetResults(query: string): Promise<void> {
 
     const addBtn = li.querySelector<HTMLButtonElement>('.result-add-btn')!;
     addBtn.addEventListener('click', async () => {
-      const alreadySubscribed = subscriptions.some(
-        (s) => s.routeId === route.id
-      );
+      const alreadySubscribed = subscriptions.some((s) => s.routeId === route.id);
       if (alreadySubscribed) {
         // Treat as unsubscribe from search sheet
         const { ok } = await apiUnsubscribe(route.id);
         if (ok) {
           subscriptions = subscriptions.filter((s) => s.routeId !== route.id);
-          document.dispatchEvent(
-            new CustomEvent('notifRouteLeave', {
-              detail: { routeId: route.id }
-            })
-          );
+          document.dispatchEvent(new CustomEvent('notifRouteLeave', { detail: { routeId: route.id } }));
         }
       } else {
         if (subscriptions.length >= MAX_SUBSCRIPTIONS) return; // button hidden at limit
@@ -381,9 +313,7 @@ async function renderSheetResults(query: string): Promise<void> {
         if (ok) {
           // Refresh subscription list from server to get the _id
           await fetchSubscriptions();
-          document.dispatchEvent(
-            new CustomEvent('notifRouteJoin', { detail: { routeId: route.id } })
-          );
+          document.dispatchEvent(new CustomEvent('notifRouteJoin', { detail: { routeId: route.id } }));
         } else if (error?.includes('already subscribed')) {
           // A9: duplicate
           showToast(`You are already subscribed to Route ${route.id}.`);
@@ -393,7 +323,7 @@ async function renderSheetResults(query: string): Promise<void> {
         }
       }
       renderList();
-      await renderSheetResults(query);
+      renderSheetResults(query);
     });
 
     results.appendChild(li);
@@ -406,14 +336,12 @@ function initSheet(): void {
   const addBtn = document.getElementById('add-route-btn')!;
   const overlay = document.getElementById('sheet-overlay')!;
   const sheet = document.getElementById('bottom-sheet')!;
-  const input = document.getElementById(
-    'route-search-input'
-  ) as HTMLInputElement;
+  const input = document.getElementById('route-search-input') as HTMLInputElement;
 
   function openSheet(): void {
     overlay.classList.add('is-active');
     sheet.classList.add('is-active');
-    void renderSheetResults('');
+    renderSheetResults('');
     input.focus();
   }
 
@@ -428,9 +356,7 @@ function initSheet(): void {
     openSheet();
   });
   overlay.addEventListener('click', closeSheet);
-  input.addEventListener('input', () => {
-    void renderSheetResults(input.value.trim());
-  });
+  input.addEventListener('input', () => renderSheetResults(input.value.trim()));
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────────
@@ -438,15 +364,11 @@ function initSheet(): void {
 async function init(): Promise<void> {
   const token = localStorage.getItem('token');
   if (!token) {
-    window.location.replace('/home');
+    window.location.replace('/auth');
     return;
   }
 
-  await Promise.all([
-    fetchSubscriptions(),
-    fetchRoutes(),
-    fetchRecentNotifications()
-  ]);
+  await Promise.all([fetchSubscriptions(), fetchRoutes(), fetchRecentNotifications()]);
   renderList();
   initSheet();
 }

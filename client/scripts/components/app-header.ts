@@ -28,7 +28,7 @@ export class AppHeader extends HTMLElement {
       </div>
       <nav class="dropdown-menu" id="dropdown-menu">
         <div class="dropdown-header">
-          <h2>ScottyGo</h2>
+          <a href="/" class="dropdown-title-link"><h2>ScottyGo</h2></a>
         </div>
         <div class="dropdown-grid">
           <a href="/subscriptions" class="dropdown-item">
@@ -90,7 +90,7 @@ export class AppHeader extends HTMLElement {
     logoutBtn?.addEventListener('click', () => {
       localStorage.removeItem('token');
       localStorage.removeItem('username');
-      window.location.replace('/home');
+      window.location.replace('/auth');
     });
   }
 }

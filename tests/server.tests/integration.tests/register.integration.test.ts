@@ -10,7 +10,7 @@ import { Server as HttpServer } from 'http';
 import App from '../../../server/app';
 import { MongoDB } from '../../../server/db/mongo.db';
 import AuthController from '../../../server/controllers/auth.controller';
-import HomeController from '../../../server/controllers/home.controller';
+import MapController from '../../../server/controllers/map.controller';
 import DAC from '../../../server/db/dac';
 import { IUser } from '../../../common/user.interface';
 import * as responses from '../../../common/server.responses';
@@ -97,7 +97,7 @@ async function request(
 
 beforeAll(async () => {
   const db = new MongoDB(TEST_DB_URL);
-  app = new App([new HomeController('/'), new AuthController('/auth')], {
+  app = new App([new MapController('/'), new AuthController('/auth')], {
     clientDir: './.dist/client',
     db,
     port: TEST_PORT,

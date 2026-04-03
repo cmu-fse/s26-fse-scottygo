@@ -26,8 +26,7 @@ const BLOCKED_PATTERNS = [
 ];
 
 /** Gemini API base URL */
-const GEMINI_BASE_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models';
+const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 class ModerationService {
   /**
@@ -90,14 +89,13 @@ class ModerationService {
     }
 
     const data = await response.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    const text =
+      data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
 
     // Parse the JSON response from Gemini
     const jsonMatch = text.match(/\{[\s\S]*?\}/);
     if (!jsonMatch) {
-      console.warn(
-        `${tag()} Could not parse Gemini response, falling back to keyword filter`
-      );
+      console.warn(`${tag()} Could not parse Gemini response, falling back to keyword filter`);
       return this.keywordFilter(comment);
     }
 
@@ -108,11 +106,7 @@ class ModerationService {
     const categoryRaw =
       typeof result.category === 'string' ? result.category.toLowerCase() : '';
     const normalizedCategory: IModerationResult['category'] =
-      categoryRaw === 'irrelevant'
-        ? 'irrelevant'
-        : result.flagged
-          ? 'inappropriate'
-          : undefined;
+      categoryRaw === 'irrelevant' ? 'irrelevant' : result.flagged ? 'inappropriate' : undefined;
 
     return {
       flagged: !!result.flagged,

@@ -9,7 +9,7 @@ import App from '../../../server/app';
 import { MongoDB } from '../../../server/db/mongo.db';
 import AccountController from '../../../server/controllers/account.controller';
 import AuthController from '../../../server/controllers/auth.controller';
-import HomeController from '../../../server/controllers/home.controller';
+import MapController from '../../../server/controllers/map.controller';
 import DAC from '../../../server/db/dac';
 import { IUserAccount, IPrivilegeLevel } from '../../../common/user.interface';
 import * as responses from '../../../common/server.responses';
@@ -239,7 +239,7 @@ beforeAll(async () => {
   const db = new MongoDB(TEST_DB_URL);
   app = new App(
     [
-      new HomeController('/'),
+      new MapController('/'),
       new AuthController('/auth'),
       new AccountController('/account')
     ],

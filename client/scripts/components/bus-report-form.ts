@@ -112,10 +112,8 @@ class BusReportForm extends HTMLElement implements BusReportFormElement {
             <p class="bus-report__subtitle">Bus ${this.vid} &middot; Route ${this.routeId}</p>
           </div>
           <div class="bus-report__progress">
-            ${Array.from(
-              { length: TOTAL_STEPS },
-              (_, i) =>
-                `<div class="bus-report__bar${i < this.currentStep ? ' bus-report__bar--filled' : ''}"></div>`
+            ${Array.from({ length: TOTAL_STEPS }, (_, i) =>
+              `<div class="bus-report__bar${i < this.currentStep ? ' bus-report__bar--filled' : ''}"></div>`
             ).join('')}
           </div>
           <div class="bus-report__body">
@@ -235,12 +233,9 @@ class BusReportForm extends HTMLElement implements BusReportFormElement {
     });
 
     // Close on backdrop click
-    this.querySelector('.bus-report-backdrop')?.addEventListener(
-      'click',
-      (e: Event) => {
-        if (e.target === e.currentTarget) this.close();
-      }
-    );
+    this.querySelector('.bus-report-backdrop')?.addEventListener('click', (e: Event) => {
+      if (e.target === e.currentTarget) this.close();
+    });
   }
 
   private advanceOrSubmit(): void {
@@ -266,8 +261,7 @@ class BusReportForm extends HTMLElement implements BusReportFormElement {
       lon: this.lon
     };
     if (crowdedness) payload.crowdedness = crowdedness;
-    if (normalizedPrioritySeating)
-      payload.prioritySeating = normalizedPrioritySeating;
+    if (normalizedPrioritySeating) payload.prioritySeating = normalizedPrioritySeating;
     if (condition) payload.condition = condition;
     if (normalizedComment) payload.comment = normalizedComment;
 

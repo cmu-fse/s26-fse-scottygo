@@ -5,12 +5,7 @@
  */
 
 /** Haversine distance in miles between two lat/lon points (R9). */
-function haversineDistanceMiles(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number
-): number {
+function haversineDistanceMiles(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const toRad = (d: number) => (d * Math.PI) / 180;
   const R = 3958.8;
   const dLat = toRad(lat2 - lat1);
@@ -445,12 +440,7 @@ export class VehicleTracker {
     if (vehicle.source === 'live') {
       this.addUpdatedRowWithDot(details, timeText);
     } else {
-      this.addDetailRow(
-        details,
-        'Updated',
-        timeText,
-        'map-popup__updated-time'
-      );
+      this.addDetailRow(details, 'Updated', timeText, 'map-popup__updated-time');
     }
 
     popup.appendChild(details);
@@ -466,13 +456,12 @@ export class VehicleTracker {
     // Action buttons — Report only available for live buses (server validates against GTFS-RT)
     const actions = document.createElement('div');
     actions.className = 'map-popup__actions';
-    const reportBtnHtml =
-      vehicle.source === 'live'
-        ? `<button class="map-popup__action-btn map-popup__action-btn--report">
+    const reportBtnHtml = vehicle.source === 'live'
+      ? `<button class="map-popup__action-btn map-popup__action-btn--report">
            <span class="material-icons-outlined">warning_amber</span>
            <strong>Report</strong>
          </button>`
-        : `<button class="map-popup__action-btn map-popup__action-btn--report" disabled title="Reporting only available for live buses">
+      : `<button class="map-popup__action-btn map-popup__action-btn--report" disabled title="Reporting only available for live buses">
            <span class="material-icons-outlined">warning_amber</span>
            <strong>Report</strong>
          </button>`;
@@ -520,9 +509,7 @@ export class VehicleTracker {
                 latestVehicle.lon
               );
               if (dist > 0.5) {
-                this.showToast(
-                  'You need to be near this bus to submit a report.'
-                );
+                this.showToast('You need to be near this bus to submit a report.');
                 return;
               }
             }
@@ -633,13 +620,8 @@ export class VehicleTracker {
 
   private formatElapsedTime(lastUpdate: string): string {
     const updatedAt = new Date(lastUpdate);
-    const secsAgo = Math.max(
-      0,
-      Math.round((Date.now() - updatedAt.getTime()) / 1000)
-    );
-    return secsAgo < 60
-      ? `${secsAgo}s ago`
-      : `${Math.round(secsAgo / 60)}m ago`;
+    const secsAgo = Math.max(0, Math.round((Date.now() - updatedAt.getTime()) / 1000));
+    return secsAgo < 60 ? `${secsAgo}s ago` : `${Math.round(secsAgo / 60)}m ago`;
   }
 
   private startPopupUpdatedTicker(): void {
@@ -669,9 +651,7 @@ export class VehicleTracker {
     const vehicle = this.vehicleData.get(this.openPopupVehicleId);
     if (!vehicle) return;
 
-    const updatedNode = popup.querySelector<HTMLElement>(
-      '.map-popup__updated-time'
-    );
+    const updatedNode = popup.querySelector<HTMLElement>('.map-popup__updated-time');
     if (updatedNode) {
       updatedNode.textContent = this.formatElapsedTime(vehicle.lastUpdate);
     }

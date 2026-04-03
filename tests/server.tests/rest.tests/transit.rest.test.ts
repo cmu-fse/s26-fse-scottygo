@@ -11,7 +11,6 @@ import { Server as HttpServer } from 'http';
 import App from '../../../server/app';
 import { MongoDB } from '../../../server/db/mongo.db';
 import AuthController from '../../../server/controllers/auth.controller';
-import HomeController from '../../../server/controllers/home.controller';
 import MapController from '../../../server/controllers/map.controller';
 import BusController from '../../../server/controllers/transit.controller';
 import DAC from '../../../server/db/dac';
@@ -318,9 +317,8 @@ beforeAll(async () => {
   const db = new MongoDB(TEST_DB_URL);
   app = new App(
     [
-      new HomeController('/'),
       new AuthController('/auth'),
-      new MapController('/map'),
+      new MapController('/'),
       new BusController('/transit')
     ],
     {
@@ -871,7 +869,7 @@ describe('GET /transit/detours/:routeId', () => {
 
 describe('GET /map/config', () => {
   test('returns map configuration with valid token', async () => {
-    const res = await request('GET', '/map/config', undefined, memberToken);
+    const res = await request('GET', '/config', undefined, memberToken);
 
     expect(res.status).toBe(200);
     const success = res.data as responses.ISuccess;
@@ -884,7 +882,7 @@ describe('GET /map/config', () => {
   });
 
   test('default center is CMU campus coordinates', async () => {
-    const res = await request('GET', '/map/config', undefined, memberToken);
+    const res = await request('GET', '/config', undefined, memberToken);
 
     const config = (res.data as responses.ISuccess).payload as IConfig;
     expect(config.lat).toBeCloseTo(40.4433, 2);
@@ -892,7 +890,7 @@ describe('GET /map/config', () => {
   });
 
   test('returns 401 without token (MissingToken)', async () => {
-    const res = await request('GET', '/map/config');
+    const res = await request('GET', '/config');
 
     expect(res.status).toBe(401);
     const error = res.data as responses.IAppError;
@@ -900,7 +898,7 @@ describe('GET /map/config', () => {
   });
 
   test('returns 401 with invalid token (InvalidToken)', async () => {
-    const res = await request('GET', '/map/config', undefined, 'bad_token');
+    const res = await request('GET', '/config', undefined, 'bad_token');
 
     expect(res.status).toBe(401);
     const error = res.data as responses.IAppError;

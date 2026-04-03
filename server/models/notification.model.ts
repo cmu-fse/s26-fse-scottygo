@@ -21,12 +21,7 @@ import moderationService from '../services/moderation.service';
 const PROXIMITY_LIMIT_MILES = 0.5;
 
 /** Valid enum values for report field validation. */
-const VALID_CROWDEDNESS: ICrowdedness[] = [
-  'Empty',
-  'Few Seats Taken',
-  'Standing Room',
-  'Packed'
-];
+const VALID_CROWDEDNESS: ICrowdedness[] = ['Empty', 'Few Seats Taken', 'Standing Room', 'Packed'];
 const VALID_PRIORITY_SEATING: IPrioritySeating[] = ['Available', 'Occupied'];
 const VALID_CONDITION: IBusCondition[] = ['Clean', 'Dirty', 'Average'];
 
@@ -90,10 +85,7 @@ export class NotificationModel {
     return await DAC.db.getSubscriptionsByUserId(userId);
   }
 
-  static async subscribe(
-    userId: string,
-    routeId: string
-  ): Promise<ISubscription> {
+  static async subscribe(userId: string, routeId: string): Promise<ISubscription> {
     // R2: no duplicate subscriptions
     const existing = await DAC.db.findSubscription(userId, routeId);
     if (existing) {
@@ -111,8 +103,7 @@ export class NotificationModel {
       const error: IAppError = {
         type: 'ClientError',
         name: 'SubscriptionLimitReached',
-        message:
-          'Subscription limit reached (10). Please remove a subscription first.'
+        message: 'Subscription limit reached (10). Please remove a subscription first.'
       };
       throw error;
     }
@@ -175,12 +166,7 @@ export class NotificationModel {
     }
 
     // R5/A5: at least one optional field must be provided
-    if (
-      !data.crowdedness &&
-      !data.prioritySeating &&
-      !data.condition &&
-      !data.comment
-    ) {
+    if (!data.crowdedness && !data.prioritySeating && !data.condition && !data.comment) {
       const error: IAppError = {
         type: 'ClientError',
         name: 'EmptyReport',
@@ -190,10 +176,7 @@ export class NotificationModel {
     }
 
     // Validate enum values
-    if (
-      data.crowdedness &&
-      !VALID_CROWDEDNESS.includes(data.crowdedness as ICrowdedness)
-    ) {
+    if (data.crowdedness && !VALID_CROWDEDNESS.includes(data.crowdedness as ICrowdedness)) {
       const error: IAppError = {
         type: 'ClientError',
         name: 'InvalidReportField',
@@ -201,10 +184,7 @@ export class NotificationModel {
       };
       throw error;
     }
-    if (
-      data.prioritySeating &&
-      !VALID_PRIORITY_SEATING.includes(data.prioritySeating as IPrioritySeating)
-    ) {
+    if (data.prioritySeating && !VALID_PRIORITY_SEATING.includes(data.prioritySeating as IPrioritySeating)) {
       const error: IAppError = {
         type: 'ClientError',
         name: 'InvalidReportField',
@@ -212,10 +192,7 @@ export class NotificationModel {
       };
       throw error;
     }
-    if (
-      data.condition &&
-      !VALID_CONDITION.includes(data.condition as IBusCondition)
-    ) {
+    if (data.condition && !VALID_CONDITION.includes(data.condition as IBusCondition)) {
       const error: IAppError = {
         type: 'ClientError',
         name: 'InvalidReportField',
@@ -236,12 +213,7 @@ export class NotificationModel {
       throw error;
     }
 
-    const distance = haversineDistanceMiles(
-      data.lat,
-      data.lon,
-      bus.lat,
-      bus.lon
-    );
+    const distance = haversineDistanceMiles(data.lat, data.lon, bus.lat, bus.lon);
     if (!data.bypassProximityCheck && distance > PROXIMITY_LIMIT_MILES) {
       const error: IAppError = {
         type: 'ClientError',
@@ -288,10 +260,7 @@ export class NotificationModel {
     if (data.crowdedness && data.crowdedness !== lastStatus.crowdedness) {
       changedFields.push('crowdedness');
     }
-    if (
-      data.prioritySeating &&
-      data.prioritySeating !== lastStatus.prioritySeating
-    ) {
+    if (data.prioritySeating && data.prioritySeating !== lastStatus.prioritySeating) {
       changedFields.push('prioritySeating');
     }
     if (data.condition && data.condition !== lastStatus.condition) {
@@ -300,12 +269,9 @@ export class NotificationModel {
 
     // Update last known status (R12)
     const updatedStatus: ILastKnownBusStatus = { ...lastStatus };
-    if (data.crowdedness)
-      updatedStatus.crowdedness = data.crowdedness as ICrowdedness;
-    if (data.prioritySeating)
-      updatedStatus.prioritySeating = data.prioritySeating as IPrioritySeating;
-    if (data.condition)
-      updatedStatus.condition = data.condition as IBusCondition;
+    if (data.crowdedness) updatedStatus.crowdedness = data.crowdedness as ICrowdedness;
+    if (data.prioritySeating) updatedStatus.prioritySeating = data.prioritySeating as IPrioritySeating;
+    if (data.condition) updatedStatus.condition = data.condition as IBusCondition;
     NotificationModel.lastKnownStatus.set(data.vid, updatedStatus);
 
     // A18: If no field changed, do not publish a notification
@@ -319,20 +285,18 @@ export class NotificationModel {
     }
 
     // R6: Construct notification message highlighting only changed fields
-    const messageParts = changedFields
-      .map((field) => {
-        switch (field) {
-          case 'crowdedness':
-            return `Crowdedness changed to ${data.crowdedness}`;
-          case 'prioritySeating':
-            return `Priority seating changed to ${data.prioritySeating}`;
-          case 'condition':
-            return `Condition changed to ${data.condition}`;
-          default:
-            return '';
-        }
-      })
-      .filter(Boolean);
+    const messageParts = changedFields.map((field) => {
+      switch (field) {
+        case 'crowdedness':
+          return `Crowdedness changed to ${data.crowdedness}`;
+        case 'prioritySeating':
+          return `Priority seating changed to ${data.prioritySeating}`;
+        case 'condition':
+          return `Condition changed to ${data.condition}`;
+        default:
+          return '';
+      }
+    }).filter(Boolean);
 
     // Include moderated comment if present and not flagged
     if (moderatedComment) {
@@ -364,15 +328,37 @@ export class NotificationModel {
   // ── Notifications (Strategy Pattern — R13) ─────────────────────────
 
   /**
-   * Returns notifications from the last 30 minutes, newest first.
-   * Optional filter supports routeId and/or vehicle id.
+   * Search notifications from the last 30 minutes using Strategy Pattern.
+   * Strategy selection per REST_LiveNotification.md §3.5.
    */
-  static async getRecentNotifications(
-    filter: {
-      routeId?: string;
-      vid?: string;
-    } = {}
-  ): Promise<INotification[]> {
-    return DAC.db.getRecentNotifications(filter);
+  static async searchNotifications(params: {
+    route?: string;
+    bus?: string;
+    q?: string;
+  }): Promise<INotification[]> {
+    const { route, bus, q } = params;
+    const hasRoute = !!route;
+    const hasBus = !!bus;
+    const hasQ = !!q;
+
+    // Build filter based on strategy
+    const filter: Record<string, unknown> = {};
+
+    if (hasRoute || hasBus) {
+      if (hasRoute) filter.routeId = route;
+      if (hasBus) filter.vid = bus;
+    }
+
+    let notifications = await DAC.db.getRecentNotifications(filter);
+
+    // TextSearchStrategy / CompositeSearchStrategy: filter by message content
+    if (hasQ) {
+      const lowerQ = q!.toLowerCase();
+      notifications = notifications.filter((n) =>
+        n.message.toLowerCase().includes(lowerQ)
+      );
+    }
+
+    return notifications;
   }
 }

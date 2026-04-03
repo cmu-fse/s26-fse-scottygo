@@ -11,12 +11,16 @@ import type {
   IPattern,
   IBulkTransitData,
   IDetour,
-  IPrediction
+  IPrediction,
+  INearbyStop,
+  INearbyStopsPayload
 } from '../../../common/transit.interface';
+import type { ILatLng } from '../../../common/map.interface';
 import { MapStateManager } from '../state/map-state';
 import { RouteRenderer, type RouteData } from '../renderers/route-renderer';
 import { MAP_POPUP_ID, closeMapPopup } from '../utils/map-popup';
 import { VehicleTracker } from '../trackers/vehicle-tracker';
+import { DirectionsController } from './directions-controller';
 import { URLSyncManager } from '../state/url-sync';
 import type { IRouteOption } from '../components/route-selector';
 
@@ -57,11 +61,29 @@ export class FilterController {
   private healthPollInterval: number | null = null;
   /** Tracks whether colors were available on the last health check (for detecting recovery). */
   private colorsWereAvailable = false;
+  /** Directions controller reference */
+  private directionsController: DirectionsController;
+  /** Currently minimised stop (for A3 restore) */
+  private minimisedStop: IStop | null = null;
+  /** Cached predictions for minimised stop */
+  private minimisedPredictions: IPrediction[] = [];
+  /** Member's current location for TUC4 walk-time estimates */
+  private userLocation: ILatLng | null = null;
+  /** Whether nearby stops are currently rendered on the map */
+  private nearbyStopsActive = false;
+  /** Route IDs that have nearby stops (used to restore hidden routes) */
+  private nearbyRouteIds = new Set<string>();
+
+  /** Earth radius in meters for haversine */
+  private static readonly EARTH_RADIUS_M = 6_371_000;
+  /** Walk-time heuristic: 1 km ≈ 15 min (TUC4 R4) */
+  private static readonly WALK_MINUTES_PER_KM = 15;
 
   private constructor() {
     this.stateManager = MapStateManager.getInstance();
     this.routeRenderer = RouteRenderer.getInstance();
     this.vehicleTracker = VehicleTracker.getInstance();
+    this.directionsController = DirectionsController.getInstance();
     this.urlSync = URLSyncManager.getInstance();
     this.token = localStorage.getItem('token');
   }
@@ -78,6 +100,14 @@ export class FilterController {
    */
   setRouteSelectorCallback(callback: (routes: IRouteOption[]) => void): void {
     this.routeSelectorUpdateCallback = callback;
+  }
+
+  /**
+   * Update the Member's current location (called from map.ts watchPosition).
+   * Used for walk-time heuristic in stop popups (TUC4 R4).
+   */
+  setUserLocation(position: ILatLng): void {
+    this.userLocation = position;
   }
 
   /**
@@ -352,6 +382,9 @@ export class FilterController {
   async applyRouteFilter(routeId: string): Promise<void> {
     try {
       console.log('Applying route filter:', routeId);
+
+      // TUC4: Clear nearby stop markers when a specific route is selected
+      this.clearNearbyStops();
 
       // Clear all existing routes
       this.routeRenderer.clearAllRoutes();
@@ -798,8 +831,15 @@ export class FilterController {
 
   /**
    * Handle a stop marker click: fetch predictions and show popup.
+   * Supports A3 (restore minimised popup) and A1 (select another stop before directions).
    */
   private async handleStopClick(stop: IStop): Promise<void> {
+    // If in directions mode, ignore stop clicks
+    if (this.directionsController.isActive) return;
+
+    // A3: If this stop was minimised, restore its popup
+    if (this.restoreMinimisedPopup(stop)) return;
+
     try {
       const predictions = await this.fetchPredictions(stop.stopId);
       this.showStopPopup(stop, predictions);
@@ -837,21 +877,25 @@ export class FilterController {
 
   /**
    * Render the stop-info popup on the map overlay.
+   * Includes Directions button (TUC4 Step 5) and minimize button (A3).
    */
   private showStopPopup(stop: IStop, predictions: IPrediction[]): void {
     // Remove any existing map popup (stop or bus) first
     closeMapPopup();
+    // Clear minimised state since we're opening a new popup
+    this.minimisedStop = null;
 
     const popup = document.createElement('div');
     popup.id = MAP_POPUP_ID;
     popup.className = 'map-popup';
 
-    // Header
+    // Header with close (×) and minimize (–) buttons
     const header = document.createElement('div');
     header.className = 'map-popup__header';
     header.innerHTML = `
       <span class="material-icons-outlined map-popup__icon map-popup__icon--stop">place</span>
       <strong class="map-popup__title">${stop.stopName}</strong>
+      <button class="map-popup__minimize" aria-label="Minimize" title="Minimize">&ndash;</button>
       <button class="map-popup__close" aria-label="Close">&times;</button>
     `;
     popup.appendChild(header);
@@ -860,6 +904,18 @@ export class FilterController {
     subheader.className = 'map-popup__subheader';
     subheader.textContent = `Stop #${stop.stopId}`;
     popup.appendChild(subheader);
+
+    // Walking time estimate (TUC4 Step 4, R4: 1km ≈ 15 min)
+    const walkMin = this.estimateWalkMinutes(stop.lat, stop.lon);
+    if (walkMin !== null) {
+      const walkRow = document.createElement('div');
+      walkRow.className = 'map-popup__walk-time';
+      walkRow.innerHTML = `
+        <span class="material-icons-outlined map-popup__walk-icon">directions_walk</span>
+        <span>~${walkMin} min walk</span>
+      `;
+      popup.appendChild(walkRow);
+    }
 
     // Predictions list
     if (predictions.length === 0) {
@@ -900,17 +956,209 @@ export class FilterController {
       popup.appendChild(list);
     }
 
+    // Directions button (TUC4 Step 5)
+    const directionsBtn = document.createElement('button');
+    directionsBtn.className = 'map-popup__directions-btn';
+    directionsBtn.innerHTML = `
+      <span class="material-icons-outlined">directions_walk</span>
+      Directions
+    `;
+    popup.appendChild(directionsBtn);
+
     // Append to map container
     const container = document.querySelector('.map-container');
     if (container) {
       container.appendChild(popup);
     }
 
-    // Close button handler
+    // Close button handler (A2: deselect stop)
     const closeBtn = popup.querySelector('.map-popup__close');
     if (closeBtn) {
       closeBtn.addEventListener('click', () => closeMapPopup());
     }
+
+    // Minimize button handler (A3)
+    const minBtn = popup.querySelector('.map-popup__minimize');
+    if (minBtn) {
+      minBtn.addEventListener('click', () => {
+        this.minimisedStop = stop;
+        this.minimisedPredictions = predictions;
+        closeMapPopup();
+      });
+    }
+
+    // Directions button handler (TUC4 Step 5)
+    directionsBtn.addEventListener('click', () => {
+      this.directionsController.startDirections(stop);
+    });
+  }
+
+  /**
+   * Restore a minimised stop popup (A3).
+   * Called when the user clicks the same stop marker again.
+   */
+  restoreMinimisedPopup(stop: IStop): boolean {
+    if (
+      this.minimisedStop &&
+      this.minimisedStop.stopId === stop.stopId
+    ) {
+      this.showStopPopup(stop, this.minimisedPredictions);
+      this.minimisedStop = null;
+      return true;
+    }
+    return false;
+  }
+
+  // -------------------------------------------------------------------
+  // Nearby Stops Discovery  (TUC4 — Discover Stops & Schedules)
+  // -------------------------------------------------------------------
+
+  /**
+   * Fetch nearby stops from the server and render them on the map.
+   * Called once when the user's location is first obtained (TUC4 Step 2).
+   * Stops are cleared automatically when a route is explicitly selected.
+   */
+  async showNearbyStops(position: ILatLng): Promise<void> {
+    this.userLocation = position;
+
+    // Don't show nearby stops if a route is already selected (TUC1 takes precedence)
+    const state = this.stateManager.getState();
+    if (state.selectedRouteId) return;
+
+    try {
+      const nearbyData = await this.fetchNearbyStops(position.lat, position.lng);
+      if (!nearbyData || nearbyData.stops.length === 0) return;
+
+      // Collect route IDs that serve nearby stops
+      this.nearbyRouteIds.clear();
+      for (const ns of nearbyData.stops) {
+        for (const rid of ns.routesServingStop) {
+          this.nearbyRouteIds.add(rid);
+        }
+      }
+
+      // Hide routes that have no nearby stops (TUC4 Step 2: show only nearby routes)
+      for (const route of state.availableRoutes) {
+        if (!this.nearbyRouteIds.has(route.id)) {
+          this.routeRenderer.hideRoute(route.id);
+        }
+      }
+
+      // Render each nearby stop as a marker (grouped under per-route keys)
+      const stopsByRoute = new Map<string, IStop[]>();
+
+      for (const ns of nearbyData.stops) {
+        // Group stops by the first route that serves them for rendering keys
+        const routeKey = ns.routesServingStop[0] ?? 'NEARBY';
+        const arr = stopsByRoute.get(routeKey) || [];
+        arr.push(ns.stop);
+        stopsByRoute.set(routeKey, arr);
+      }
+
+      for (const [routeKey, stops] of stopsByRoute.entries()) {
+        this.routeRenderer.renderStopMarkers(
+          routeKey,
+          stops,
+          'NEARBY',
+          (stop) => this.handleStopClick(stop)
+        );
+      }
+
+      this.nearbyStopsActive = true;
+
+      console.log(
+        `[FilterController] Rendered ${nearbyData.stops.length} nearby stops ` +
+          `(${this.nearbyRouteIds.size} routes, radius: ${nearbyData.radiusMeters}m` +
+          `${nearbyData.expandedRadiusApplied ? ', expanded' : ''})`
+      );
+    } catch (error) {
+      console.error('[FilterController] Error showing nearby stops:', error);
+    }
+  }
+
+  /**
+   * Clear nearby stop markers from the map.
+   * Called when the user selects a specific route.
+   */
+  clearNearbyStops(): void {
+    if (!this.nearbyStopsActive) return;
+
+    // The nearby markers are keyed as "{routeId}_NEARBY"
+    for (const route of this.stateManager.getState().availableRoutes) {
+      this.routeRenderer.clearStopMarkers(`${route.id}_NEARBY`);
+    }
+    this.routeRenderer.clearStopMarkers('NEARBY_NEARBY');
+
+    // Restore routes that were hidden during nearby-stops mode
+    for (const route of this.stateManager.getState().availableRoutes) {
+      if (!this.nearbyRouteIds.has(route.id)) {
+        this.routeRenderer.showRoute(route.id);
+      }
+    }
+
+    this.nearbyRouteIds.clear();
+    this.nearbyStopsActive = false;
+    console.log('[FilterController] Cleared nearby stop markers and restored routes');
+  }
+
+  /**
+   * Fetch nearby stops from the server endpoint.
+   * GET /transit/stops/nearbystops?lat=...&lon=...
+   */
+  private async fetchNearbyStops(
+    lat: number,
+    lon: number
+  ): Promise<INearbyStopsPayload | null> {
+    try {
+      const response: AxiosResponse = await axios.get(
+        '/transit/stops/nearbystops',
+        {
+          params: { lat, lon },
+          headers: { Authorization: `Bearer ${this.token}` },
+          validateStatus: () => true
+        }
+      );
+
+      if (
+        response.status === 200 &&
+        response.data.name === 'NearbyStopsRetrieved'
+      ) {
+        return response.data.payload as INearbyStopsPayload;
+      }
+      console.warn('[FilterController] Nearby stops request failed:', response.data);
+      return null;
+    } catch (error) {
+      console.error('[FilterController] Error fetching nearby stops:', error);
+      return null;
+    }
+  }
+
+  // -------------------------------------------------------------------
+  // Haversine utility (TUC4 R4 — walk-time heuristic)
+  // -------------------------------------------------------------------
+
+  /**
+   * Haversine distance between two points in meters.
+   */
+  private haversine(a: ILatLng, b: ILatLng): number {
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    const dLat = toRad(b.lat - a.lat);
+    const dLng = toRad(b.lng - a.lng);
+    const sinDLat = Math.sin(dLat / 2);
+    const sinDLng = Math.sin(dLng / 2);
+    const h =
+      sinDLat * sinDLat +
+      Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * sinDLng * sinDLng;
+    return 2 * FilterController.EARTH_RADIUS_M * Math.asin(Math.sqrt(h));
+  }
+
+  /**
+   * Estimate walking time in minutes using the R4 heuristic (1 km ≈ 15 min).
+   */
+  private estimateWalkMinutes(stopLat: number, stopLon: number): number | null {
+    if (!this.userLocation) return null;
+    const dist = this.haversine(this.userLocation, { lat: stopLat, lng: stopLon });
+    return Math.ceil((dist / 1000) * FilterController.WALK_MINUTES_PER_KM);
   }
 
   /**

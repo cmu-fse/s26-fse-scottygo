@@ -8,38 +8,17 @@
 }
 
 /* Search bar */
-.notif-search-wrap {
-  width: 100%;
-  max-width: 480px;
-  position: relative;
-  margin-bottom: 20px;
-}
-
 .notif-search {
   width: 100%;
+  max-width: 480px;
   display: flex;
   align-items: center;
-  background: #fff;
-  border-radius: 14px;
-  padding: 0 16px;
-  height: 52px;
-  gap: 10px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e5e7eb;
-  transition:
-    box-shadow 0.2s ease,
-    border-color 0.2s ease;
-}
-
-.notif-search:focus-within {
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.13);
-  border-color: #d1d5db;
-}
-
-.notif-search-icon {
-  color: #9ca3af;
-  font-size: 22px;
-  flex-shrink: 0;
+  background: #f5f5f5;
+  border-radius: 12px;
+  padding: 10px 14px;
+  gap: 8px;
+  margin-bottom: 20px;
+  color: #888;
 }
 
 #notif-search-input {
@@ -47,12 +26,12 @@
   border: none;
   background: none;
   font-size: 15px;
-  color: #111827;
+  color: #333;
   outline: none;
 }
 
 #notif-search-input::placeholder {
-  color: #9ca3af;
+  color: #aaa;
 }
 
 .notif-search-clear {
@@ -61,12 +40,8 @@
   border: none;
   cursor: pointer;
   padding: 0;
-  color: #9ca3af;
+  color: #aaa;
   line-height: 0;
-}
-
-.notif-search-clear .material-icons-outlined {
-  font-size: 20px;
 }
 
 .notif-search-clear.is-visible {
@@ -76,80 +51,7 @@
 }
 
 .notif-search-clear:hover {
-  color: #4b5563;
-}
-
-/* Dropdown */
-.notif-search-suggestions {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  right: 0;
-  max-height: 320px;
-  overflow-y: auto;
-  background: rgba(255, 255, 255, 0.98);
-  border-radius: 14px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.13);
-  z-index: 20;
-}
-
-.notif-search-suggestion {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  border: none;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-  background: transparent;
-  text-align: left;
-  padding: 12px 16px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-
-.notif-search-suggestion:last-child {
-  border-bottom: none;
-}
-
-.notif-search-suggestion:hover,
-.notif-search-suggestion:focus {
-  background: rgba(0, 0, 0, 0.04);
-  outline: none;
-}
-
-.notif-suggestion-icon {
-  font-size: 20px;
-  flex-shrink: 0;
-  color: #9ca3af;
-}
-
-.notif-suggestion-icon[data-type='route'] {
-  color: #3b82f6;
-}
-.notif-suggestion-icon[data-type='vehicle'] {
-  color: #6b7280;
-}
-.notif-suggestion-icon[data-type='alert'] {
-  color: #f59e0b;
-}
-.notif-suggestion-icon[data-type='notification'] {
-  color: #8b5cf6;
-}
-
-.notif-suggestion-label {
-  font-size: 14px;
-  font-weight: 500;
-  color: #111827;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.notif-search-no-suggestions {
-  padding: 12px 16px;
-  color: #9ca3af;
-  font-size: 13px;
+  color: #555;
 }
 
 /* Notification list */
@@ -187,12 +89,20 @@
   gap: 6px;
 }
 
-.notif-card[data-category='notification'] {
-  border-left-color: #8b5cf6;
+.notif-card[data-category='accessibility'] {
+  border-left-color: #f59e0b;
 }
 
-.notif-card[data-category='alert'] {
-  border-left-color: #f59e0b;
+.notif-card[data-category='capacity'] {
+  border-left-color: #ef4444;
+}
+
+.notif-card[data-category='condition'] {
+  border-left-color: #3b82f6;
+}
+
+.notif-card[data-category='delay'] {
+  border-left-color: #8b5cf6;
 }
 
 /* Dismiss button */
@@ -227,12 +137,20 @@
   line-height: 0;
 }
 
-.notif-icon[data-category='notification'] {
-  color: #8b5cf6;
+.notif-icon[data-category='accessibility'] {
+  color: #f59e0b;
 }
 
-.notif-icon[data-category='alert'] {
-  color: #f59e0b;
+.notif-icon[data-category='capacity'] {
+  color: #ef4444;
+}
+
+.notif-icon[data-category='condition'] {
+  color: #3b82f6;
+}
+
+.notif-icon[data-category='delay'] {
+  color: #8b5cf6;
 }
 
 .notif-title {
@@ -266,14 +184,24 @@
   color: #555;
 }
 
-.notif-tag[data-category='notification'] {
-  background: #ede9fe;
-  color: #6d28d9;
-}
-
-.notif-tag[data-category='alert'] {
+.notif-tag[data-category='accessibility'] {
   background: #fef3c7;
   color: #b45309;
+}
+
+.notif-tag[data-category='capacity'] {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.notif-tag[data-category='condition'] {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.notif-tag[data-category='delay'] {
+  background: #ede9fe;
+  color: #6d28d9;
 }
 
 .notif-time {
