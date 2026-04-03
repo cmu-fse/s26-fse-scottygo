@@ -11,7 +11,8 @@ import {
   ISubscription,
   IBusReport,
   INotification,
-  IServiceAlert
+  IServiceAlert,
+  ITransitSearchResult
 } from './transit.interface';
 import { IConfig } from './map.interface';
 
