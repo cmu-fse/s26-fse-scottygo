@@ -33,7 +33,7 @@ Rules \[Make sure that the **Rules** are covered in the **OOA model**\]
 
 | Search Context | Search Criteria | Search Results |
 | :-- | :-- | :-- |
-| List of users (Mange Account) | Member provides one or more search words where each search work is an existing username (or part of a username) | App displays a list of all users whose username matches the search words provided. First matching users who are online are displayed, followed by matching users who are offline. Within each group, users are displayed in alphabetical order using their usernames and emails. |
+| List of users (Manage Account) | Member provides one or more search words where each search word is an existing username (or part of a username) | App displays a list of all users whose username matches the search words provided. First matching users who are online are displayed, followed by matching users who are offline. Within each group, users are displayed in alphabetical order using their usernames and emails. |
 | Stop and Bus Search (Map) | Member provides one or more search words compatible with the context | App displays the 10 latest matching items for the resources associated with the custom context. The Member can ask to see more matches by sets of 10\. |
 | Route Search (Map) | Member provides one or more search words compatible with the context | App displays the 10 latest matching items for the resources associated with the custom context. The Member can ask to see more matches by sets of 10\. |
 | Subscriptions Search (Subscriptions) | Member provides one or more search words compatible with the context | App displays the 10 latest matching items for the resources associated with the custom context. The Member can ask to see more matches by sets of 10\. |
