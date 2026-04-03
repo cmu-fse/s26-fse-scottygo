@@ -181,10 +181,18 @@ export default class NotificationController extends Controller {
 
   private async searchNotifications(req: Request, res: Response): Promise<void> {
     try {
-      const route = req.query.route as string | undefined;
-      const bus = req.query.bus as string | undefined;
-      const q = req.query.q as string | undefined;
+      const normalizeQueryParam = (value: unknown): string | undefined => {
+        if (typeof value !== 'string') {
+          return undefined;
+        }
 
+        const trimmedValue = value.trim();
+        return trimmedValue === '' ? undefined : trimmedValue;
+      };
+
+      const route = normalizeQueryParam(req.query.route);
+      const bus = normalizeQueryParam(req.query.bus);
+      const q = normalizeQueryParam(req.query.q);
       const notifications = await NotificationModel.searchNotifications({ route, bus, q });
 
       const success: responses.ISuccess = {
