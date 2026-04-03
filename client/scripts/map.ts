@@ -893,6 +893,7 @@ function requestUserLocation(): void {
 
         // Always feed location to directions controller (TUC4 Step 8)
         directionsController.updateUserLocation({ lat, lng });
+        vehicleTracker.updateUserLocation({ lat, lng });
       },
       (error) => {
         if (initialLocationSet) return; // Only show error on first failure
