@@ -191,7 +191,9 @@ async function getUser(username: string): Promise<IUser | null> {
 }
 
 // Get current user account information for role-based UI behavior.
-async function getCurrentUserAccount(username: string): Promise<IUserAccount | null> {
+async function getCurrentUserAccount(
+  username: string
+): Promise<IUserAccount | null> {
   try {
     const token = localStorage.getItem('token');
     const res: AxiosResponse = await axios.request({
@@ -260,7 +262,6 @@ function showSubscriptionToast(message: string): void {
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 5000);
 }
-
 
 // ─── Map provider ──────────────────────────────────────────────────────────────
 
@@ -370,10 +371,15 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
 
     // Show/hide the route bell whenever the selected route changes
     mapStateManager.subscribe((state) => {
-      const bell = document.querySelector('route-bell') as IRouteBellElement | null;
+      const bell = document.querySelector(
+        'route-bell'
+      ) as IRouteBellElement | null;
       if (!bell || typeof bell.showBell !== 'function') return;
       if (state.selectedRouteId) {
-        bell.showBell(state.selectedRouteId, isRouteSubscribed(state.selectedRouteId));
+        bell.showBell(
+          state.selectedRouteId,
+          isRouteSubscribed(state.selectedRouteId)
+        );
       } else {
         bell.hideBell();
       }
@@ -388,7 +394,6 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
 
     // Request user location for centering map
     requestUserLocation();
-
   } else {
     console.error('Map could not be initialized: config unavailable');
     showModal(
@@ -462,46 +467,77 @@ function getPanels(): {
 // Helper function to close all panels
 function closeAllPanels(): void {
   const panels = getPanels();
-  if (
-    panels.direction &&
-    'isOpen' in panels.direction &&
-    (panels.direction as ITogglePanelElement).isOpen()
-  ) {
-    (panels.direction as ITogglePanelElement).hide();
-  }
-  if (
-    panels.system &&
-    'isOpen' in panels.system &&
-    (panels.system as ITogglePanelElement).isOpen()
-  ) {
-    (panels.system as ITogglePanelElement).hide();
-  }
-  if (
-    panels.time &&
-    'isOpen' in panels.time &&
-    (panels.time as ITimePickerElement).isOpen()
-  ) {
-    (panels.time as ITimePickerElement).hide();
-  }
-  if (
-    panels.calendar &&
-    'isOpen' in panels.calendar &&
-    (panels.calendar as ICalendarPickerElement).isOpen()
-  ) {
-    (panels.calendar as ICalendarPickerElement).hide();
-  }
-  if (
-    panels.route &&
-    'isOpen' in panels.route &&
-    (panels.route as IRouteSelectorElement).isOpen()
-  ) {
-    (panels.route as IRouteSelectorElement).hide();
-  }
+  hidePanelIfOpen(panels.direction);
+  hidePanelIfOpen(panels.system);
+  hidePanelIfOpen(panels.time);
+  hidePanelIfOpen(panels.calendar);
+  hidePanelIfOpen(panels.route);
 }
 
-// Setup event listeners for web components
-function setupMapEventListeners(): void {
-  // Transit Search Events
+type PanelCollection = ReturnType<typeof getPanels>;
+type PanelName = keyof PanelCollection;
+type ToggleablePanel = {
+  isOpen: () => boolean;
+  hide: () => void;
+  toggle: () => void;
+};
+
+const panelOrder: PanelName[] = [
+  'direction',
+  'system',
+  'time',
+  'calendar',
+  'route'
+];
+
+const isToggleablePanel = (panel: unknown): panel is ToggleablePanel =>
+  !!panel &&
+  typeof panel === 'object' &&
+  'isOpen' in panel &&
+  'hide' in panel &&
+  'toggle' in panel &&
+  typeof (panel as ToggleablePanel).isOpen === 'function' &&
+  typeof (panel as ToggleablePanel).hide === 'function' &&
+  typeof (panel as ToggleablePanel).toggle === 'function';
+
+const hidePanelIfOpen = (panel: unknown): void => {
+  if (isToggleablePanel(panel) && panel.isOpen()) {
+    panel.hide();
+  }
+};
+
+const togglePanelIfSupported = (panel: unknown): void => {
+  if (isToggleablePanel(panel)) {
+    panel.toggle();
+  }
+};
+
+const closePanelsExcept = (
+  panels: PanelCollection,
+  keepPanel: PanelName
+): void => {
+  panelOrder.forEach((panelName) => {
+    if (panelName !== keepPanel) {
+      hidePanelIfOpen(panels[panelName]);
+    }
+  });
+};
+
+const handlePanelToggle = (
+  panelName: PanelName,
+  clickMessage: string,
+  panelFoundMessage?: string
+): void => {
+  console.log(clickMessage);
+  const panels = getPanels();
+  if (panelFoundMessage) {
+    console.log(panelFoundMessage, panels[panelName]);
+  }
+  closePanelsExcept(panels, panelName);
+  togglePanelIfSupported(panels[panelName]);
+};
+
+const registerTransitSearchEvents = (): void => {
   document.addEventListener('search', (e: Event) => {
     const customEvent = e as CustomEvent;
     const query = customEvent.detail.query;
@@ -525,213 +561,43 @@ function setupMapEventListeners(): void {
     const mode = mapProvider.toggleLayers();
     showSubscriptionToast(`Map layer: ${mode}`);
   });
+};
 
-  // Map Control Events (Filters)
+const registerFilterPanelToggleEvents = (): void => {
   document.addEventListener('filterRoute', () => {
-    console.log('Route filter clicked');
-    const panels = getPanels();
-    console.log('Route selector panel found:', panels.route);
-
-    // Close other panels if open
-    if (
-      panels.direction &&
-      'isOpen' in panels.direction &&
-      (panels.direction as ITogglePanelElement).isOpen()
-    ) {
-      (panels.direction as ITogglePanelElement).hide();
-    }
-    if (
-      panels.system &&
-      'isOpen' in panels.system &&
-      (panels.system as ITogglePanelElement).isOpen()
-    ) {
-      (panels.system as ITogglePanelElement).hide();
-    }
-    if (
-      panels.time &&
-      'isOpen' in panels.time &&
-      (panels.time as ITimePickerElement).isOpen()
-    ) {
-      (panels.time as ITimePickerElement).hide();
-    }
-    if (
-      panels.calendar &&
-      'isOpen' in panels.calendar &&
-      (panels.calendar as ICalendarPickerElement).isOpen()
-    ) {
-      (panels.calendar as ICalendarPickerElement).hide();
-    }
-
-    // Toggle route selector panel
-    if (panels.route && 'toggle' in panels.route) {
-      (panels.route as IRouteSelectorElement).toggle();
-    }
+    handlePanelToggle(
+      'route',
+      'Route filter clicked',
+      'Route selector panel found:'
+    );
   });
 
   document.addEventListener('filterCalendar', () => {
-    console.log('Calendar filter clicked');
-    const panels = getPanels();
-
-    // Close other panels if open
-    if (
-      panels.direction &&
-      'isOpen' in panels.direction &&
-      (panels.direction as ITogglePanelElement).isOpen()
-    ) {
-      (panels.direction as ITogglePanelElement).hide();
-    }
-    if (
-      panels.system &&
-      'isOpen' in panels.system &&
-      (panels.system as ITogglePanelElement).isOpen()
-    ) {
-      (panels.system as ITogglePanelElement).hide();
-    }
-    if (
-      panels.time &&
-      'isOpen' in panels.time &&
-      (panels.time as ITimePickerElement).isOpen()
-    ) {
-      (panels.time as ITimePickerElement).hide();
-    }
-    if (
-      panels.route &&
-      'isOpen' in panels.route &&
-      (panels.route as IRouteSelectorElement).isOpen()
-    ) {
-      (panels.route as IRouteSelectorElement).hide();
-    }
-
-    // Toggle calendar picker panel
-    if (panels.calendar && 'toggle' in panels.calendar) {
-      (panels.calendar as ICalendarPickerElement).toggle();
-    }
+    handlePanelToggle('calendar', 'Calendar filter clicked');
   });
 
   document.addEventListener('filterTime', () => {
-    console.log('Time filter clicked');
-    const panels = getPanels();
-    console.log('Time picker panel found:', panels.time);
-
-    // Close other panels if open
-    if (
-      panels.direction &&
-      'isOpen' in panels.direction &&
-      (panels.direction as ITogglePanelElement).isOpen()
-    ) {
-      (panels.direction as ITogglePanelElement).hide();
-    }
-    if (
-      panels.system &&
-      'isOpen' in panels.system &&
-      (panels.system as ITogglePanelElement).isOpen()
-    ) {
-      (panels.system as ITogglePanelElement).hide();
-    }
-    if (
-      panels.calendar &&
-      'isOpen' in panels.calendar &&
-      (panels.calendar as ICalendarPickerElement).isOpen()
-    ) {
-      (panels.calendar as ICalendarPickerElement).hide();
-    }
-    if (
-      panels.route &&
-      'isOpen' in panels.route &&
-      (panels.route as IRouteSelectorElement).isOpen()
-    ) {
-      (panels.route as IRouteSelectorElement).hide();
-    }
-
-    // Toggle time picker panel
-    if (panels.time && 'toggle' in panels.time) {
-      (panels.time as ITimePickerElement).toggle();
-    }
+    handlePanelToggle(
+      'time',
+      'Time filter clicked',
+      'Time picker panel found:'
+    );
   });
 
   document.addEventListener('filterSystem', () => {
-    console.log('System filter clicked');
-    const panels = getPanels();
-    console.log('System panel found:', panels.system);
-
-    // Close other panels if open
-    if (
-      panels.direction &&
-      'isOpen' in panels.direction &&
-      (panels.direction as ITogglePanelElement).isOpen()
-    ) {
-      (panels.direction as ITogglePanelElement).hide();
-    }
-    if (
-      panels.time &&
-      'isOpen' in panels.time &&
-      (panels.time as ITimePickerElement).isOpen()
-    ) {
-      (panels.time as ITimePickerElement).hide();
-    }
-    if (
-      panels.calendar &&
-      'isOpen' in panels.calendar &&
-      (panels.calendar as ICalendarPickerElement).isOpen()
-    ) {
-      (panels.calendar as ICalendarPickerElement).hide();
-    }
-    if (
-      panels.route &&
-      'isOpen' in panels.route &&
-      (panels.route as IRouteSelectorElement).isOpen()
-    ) {
-      (panels.route as IRouteSelectorElement).hide();
-    }
-
-    // Toggle system panel
-    if (panels.system && 'toggle' in panels.system) {
-      (panels.system as ITogglePanelElement).toggle();
-    }
+    handlePanelToggle('system', 'System filter clicked', 'System panel found:');
   });
 
   document.addEventListener('filterDirection', () => {
-    console.log('Direction filter clicked');
-    const panels = getPanels();
-    console.log('Direction panel found:', panels.direction);
-
-    // Close other panels if open
-    if (
-      panels.system &&
-      'isOpen' in panels.system &&
-      (panels.system as ITogglePanelElement).isOpen()
-    ) {
-      (panels.system as ITogglePanelElement).hide();
-    }
-    if (
-      panels.time &&
-      'isOpen' in panels.time &&
-      (panels.time as ITimePickerElement).isOpen()
-    ) {
-      (panels.time as ITimePickerElement).hide();
-    }
-    if (
-      panels.calendar &&
-      'isOpen' in panels.calendar &&
-      (panels.calendar as ICalendarPickerElement).isOpen()
-    ) {
-      (panels.calendar as ICalendarPickerElement).hide();
-    }
-    if (
-      panels.route &&
-      'isOpen' in panels.route &&
-      (panels.route as IRouteSelectorElement).isOpen()
-    ) {
-      (panels.route as IRouteSelectorElement).hide();
-    }
-
-    // Toggle direction panel
-    if (panels.direction && 'toggle' in panels.direction) {
-      (panels.direction as ITogglePanelElement).toggle();
-    }
+    handlePanelToggle(
+      'direction',
+      'Direction filter clicked',
+      'Direction panel found:'
+    );
   });
+};
 
-  // Zoom Control Events
+const registerZoomAndMapEvents = (): void => {
   document.addEventListener('zoomIn', () => {
     console.log('Zoom in clicked');
     const currentZoom = mapProvider.getZoom();
@@ -755,21 +621,20 @@ function setupMapEventListeners(): void {
     }
   });
 
-  // Location Indicator Events
   document.addEventListener('locationShown', (e: Event) => {
     const customEvent = e as CustomEvent;
     console.log('Location shown:', customEvent.detail);
   });
 
-  // Dark Mode Events
   document.addEventListener('themeChanged', (e: Event) => {
     const customEvent = e as CustomEvent;
     const isDark = customEvent.detail.isDark;
     console.log('Theme changed to:', isDark ? 'dark' : 'light');
     // TODO: Update map theme if needed
   });
+};
 
-  // System Toggle Events
+const registerFilterApplicationEvents = (): void => {
   document.addEventListener('systemFilterApplied', async (e: Event) => {
     const customEvent = e as CustomEvent;
     const { prt, cmu } = customEvent.detail;
@@ -778,7 +643,6 @@ function setupMapEventListeners(): void {
     await filterController.applySystemFilter();
   });
 
-  // Direction Filter Events
   document.addEventListener('directionFilterApplied', async (e: Event) => {
     const customEvent = e as CustomEvent;
     const { inbound, outbound } = customEvent.detail;
@@ -792,7 +656,6 @@ function setupMapEventListeners(): void {
     await filterController.applyDirectionFilter();
   });
 
-  // Time Picker Events
   document.addEventListener('timeSelected', async (e: Event) => {
     const customEvent = e as CustomEvent<ITimeSelection>;
     const { hour, minute, period } = customEvent.detail;
@@ -800,7 +663,6 @@ function setupMapEventListeners(): void {
       `Time selected: ${hour}:${minute.toString().padStart(2, '0')} ${period}`
     );
 
-    // Highlight the time filter button to indicate active filter
     const timeBtn = document.querySelector('#time-filter-btn');
     if (timeBtn) {
       timeBtn.classList.add('primary');
@@ -810,7 +672,6 @@ function setupMapEventListeners(): void {
     await filterController.applyDateTimeFilter();
   });
 
-  // Calendar Picker Events
   document.addEventListener('dateSelected', async (e: Event) => {
     const customEvent = e as CustomEvent<IDateSelection>;
     const date = customEvent.detail.date;
@@ -818,8 +679,9 @@ function setupMapEventListeners(): void {
     mapStateManager.updateFilter('selectedDate', date);
     await filterController.applyDateTimeFilter();
   });
+};
 
-  // Bell subscription events
+const registerSubscriptionEvents = (): void => {
   document.addEventListener('bellSubscribe', async (e: Event) => {
     const { routeId } = (e as CustomEvent<{ routeId: string }>).detail;
     const token = localStorage.getItem('token');
@@ -827,29 +689,48 @@ function setupMapEventListeners(): void {
       const res = await axios.post(
         '/notifications/subscriptions',
         { routeId },
-        { headers: { Authorization: `Bearer ${token}` }, validateStatus: () => true }
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          validateStatus: () => true
+        }
       );
       if (res.status === 201 && res.data.name === 'RouteSubscribed') {
         subscribedRoutes.add(routeId);
-        document.dispatchEvent(new CustomEvent('notifRouteJoin', { detail: { routeId } }));
+        document.dispatchEvent(
+          new CustomEvent('notifRouteJoin', { detail: { routeId } })
+        );
         showSubscriptionToast(`Subscribed to Route ${routeId}.`);
-      } else if (res.status === 409 && res.data.name === 'SubscriptionLimitReached') {
-        showSubscriptionToast('Subscription limit reached (10). Please remove a subscription first.');
-        // Revert bell to unsubscribed state
-        const bell = document.querySelector('route-bell') as IRouteBellElement | null;
+      } else if (
+        res.status === 409 &&
+        res.data.name === 'SubscriptionLimitReached'
+      ) {
+        showSubscriptionToast(
+          'Subscription limit reached (10). Please remove a subscription first.'
+        );
+        const bell = document.querySelector(
+          'route-bell'
+        ) as IRouteBellElement | null;
         bell?.showBell(routeId, false);
-      } else if (res.status === 409 && res.data.name === 'DuplicateSubscription') {
-        // Already subscribed server-side — sync local state
+      } else if (
+        res.status === 409 &&
+        res.data.name === 'DuplicateSubscription'
+      ) {
         subscribedRoutes.add(routeId);
-        document.dispatchEvent(new CustomEvent('notifRouteJoin', { detail: { routeId } }));
+        document.dispatchEvent(
+          new CustomEvent('notifRouteJoin', { detail: { routeId } })
+        );
       } else {
         showSubscriptionToast('Failed to subscribe. Please try again.');
-        const bell = document.querySelector('route-bell') as IRouteBellElement | null;
+        const bell = document.querySelector(
+          'route-bell'
+        ) as IRouteBellElement | null;
         bell?.showBell(routeId, false);
       }
     } catch {
       showSubscriptionToast('Failed to subscribe. Please try again.');
-      const bell = document.querySelector('route-bell') as IRouteBellElement | null;
+      const bell = document.querySelector(
+        'route-bell'
+      ) as IRouteBellElement | null;
       bell?.showBell(routeId, false);
     }
   });
@@ -858,31 +739,49 @@ function setupMapEventListeners(): void {
     const { routeId } = (e as CustomEvent<{ routeId: string }>).detail;
     const token = localStorage.getItem('token');
     try {
-      const res = await axios.delete(`/notifications/subscriptions/${routeId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-        validateStatus: () => true
-      });
+      const res = await axios.delete(
+        `/notifications/subscriptions/${routeId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          validateStatus: () => true
+        }
+      );
       if (res.status === 200 || res.status === 404) {
         subscribedRoutes.delete(routeId);
-        document.dispatchEvent(new CustomEvent('notifRouteLeave', { detail: { routeId } }));
+        document.dispatchEvent(
+          new CustomEvent('notifRouteLeave', { detail: { routeId } })
+        );
         showSubscriptionToast(`Unsubscribed from Route ${routeId}.`);
       } else {
         showSubscriptionToast('Failed to unsubscribe. Please try again.');
-        // Revert bell to subscribed state
-        const bell = document.querySelector('route-bell') as IRouteBellElement | null;
+        const bell = document.querySelector(
+          'route-bell'
+        ) as IRouteBellElement | null;
         bell?.showBell(routeId, true);
       }
     } catch {
       showSubscriptionToast('Failed to unsubscribe. Please try again.');
-      const bell = document.querySelector('route-bell') as IRouteBellElement | null;
+      const bell = document.querySelector(
+        'route-bell'
+      ) as IRouteBellElement | null;
       bell?.showBell(routeId, true);
     }
   });
+};
 
-  // Bus Report Form — opened by vehicle-tracker with lat/lon already checked
+const registerBusReportEvents = (): void => {
   document.addEventListener('busReport', (e: Event) => {
-    const { vid, routeId, lat, lon } = (e as CustomEvent<{ vid: string; routeId: string; lat: number; lon: number }>).detail;
-    const form = document.querySelector('bus-report-form') as BusReportFormElement | null;
+    const { vid, routeId, lat, lon } = (
+      e as CustomEvent<{
+        vid: string;
+        routeId: string;
+        lat: number;
+        lon: number;
+      }>
+    ).detail;
+    const form = document.querySelector(
+      'bus-report-form'
+    ) as BusReportFormElement | null;
     if (form && typeof form.open === 'function') {
       form.open(vid, routeId, lat, lon);
     }
@@ -897,20 +796,24 @@ function setupMapEventListeners(): void {
         validateStatus: () => true
       });
       if (res.status === 201) {
-        showSubscriptionToast(res.data.message ?? 'Report submitted. Thank you!');
+        showSubscriptionToast(
+          res.data.message ?? 'Report submitted. Thank you!'
+        );
       } else {
         console.error('Report submission failed:', res.status, res.data);
-        // Show the server's message when available (e.g. ProximityViolation, VehicleNotFound)
         const serverMsg: string | undefined = res.data?.message;
-        showSubscriptionToast(serverMsg ?? 'Failed to submit report. Please try again.');
+        showSubscriptionToast(
+          serverMsg ?? 'Failed to submit report. Please try again.'
+        );
       }
     } catch (err) {
       console.error('Report submission error:', err);
       showSubscriptionToast('Failed to submit report. Please try again.');
     }
   });
+};
 
-  // Route Selector Events
+const registerRouteSelectionEvents = (): void => {
   document.addEventListener('routeSelected', async (e: Event) => {
     const customEvent = e as CustomEvent<IRouteSelection>;
     const route = customEvent.detail.route;
@@ -918,6 +821,17 @@ function setupMapEventListeners(): void {
     mapStateManager.updateFilter('selectedRouteId', route);
     await filterController.applyRouteFilter(route);
   });
+};
+
+// Setup event listeners for web components
+function setupMapEventListeners(): void {
+  registerTransitSearchEvents();
+  registerFilterPanelToggleEvents();
+  registerZoomAndMapEvents();
+  registerFilterApplicationEvents();
+  registerSubscriptionEvents();
+  registerBusReportEvents();
+  registerRouteSelectionEvents();
 }
 
 // Request user's geographic location (VisRoute Basic Flow step 2-3)
@@ -1067,8 +981,7 @@ function updateDirectionsPanel(
   panel.id = 'directions-panel';
   panel.className = 'directions-panel';
 
-  const stopName =
-    directionsController.targetStop?.stopName ?? 'Selected Stop';
+  const stopName = directionsController.targetStop?.stopName ?? 'Selected Stop';
 
   panel.innerHTML = `
     <div class="directions-panel__header">
@@ -1108,4 +1021,3 @@ function isInPittsburghArea(lat: number, lng: number): boolean {
 
   return lat >= MIN_LAT && lat <= MAX_LAT && lng >= MIN_LNG && lng <= MAX_LNG;
 }
-

@@ -157,22 +157,30 @@ body.dark .circle-btn.primary {
   padding: 0 14px;
   border-radius: 28px;
   height: 48px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.15),
+    0 0 0 1px rgba(0, 0, 0, 0.04);
   transition: box-shadow 0.2s ease;
 }
 
 .search-box:focus-within {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(0, 0, 0, 0.06);
 }
 
 body.dark .search-box {
   background: #1f2937;
   color: var(--white);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 
 body.dark .search-box:focus-within {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.1);
 }
 
 .search-box .search-icon {
@@ -194,7 +202,11 @@ body.dark .search-box .search-icon {
   font-size: 15px;
   background: transparent;
   color: #202124;
-  font-family: 'Inter', -apple-system, system-ui, sans-serif;
+  font-family:
+    'Inter',
+    -apple-system,
+    system-ui,
+    sans-serif;
   line-height: 48px;
 }
 
@@ -258,7 +270,9 @@ body.dark .search-clear-btn:hover {
   right: 0;
   background: #fff;
   border-radius: 16px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.18),
+    0 0 0 1px rgba(0, 0, 0, 0.04);
   max-height: 320px;
   overflow-y: auto;
   padding: 6px 0;
@@ -267,7 +281,9 @@ body.dark .search-clear-btn:hover {
 
 body.dark .search-dropdown {
   background: #1f2937;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 
 .search-dropdown::-webkit-scrollbar {
@@ -1981,10 +1997,18 @@ body.dark .map-popup__source--static {
   animation: mapNotifFadeOut 0.3s ease-in forwards;
 }
 
-.map-notif-card[data-category='accessibility'] { border-left-color: #f59e0b; }
-.map-notif-card[data-category='capacity']      { border-left-color: #ef4444; }
-.map-notif-card[data-category='condition']     { border-left-color: #3b82f6; }
-.map-notif-card[data-category='delay']         { border-left-color: #8b5cf6; }
+.map-notif-card[data-category='accessibility'] {
+  border-left-color: #f59e0b;
+}
+.map-notif-card[data-category='capacity'] {
+  border-left-color: #ef4444;
+}
+.map-notif-card[data-category='condition'] {
+  border-left-color: #3b82f6;
+}
+.map-notif-card[data-category='delay'] {
+  border-left-color: #8b5cf6;
+}
 
 .map-notif-header {
   display: flex;
@@ -1993,11 +2017,22 @@ body.dark .map-popup__source--static {
   padding-right: 20px;
 }
 
-.map-notif-icon { flex-shrink: 0; line-height: 0; }
-.map-notif-icon[data-category='accessibility'] { color: #f59e0b; }
-.map-notif-icon[data-category='capacity']      { color: #ef4444; }
-.map-notif-icon[data-category='condition']     { color: #3b82f6; }
-.map-notif-icon[data-category='delay']         { color: #8b5cf6; }
+.map-notif-icon {
+  flex-shrink: 0;
+  line-height: 0;
+}
+.map-notif-icon[data-category='accessibility'] {
+  color: #f59e0b;
+}
+.map-notif-icon[data-category='capacity'] {
+  color: #ef4444;
+}
+.map-notif-icon[data-category='condition'] {
+  color: #3b82f6;
+}
+.map-notif-icon[data-category='delay'] {
+  color: #8b5cf6;
+}
 
 .map-notif-title {
   font-size: 14px;
@@ -2029,10 +2064,22 @@ body.dark .map-popup__source--static {
   color: #555;
 }
 
-.map-notif-tag[data-category='accessibility'] { background: #fef3c7; color: #b45309; }
-.map-notif-tag[data-category='capacity']      { background: #fee2e2; color: #b91c1c; }
-.map-notif-tag[data-category='condition']     { background: #dbeafe; color: #1d4ed8; }
-.map-notif-tag[data-category='delay']         { background: #ede9fe; color: #6d28d9; }
+.map-notif-tag[data-category='accessibility'] {
+  background: #fef3c7;
+  color: #b45309;
+}
+.map-notif-tag[data-category='capacity'] {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.map-notif-tag[data-category='condition'] {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+.map-notif-tag[data-category='delay'] {
+  background: #ede9fe;
+  color: #6d28d9;
+}
 
 .map-notif-time {
   font-size: 11px;
@@ -2058,7 +2105,9 @@ body.dark .map-popup__source--static {
 }
 
 /* Each card is position:relative to anchor the dismiss button */
-.map-notif-card { position: relative; }
+.map-notif-card {
+  position: relative;
+}
 
 @media (max-width: 768px) {
   .map-notif-container {
@@ -2104,8 +2153,14 @@ bus-report-form.is-open .bus-report-backdrop {
 }
 
 @keyframes busReportFadeIn {
-  from { opacity: 0; transform: scale(0.96); }
-  to   { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* Header */
@@ -2179,7 +2234,10 @@ bus-report-form.is-open .bus-report-backdrop {
   font-family: inherit;
   cursor: pointer;
   color: #1f2937;
-  transition: border-color 0.15s, background 0.15s, color 0.15s;
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    color 0.15s;
 }
 
 .bus-report__option:hover {
@@ -2235,7 +2293,9 @@ bus-report-form.is-open .bus-report-backdrop {
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s, opacity 0.15s;
+  transition:
+    background 0.15s,
+    opacity 0.15s;
 }
 
 .bus-report__nav-btn--back {
@@ -2366,7 +2426,7 @@ body.dark .map-popup__minimize:hover {
 
 .map-popup__walk-icon {
   font-size: 16px;
-  color: #4285F4;
+  color: #4285f4;
 }
 
 body.dark .map-popup__walk-time {
@@ -2391,7 +2451,7 @@ body.dark .map-popup__walk-icon {
   padding: 10px 0;
   border: none;
   border-radius: 10px;
-  background: #4285F4;
+  background: #4285f4;
   color: #fff;
   font-size: 14px;
   font-weight: 600;
@@ -2445,7 +2505,7 @@ body.dark .map-popup__directions-btn:hover {
 
 .directions-panel__icon {
   font-size: 22px;
-  color: #4285F4;
+  color: #4285f4;
   flex-shrink: 0;
 }
 
