@@ -44,6 +44,15 @@ export class FilterController {
   private stopCache = new Map<string, IStop[]>();
   /** Whether bulk data has been loaded */
   private bulkLoaded = false;
+
+  /** Return the stop cache (routeId:DIRECTION → stops) for the search component. */
+  getStopsData(): Record<string, IStop[]> {
+    const result: Record<string, IStop[]> = {};
+    for (const [key, stops] of this.stopCache.entries()) {
+      result[key] = stops;
+    }
+    return result;
+  }
   /** Interval handle for health polling */
   private healthPollInterval: number | null = null;
   /** Tracks whether colors were available on the last health check (for detecting recovery). */
@@ -777,6 +786,14 @@ export class FilterController {
       console.error('Error fetching stops:', error);
       return [];
     }
+  }
+
+  /**
+   * Public helper for map search stop selections.
+   * Reuses the same prediction + popup flow as marker clicks.
+   */
+  async showStopDetailsFromSearch(stop: IStop): Promise<void> {
+    await this.handleStopClick(stop);
   }
 
   /**

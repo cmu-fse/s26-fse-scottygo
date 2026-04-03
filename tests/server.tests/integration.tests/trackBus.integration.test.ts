@@ -97,7 +97,7 @@ const sampleVehiclesP1: IVehicle[] = [
   {
     vid: '3301',
     lat: 40.4425,
-    lon: -79.9950,
+    lon: -79.995,
     routeId: 'P1',
     heading: 90,
     source: 'live',
@@ -108,8 +108,8 @@ const sampleVehiclesP1: IVehicle[] = [
   },
   {
     vid: '3302',
-    lat: 40.4480,
-    lon: -79.9870,
+    lat: 40.448,
+    lon: -79.987,
     routeId: 'P1',
     heading: 270,
     source: 'live',
@@ -162,7 +162,7 @@ const sampleDetourGeometry = [
     ],
     originalPath: [
       { lat: 40.452, lng: -79.932 },
-      { lat: 40.453, lng: -79.930 }
+      { lat: 40.453, lng: -79.93 }
     ]
   }
 ];
@@ -398,7 +398,7 @@ describe('TUC 2: Track Bus in Real-Time — Integration Tests', () => {
     const v1 = vehicles.find((v) => v.vid === '3301');
     expect(v1).toBeDefined();
     expect(v1!.lat).toBeCloseTo(40.4425, 4);
-    expect(v1!.lon).toBeCloseTo(-79.9950, 4);
+    expect(v1!.lon).toBeCloseTo(-79.995, 4);
     expect(v1!.routeId).toBe('P1');
     expect(v1!.heading).toBe(90);
     expect(v1!.source).toBe('live');

@@ -30,6 +30,7 @@ export class RouteSelectorPanel
   private selectedRoute: string | null = null;
   private isVisible = false;
   private searchValue = '';
+  private searchRequestId = 0;
 
   constructor() {
     super();
@@ -181,31 +182,13 @@ export class RouteSelectorPanel
     const input = this.querySelector('.route-search-input') as HTMLInputElement;
     input?.addEventListener('input', (e) => {
       e.stopPropagation();
-      const value = (e.target as HTMLInputElement).value.toLowerCase();
+      const value = (e.target as HTMLInputElement).value;
       const cursorPos = (e.target as HTMLInputElement).selectionStart;
       this.searchValue = value;
-      this.filteredRoutes = this.routes.filter(
-        (route) =>
-          route.id.toLowerCase().includes(value) ||
-          route.name.toLowerCase().includes(value)
-      );
       // Save scroll position before re-render
       const routeList = this.querySelector('.route-list') as HTMLElement;
       const scrollTop = routeList?.scrollTop || 0;
-      this.render();
-      // Restore scroll position and focus after re-render
-      const newRouteList = this.querySelector('.route-list') as HTMLElement;
-      if (newRouteList) {
-        newRouteList.scrollTop = scrollTop;
-      }
-      // Restore focus and cursor position
-      const newInput = this.querySelector(
-        '.route-search-input'
-      ) as HTMLInputElement;
-      if (newInput) {
-        newInput.focus();
-        newInput.setSelectionRange(cursorPos, cursorPos);
-      }
+      void this.updateSearchResults(value, scrollTop, cursorPos);
     });
 
     // Route button selection
@@ -248,6 +231,84 @@ export class RouteSelectorPanel
 
       this.hide();
     });
+  }
+
+  private async updateSearchResults(
+    value: string,
+    scrollTop: number,
+    cursorPos: number | null
+  ): Promise<void> {
+    const requestId = ++this.searchRequestId;
+    const trimmed = value.trim();
+
+    if (!trimmed) {
+      this.filteredRoutes = [...this.routes];
+    } else {
+      let remoteResults: IRouteOption[] | null = null;
+      try {
+        remoteResults = await this.searchRoutesViaApi(trimmed);
+      } catch {
+        remoteResults = null;
+      }
+
+      if (requestId !== this.searchRequestId) {
+        return;
+      }
+
+      if (remoteResults !== null) {
+        this.filteredRoutes = remoteResults;
+      } else {
+        const lower = trimmed.toLowerCase();
+        this.filteredRoutes = this.routes.filter(
+          (route) =>
+            route.id.toLowerCase().includes(lower) ||
+            route.name.toLowerCase().includes(lower)
+        );
+      }
+    }
+
+    if (requestId !== this.searchRequestId) {
+      return;
+    }
+
+    this.render();
+
+    // Restore scroll position and focus after re-render.
+    const newRouteList = this.querySelector('.route-list') as HTMLElement;
+    if (newRouteList) {
+      newRouteList.scrollTop = scrollTop;
+    }
+
+    const newInput = this.querySelector(
+      '.route-search-input'
+    ) as HTMLInputElement;
+    if (newInput) {
+      const selection = cursorPos ?? this.searchValue.length;
+      newInput.focus();
+      newInput.setSelectionRange(selection, selection);
+    }
+  }
+
+  private async searchRoutesViaApi(query: string): Promise<IRouteOption[]> {
+    const token = localStorage.getItem('token') ?? '';
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    const res = await fetch(
+      `/map/routes/search?q=${encodeURIComponent(query)}`,
+      {
+        headers
+      }
+    );
+
+    if (!res.ok) {
+      return [];
+    }
+
+    const data = (await res.json()) as { payload?: IRouteOption[] };
+    return data.payload ?? [];
   }
 }
 

@@ -486,6 +486,13 @@ export class User implements IUser {
   }
 
   /**
+   * Get all user accounts (for server-side user search and ordering).
+   */
+  static async getAllUserAccounts(): Promise<IUserAccount[]> {
+    return DAC.db.getAllUserAccounts();
+  }
+
+  /**
    * Get a user account by userId (immutable _id)
    */
   static async getUserAccountById(userId: string): Promise<IUserAccount> {

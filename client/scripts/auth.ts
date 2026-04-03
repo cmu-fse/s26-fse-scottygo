@@ -1,4 +1,5 @@
 import axios, { AxiosResponse } from 'axios';
+import './components/app-header';
 import type { ILogin, IUser } from '../../common/user.interface';
 import type {
   IAuthenticatedUser,
@@ -551,24 +552,4 @@ termsDecline?.addEventListener('click', () => {
 declineOk?.addEventListener('click', () => {
   closeModal(declineModal);
   window.location.href = '/home';
-});
-
-// Menu toggle
-const menuIcon = document.getElementById('menu-icon');
-const dropdownMenu = document.getElementById('dropdown-menu');
-const backIcon = document.getElementById('back-icon');
-
-menuIcon?.addEventListener('click', () => {
-  menuIcon.classList.toggle('is-active');
-  dropdownMenu?.classList.toggle('is-active');
-  backIcon?.classList.toggle('is-hidden');
-});
-
-// Logout from menu
-const menuLogoutBtn = document.getElementById('menu-logout-btn');
-
-menuLogoutBtn?.addEventListener('click', () => {
-  localStorage.removeItem('token');
-  localStorage.removeItem('username');
-  window.location.replace('/home');
 });

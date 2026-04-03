@@ -64,7 +64,7 @@ const nearbyStops: IStop[] = [
     stopId: '4408',
     stopName: 'Forbes Ave at Craig St',
     lat: 40.4445,
-    lon: -79.9490,
+    lon: -79.949,
     routes: ['61C', 'P1'],
     dtradd: [],
     dtrrem: []
@@ -459,10 +459,7 @@ describe('GET /transit/stops/nearbystops', () => {
   // 6. 400 MissingParameter when lat/lon are absent
   // --------------------------------------------------------------------------
   test('returns 400 MissingParameter when lat is missing', async () => {
-    const res = await request(
-      'GET',
-      '/transit/stops/nearbystops?lon=-79.9436'
-    );
+    const res = await request('GET', '/transit/stops/nearbystops?lon=-79.9436');
 
     expect(res.status).toBe(400);
     const error = res.data as responses.IAppError;
@@ -470,10 +467,7 @@ describe('GET /transit/stops/nearbystops', () => {
   });
 
   test('returns 400 MissingParameter when lon is missing', async () => {
-    const res = await request(
-      'GET',
-      '/transit/stops/nearbystops?lat=40.4433'
-    );
+    const res = await request('GET', '/transit/stops/nearbystops?lat=40.4433');
 
     expect(res.status).toBe(400);
     const error = res.data as responses.IAppError;
@@ -680,9 +674,7 @@ describe('GET /transit/stops/nearbystops', () => {
   // 15. INearbyStop payload has all required fields
   // --------------------------------------------------------------------------
   test('each nearby stop has required INearbyStop fields', async () => {
-    const mockStops = [
-      buildNearbyStop(nearbyStops[0], 210, ['61C'])
-    ];
+    const mockStops = [buildNearbyStop(nearbyStops[0], 210, ['61C'])];
     const payload = buildNearbyPayload(mockStops);
     mockTransitModel.getNearbyStops.mockResolvedValue(payload);
 

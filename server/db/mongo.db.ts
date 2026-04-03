@@ -103,9 +103,12 @@ const BusReportSchema = new Schema<IBusReport>({
   userId: { type: String, required: true },
   vid: { type: String, required: true },
   routeId: { type: String, required: true },
-  crowdedness: { type: String, enum: ['Empty', 'Few Seats Taken', 'Standing Room', 'Packed'] },
+  crowdedness: {
+    type: String,
+    enum: ['Empty', 'Few Seats Taken', 'Standing Room', 'Packed']
+  },
   prioritySeating: { type: String, enum: ['Available', 'Occupied'] },
-  condition: { type: String, enum: ['Clean', 'Dirty', 'Needs Maintenance'] },
+  condition: { type: String, enum: ['Clean', 'Dirty', 'Average'] },
   comment: { type: String },
   lat: { type: Number, required: true },
   lon: { type: Number, required: true },
@@ -350,6 +353,11 @@ export class MongoDB implements IDatabase {
     return users.map((u) => u.credentials.username);
   }
 
+  async getAllUserAccounts(): Promise<IUserAccount[]> {
+    const users = await MUser.find({}).lean();
+    return users as IUserAccount[];
+  }
+
   // ── Transit Cache Methods ──────────────────────────────────────────────
 
   async getTransitCache(cacheKey: string): Promise<ITransitCache | null> {
@@ -358,6 +366,14 @@ export class MongoDB implements IDatabase {
     // Check if the cache has expired (belt-and-suspenders alongside TTL index)
     if (new Date() > new Date(entry.expiresAt)) return null;
     return entry as ITransitCache;
+  }
+
+  async getAllTransitCaches(): Promise<ITransitCache[]> {
+    const now = new Date();
+    const entries = await MTransitCache.find({
+      expiresAt: { $gt: now }
+    }).lean();
+    return entries as ITransitCache[];
   }
 
   async upsertTransitCache(entry: ITransitCache): Promise<void> {
@@ -397,11 +413,17 @@ export class MongoDB implements IDatabase {
   // ── Notification (TUC3) Methods ──────────────────────────────────────
 
   async getSubscriptionsByUserId(userId: string): Promise<ISubscription[]> {
-    return await MSubscription.find({ userId }).lean() as ISubscription[];
+    return (await MSubscription.find({ userId }).lean()) as ISubscription[];
   }
 
-  async findSubscription(userId: string, routeId: string): Promise<ISubscription | null> {
-    return await MSubscription.findOne({ userId, routeId }).lean() as ISubscription | null;
+  async findSubscription(
+    userId: string,
+    routeId: string
+  ): Promise<ISubscription | null> {
+    return (await MSubscription.findOne({
+      userId,
+      routeId
+    }).lean()) as ISubscription | null;
   }
 
   async countSubscriptionsByUserId(userId: string): Promise<number> {
@@ -426,9 +448,9 @@ export class MongoDB implements IDatabase {
   }
 
   async getLatestReportByVehicle(vid: string): Promise<IBusReport | null> {
-    return await MBusReport.findOne({ vid })
+    return (await MBusReport.findOne({ vid })
       .sort({ createdAt: -1 })
-      .lean() as IBusReport | null;
+      .lean()) as IBusReport | null;
   }
 
   async saveNotification(notification: INotification): Promise<INotification> {
@@ -443,12 +465,12 @@ export class MongoDB implements IDatabase {
     return obj as unknown as INotification;
   }
 
-  async getRecentNotifications(filter: Record<string, unknown>): Promise<INotification[]> {
+  async getRecentNotifications(
+    filter: Record<string, unknown>
+  ): Promise<INotification[]> {
     const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
     const query = { ...filter, createdAt: { $gte: thirtyMinAgo } };
-    const docs = await MNotification.find(query)
-      .sort({ createdAt: -1 })
-      .lean();
+    const docs = await MNotification.find(query).sort({ createdAt: -1 }).lean();
     // Strip internal _expiresAt field
     return docs.map((d) => {
       const { _expiresAt, __v, ...rest } = d as Record<string, unknown>;

@@ -71,6 +71,14 @@ export interface IPattern {
   path: { lat: number; lng: number }[]; // Ordered sequence of points forming the route geometry
 }
 
+// ── Search Result Types ────────────────────────────────────────────────
+
+/** Combined result for the Stop and Route Search context (GET /map/search). */
+export interface ITransitSearchResult {
+  routes: IRoute[];
+  stops: IStop[];
+}
+
 // ── Bulk Transit Data ──────────────────────────────────────────────────
 // Single-payload response containing all static transit data so the client
 // can do every bit of filtering on the frontend without extra API calls.
@@ -101,9 +109,13 @@ export interface INearbyStopsPayload {
 
 // ── Live Notification (TUC3) ───────────────────────────────────────────
 
-export type ICrowdedness = 'Empty' | 'Few Seats Taken' | 'Standing Room' | 'Packed';
+export type ICrowdedness =
+  | 'Empty'
+  | 'Few Seats Taken'
+  | 'Standing Room'
+  | 'Packed';
 export type IPrioritySeating = 'Available' | 'Occupied';
-export type IBusCondition = 'Clean' | 'Dirty' | 'Needs Maintenance';
+export type IBusCondition = 'Clean' | 'Dirty' | 'Average';
 
 export interface ISubscription {
   _id?: string;

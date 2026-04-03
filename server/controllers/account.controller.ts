@@ -15,6 +15,11 @@ import jwt from 'jsonwebtoken';
 import { JWT_KEY as secretKey } from '../env';
 import * as responses from '../../common/server.responses';
 import EmailService from '../services/email.service';
+import {
+  SearchContext,
+  UserSearchStrategy,
+  UserSearchField
+} from '../search/search-strategy';
 
 export default class AccountController extends Controller {
   public constructor(path: string) {
@@ -30,6 +35,7 @@ export default class AccountController extends Controller {
 
     // Account management routes
     this.router.get('/users', this.getAllUsers.bind(this)); // Must be before :username route
+    this.router.get('/users/search', this.searchUsers.bind(this)); // Must be before :username route
     this.router.get('/users/:username', this.getUserAccount.bind(this));
     this.router.patch('/users/:username/status', this.updateStatus.bind(this));
     this.router.patch(
@@ -155,6 +161,69 @@ export default class AccountController extends Controller {
       const successRes: responses.ISuccess = {
         name: 'UsersRetrieved',
         authorizedUser: requestingUser.credentials.username,
+        payload: usernames
+      };
+      res.status(200).json(successRes);
+    } catch (error: unknown) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
+   * GET /account/users/search?field=username|email&q=<keywords>
+   * Search users with contextual strategy and deterministic ordering.
+   * Only available to administrators.
+   */
+  public async searchUsers(req: Request, res: Response): Promise<void> {
+    try {
+      const requestingUser = await this.getRequestingUserAccount(req);
+      if (!requestingUser) {
+        const error: responses.IAppError = {
+          type: 'ClientError',
+          name: 'UnauthorizedRequest',
+          message: 'Unable to verify requesting user'
+        };
+        res.status(401).json(error);
+        return;
+      }
+
+      if (requestingUser.privilegeLevel !== 'Administrator') {
+        const error: responses.IAppError = {
+          type: 'ClientError',
+          name: 'UnauthorizedRequest',
+          message: 'Only administrators can search users'
+        };
+        res.status(403).json(error);
+        return;
+      }
+
+      const rawField = ((req.query.field as string | undefined)
+        ?.trim()
+        .toLowerCase() ?? 'username') as UserSearchField;
+
+      if (rawField !== 'username' && rawField !== 'email') {
+        const error: responses.IAppError = {
+          type: 'ClientError',
+          name: 'InvalidSearchField',
+          message: 'field must be either "username" or "email"'
+        };
+        res.status(400).json(error);
+        return;
+      }
+
+      const q = (req.query.q as string | undefined)?.trim() ?? '';
+      const context = new SearchContext<string[]>(
+        new UserSearchStrategy(rawField)
+      );
+      const usernames = await context.executeSearch(q);
+
+      const successRes: responses.ISuccess = {
+        name: 'UsersSearchCompleted',
+        authorizedUser: requestingUser.credentials.username,
+        message: usernames.length
+          ? `Found ${usernames.length} matching user${usernames.length === 1 ? '' : 's'}`
+          : 'No matching users found',
+        metadata: { totalItems: usernames.length, field: rawField },
         payload: usernames
       };
       res.status(200).json(successRes);

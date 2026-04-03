@@ -7,6 +7,7 @@ import {
   IDetour,
   IPattern,
   IBulkTransitData,
+  ITransitSearchResult,
   INearbyStopsPayload,
   ISubscription,
   IBusReport,
@@ -55,7 +56,10 @@ export type SuccessName =
   | 'RouteUnsubscribed'
   | 'ReportSubmitted'
   | 'NotificationsRetrieved'
-  | 'AlertsRetrieved';
+  | 'AlertsRetrieved'
+  | 'SearchTransitCompleted'
+  | 'SearchNotificationsCompleted'
+  | 'UsersSearchCompleted';
 
 export type ClientErrorName =
   | 'MissingEmail'
@@ -87,7 +91,9 @@ export type ClientErrorName =
   | 'VehicleNotFound'
   | 'SubscriptionNotFound'
   | 'DuplicateSubscription'
-  | 'SubscriptionLimitReached';
+  | 'SubscriptionLimitReached'
+  | 'MissingSearchQuery'
+  | 'InvalidSearchField';
 
 export type ServerErrorName =
   | 'FailedAuthentication'
@@ -123,6 +129,7 @@ export type IPayload =
   | INotification
   | INotification[]
   | IServiceAlert[]
+  | ITransitSearchResult
   | null;
 
 export interface ISuccess {
