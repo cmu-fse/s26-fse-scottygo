@@ -56,7 +56,10 @@ export default class BusController extends Controller {
     );
     this.router.get('/routes/:id', this.getPatterns.bind(this));
     this.router.get('/vehicles/:routeId', this.getVehicles.bind(this));
-    this.router.get('/stops/nearbystops', this.getNearbyStops.bind(this));
+    this.router.get(
+      '/stops/nearbystops',
+      this.getNearbyStops.bind(this)
+    );
     this.router.get('/stops/:routeId', this.getStops.bind(this));
     this.router.get(
       '/stops/:stopId/predictions',
