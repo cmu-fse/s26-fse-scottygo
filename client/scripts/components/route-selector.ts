@@ -5,7 +5,7 @@
  */
 
 export interface IRouteSelection {
-  route: string;
+  route: string | null;
 }
 
 export interface IRouteOption {
@@ -195,14 +195,21 @@ export class RouteSelectorPanel
     this.querySelectorAll('.route-btn').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const route = (e.currentTarget as HTMLElement).dataset.route;
-        this.selectedRoute = route || null;
+        const route = (e.currentTarget as HTMLElement).dataset.route || null;
 
-        // Update selection without full re-render to preserve scroll position
-        this.querySelectorAll('.route-btn').forEach((b) => {
-          b.classList.remove('selected');
-        });
-        (e.currentTarget as HTMLElement).classList.add('selected');
+        // Toggle: clicking an already-selected route deselects it
+        if (this.selectedRoute === route) {
+          this.selectedRoute = null;
+          this.querySelectorAll('.route-btn').forEach((b) => {
+            b.classList.remove('selected');
+          });
+        } else {
+          this.selectedRoute = route;
+          this.querySelectorAll('.route-btn').forEach((b) => {
+            b.classList.remove('selected');
+          });
+          (e.currentTarget as HTMLElement).classList.add('selected');
+        }
       });
     });
 
@@ -213,21 +220,19 @@ export class RouteSelectorPanel
       this.hide();
     });
 
-    // OK button - dispatch routeSelected event
+    // OK button - dispatch routeSelected event (null when deselected)
     this.querySelector('#route-ok')?.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (this.selectedRoute) {
-        const routeSelection: IRouteSelection = {
-          route: this.selectedRoute
-        };
+      const routeSelection: IRouteSelection = {
+        route: this.selectedRoute
+      };
 
-        this.dispatchEvent(
-          new CustomEvent('routeSelected', {
-            detail: routeSelection,
-            bubbles: true
-          })
-        );
-      }
+      this.dispatchEvent(
+        new CustomEvent('routeSelected', {
+          detail: routeSelection,
+          bubbles: true
+        })
+      );
 
       this.hide();
     });

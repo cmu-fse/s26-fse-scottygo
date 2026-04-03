@@ -16,6 +16,7 @@ import {
 import { IAppError } from '../../common/server.responses';
 import vehiclePositionsService from '../services/vehicle-positions.service';
 import moderationService from '../services/moderation.service';
+import { TransitModel } from './transit.model';
 
 /** Radius limit for proximity check in miles (R9). */
 const PROXIMITY_LIMIT_MILES = 0.5;
@@ -90,10 +91,19 @@ export class NotificationModel {
     return await DAC.db.getSubscriptionsByUserId(userId);
   }
 
-  static async subscribe(
-    userId: string,
-    routeId: string
-  ): Promise<ISubscription> {
+  static async subscribe(userId: string, routeId: string): Promise<ISubscription> {
+    // Validate that the route exists
+    const routes = await TransitModel.getRoutes();
+    const routeExists = routes.some(r => r.id === routeId);
+    if (!routeExists) {
+      const error: IAppError = {
+        type: 'ClientError',
+        name: 'RouteNotFound',
+        message: `Route ${routeId} does not exist.`
+      };
+      throw error;
+    }
+
     // R2: no duplicate subscriptions
     const existing = await DAC.db.findSubscription(userId, routeId);
     if (existing) {
