@@ -221,13 +221,8 @@ export class GoogleMapProvider implements IMapProvider {
   }
 
   toggleLayers(): string {
-    const modes: Array<'none' | 'transit' | 'traffic' | 'bike' | 'satellite'> = [
-      'none',
-      'transit',
-      'traffic',
-      'bike',
-      'satellite'
-    ];
+    const modes: Array<'none' | 'transit' | 'traffic' | 'bike' | 'satellite'> =
+      ['none', 'transit', 'traffic', 'bike', 'satellite'];
     this.layerModeIndex = (this.layerModeIndex + 1) % modes.length;
     const nextMode = modes[this.layerModeIndex];
     this.applyLayerMode(nextMode);
@@ -246,7 +241,9 @@ export class GoogleMapProvider implements IMapProvider {
     }
   }
 
-  private applyLayerMode(mode: 'none' | 'transit' | 'traffic' | 'bike' | 'satellite'): void {
+  private applyLayerMode(
+    mode: 'none' | 'transit' | 'traffic' | 'bike' | 'satellite'
+  ): void {
     this.transitLayer.setMap(null);
     this.trafficLayer.setMap(null);
     this.bikeLayer.setMap(null);

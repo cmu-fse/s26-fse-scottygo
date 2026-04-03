@@ -978,10 +978,7 @@ export class FilterController {
    * Called when the user clicks the same stop marker again.
    */
   restoreMinimisedPopup(stop: IStop): boolean {
-    if (
-      this.minimisedStop &&
-      this.minimisedStop.stopId === stop.stopId
-    ) {
+    if (this.minimisedStop && this.minimisedStop.stopId === stop.stopId) {
       this.showStopPopup(stop, this.minimisedPredictions);
       this.minimisedStop = null;
       return true;
@@ -1006,7 +1003,10 @@ export class FilterController {
     if (state.selectedRouteId) return;
 
     try {
-      const nearbyData = await this.fetchNearbyStops(position.lat, position.lng);
+      const nearbyData = await this.fetchNearbyStops(
+        position.lat,
+        position.lng
+      );
       if (!nearbyData || nearbyData.stops.length === 0) return;
 
       // Collect route IDs that serve nearby stops
@@ -1078,7 +1078,9 @@ export class FilterController {
 
     this.nearbyRouteIds.clear();
     this.nearbyStopsActive = false;
-    console.log('[FilterController] Cleared nearby stop markers and restored routes');
+    console.log(
+      '[FilterController] Cleared nearby stop markers and restored routes'
+    );
   }
 
   /**
@@ -1105,7 +1107,10 @@ export class FilterController {
       ) {
         return response.data.payload as INearbyStopsPayload;
       }
-      console.warn('[FilterController] Nearby stops request failed:', response.data);
+      console.warn(
+        '[FilterController] Nearby stops request failed:',
+        response.data
+      );
       return null;
     } catch (error) {
       console.error('[FilterController] Error fetching nearby stops:', error);

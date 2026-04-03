@@ -36,7 +36,10 @@ export const estimateWalkMinutes = (
   walkMinutesPerKm: number
 ): number | null => {
   if (!userLocation) return null;
-  const distMeters = haversineMeters(userLocation, { lat: stopLat, lng: stopLon });
+  const distMeters = haversineMeters(userLocation, {
+    lat: stopLat,
+    lng: stopLon
+  });
   return Math.ceil((distMeters / 1000) * walkMinutesPerKm);
 };
 
@@ -49,7 +52,9 @@ const escapeHtml = (text: string): string =>
     .replaceAll("'", '&#39;');
 
 export const buildServiceBannerMarkup = (issues: string[]): string => {
-  const issueList = issues.map((issue) => `<li>${escapeHtml(issue)}</li>`).join('');
+  const issueList = issues
+    .map((issue) => `<li>${escapeHtml(issue)}</li>`)
+    .join('');
 
   return `
     <div class="service-status-banner__content">
