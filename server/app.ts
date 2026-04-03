@@ -13,12 +13,19 @@ import { JWT_KEY as secretKey, STAGE } from './env';
 import { Server as SocketServer, Socket } from 'socket.io';
 import {
   ClientToServerEvents,
-  ServerToClientEvents
+  ServerToClientEvents,
+  ISearchAutocompleteContext,
+  ISearchSuggestion
 } from '../common/socket.interface';
-import { ExtendedError } from 'socket.io/dist/namespace';
 import jwt from 'jsonwebtoken';
 import { User } from './models/user.model';
 import { ITokenPayload } from '../common/user.interface';
+import {
+  NotificationAutocompleteStrategy,
+  SearchContext,
+  TransitSearchStrategy
+} from './search/search-strategy';
+import type { ITransitSearchResult } from '../common/transit.interface';
 
 class App {
   public app: Express;
@@ -290,7 +297,7 @@ class App {
 
   public validateToken = (
     socket: Socket,
-    next: (err?: ExtendedError | undefined) => void
+    next: (err?: Error | undefined) => void
   ) => {
     const token = socket.handshake.query.token as string;
     if (!token) {
@@ -412,6 +419,46 @@ class App {
             `[Socket ${new Date().toISOString()}] Client ${socket.id} unsubscribed from ${roomName}`
           );
         });
+
+        // Handle contextual autocomplete for SearchInfo (transit, notifications)
+        socket.on(
+          'searchAutocomplete',
+          async (query: string, context: ISearchAutocompleteContext) => {
+            const trimmed = query.trim();
+            if (!trimmed) {
+              socket.emit('searchSuggestions', []);
+              return;
+            }
+
+            try {
+              if (context === 'transit') {
+                const searchContext = new SearchContext<ITransitSearchResult>(
+                  new TransitSearchStrategy()
+                );
+                const results = await searchContext.executeSearch(trimmed);
+                const suggestions = this.buildTransitSuggestions(results);
+                socket.emit('searchSuggestions', suggestions);
+                return;
+              }
+
+              if (context === 'notifications') {
+                const searchContext = new SearchContext<ISearchSuggestion[]>(
+                  new NotificationAutocompleteStrategy()
+                );
+                const suggestions = await searchContext.executeSearch(trimmed);
+                socket.emit('searchSuggestions', suggestions);
+                return;
+              }
+
+              socket.emit('searchSuggestions', []);
+            } catch (error) {
+              console.error(
+                `[Socket ${new Date().toISOString()}] Error in searchAutocomplete: ${error}`
+              );
+              socket.emit('searchSuggestions', []);
+            }
+          }
+        );
       });
 
       try {
@@ -426,6 +473,41 @@ class App {
         reject(err);
       }
     });
+  }
+
+  private buildTransitSuggestions(results: ITransitSearchResult): string[] {
+    const suggestions: string[] = [];
+
+    for (const route of results.routes) {
+      suggestions.push(route.id);
+      if (route.name && route.name.toLowerCase() !== route.id.toLowerCase()) {
+        suggestions.push(route.name);
+      }
+    }
+
+    for (const stop of results.stops) {
+      suggestions.push(stop.stopName);
+      suggestions.push(stop.stopId);
+    }
+
+    return this.uniqueSuggestions(suggestions, 5);
+  }
+
+  private uniqueSuggestions(values: string[], limit: number): string[] {
+    const deduped: string[] = [];
+    const seen = new Set<string>();
+
+    for (const value of values) {
+      const trimmed = value.trim();
+      if (!trimmed) continue;
+      const key = trimmed.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      deduped.push(trimmed);
+      if (deduped.length >= limit) break;
+    }
+
+    return deduped;
   }
 }
 

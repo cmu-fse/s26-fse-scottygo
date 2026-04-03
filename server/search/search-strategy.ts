@@ -10,7 +10,7 @@
  *  2. RouteSearchStrategy       — GET /map/routes/search       (Route Search on Map)
  *  3. TransitSearchStrategy     — GET /map/search              (Stop & Route Search on Map)
  *  4. SubscriptionSearchStrategy— GET /map/routes/search       (Add Route on Subscriptions page)
- *  5. NotificationSearchStrategy— GET /notifications/search    (Notification Search)
+ *  5. NotificationSearchStrategy— GET /notifications/notifications (Notification Search)
  *
  * Rule R1: Search is contextual — each endpoint picks a different strategy.
  * Rule R2: Stop words are filtered before search (applied in strategies that search
@@ -21,7 +21,10 @@ import { TransitModel } from '../models/transit.model';
 import { User } from '../models/user.model';
 import { NotificationModel } from '../models/notification.model';
 import gtfsService from '../services/gtfs.service';
-import type { IRoute, INotification, ITransitSearchResult } from '../../common/transit.interface';
+import alertsService from '../services/alerts.service';
+import vehiclePositionsService from '../services/vehicle-positions.service';
+import type { IRoute, INotification, IServiceAlert, ITransitSearchResult } from '../../common/transit.interface';
+import type { ISearchSuggestion } from '../../common/socket.interface';
 
 // ── Stop Word List (R2) ───────────────────────────────────────────────────────
 
@@ -85,6 +88,8 @@ export class SearchContext<T> {
   }
 }
 
+export type UserSearchField = 'username' | 'email';
+
 // ── Concrete Strategy 1: User Search ─────────────────────────────────────────
 
 /**
@@ -93,14 +98,37 @@ export class SearchContext<T> {
  *
  * Context : Manage Account page (Admin combobox, GET /account/users/search).
  * Criteria: One or more words matching an existing username (or part of one).
- * Results : Matching usernames (online-first order is handled by the DB layer).
+ * Results : Matching usernames ordered by Active users first, then Inactive,
+ *           and alphabetical by username/email within each group.
  */
 export class UserSearchStrategy implements ISearchStrategy<string[]> {
+  constructor(private readonly field: UserSearchField = 'username') {}
+
   async search(query: string): Promise<string[]> {
-    const allUsernames = await User.getAllUsernames();
-    if (!query) return allUsernames;
-    const lower = query.toLowerCase();
-    return allUsernames.filter((u) => u.toLowerCase().includes(lower));
+    const lower = query.trim().toLowerCase();
+    const users = await User.getAllUserAccounts();
+
+    const filtered = lower
+      ? users.filter((u) => {
+          const target =
+            this.field === 'email' ? u.email : u.credentials.username;
+          return target.toLowerCase().includes(lower);
+        })
+      : users;
+
+    filtered.sort((a, b) => {
+      const aGroup = a.status === 'Active' ? 0 : 1;
+      const bGroup = b.status === 'Active' ? 0 : 1;
+      if (aGroup !== bGroup) return aGroup - bGroup;
+
+      const byUsername = a.credentials.username.localeCompare(
+        b.credentials.username
+      );
+      if (byUsername !== 0) return byUsername;
+      return a.email.localeCompare(b.email);
+    });
+
+    return filtered.map((u) => u.credentials.username);
   }
 }
 
@@ -211,7 +239,7 @@ export class SubscriptionSearchStrategy implements ISearchStrategy<IRoute[]> {
  * Delegates to NotificationModel which handles DB retrieval and message filtering.
  *
  * Context : Notification search bar on the Notifications page
- *           (GET /notifications/search).
+ *           (GET /notifications/notifications).
  * Criteria: Keywords matching notification message content, route IDs, or vehicle IDs.
  * Results : Matching INotification objects, newest first.
  */
@@ -219,6 +247,199 @@ export class NotificationSearchStrategy implements ISearchStrategy<INotification
   async search(query: string): Promise<INotification[]> {
     const filtered = filterStopWords(query);
     if (filtered === null) return [];
-    return NotificationModel.searchNotifications({ q: filtered });
+
+    const notifications = await NotificationModel.getRecentNotifications();
+    const lower = filtered.toLowerCase();
+    return notifications.filter((n) => matchesNotificationText(n, lower));
   }
+}
+
+export interface INotificationSearchCriteria {
+  route?: string;
+  bus?: string;
+  q?: string;
+}
+
+export class RecentNotificationsStrategy
+  implements ISearchStrategy<INotification[]>
+{
+  async search(_query: string): Promise<INotification[]> {
+    return NotificationModel.getRecentNotifications();
+  }
+}
+
+export class NotificationRouteSearchStrategy
+  implements ISearchStrategy<INotification[]>
+{
+  constructor(private readonly routeId: string) {}
+
+  async search(_query: string): Promise<INotification[]> {
+    return NotificationModel.getRecentNotifications({ routeId: this.routeId });
+  }
+}
+
+export class NotificationBusSearchStrategy
+  implements ISearchStrategy<INotification[]>
+{
+  constructor(private readonly vid: string) {}
+
+  async search(_query: string): Promise<INotification[]> {
+    return NotificationModel.getRecentNotifications({ vid: this.vid });
+  }
+}
+
+export class NotificationCompositeSearchStrategy
+  implements ISearchStrategy<INotification[]>
+{
+  constructor(
+    private readonly criteria: {
+      route?: string;
+      bus?: string;
+    }
+  ) {}
+
+  async search(query: string): Promise<INotification[]> {
+    const filter: { routeId?: string; vid?: string } = {};
+    if (this.criteria.route) filter.routeId = this.criteria.route;
+    if (this.criteria.bus) filter.vid = this.criteria.bus;
+
+    let notifications = await NotificationModel.getRecentNotifications(filter);
+
+    if (!query.trim()) return notifications;
+
+    const filtered = filterStopWords(query);
+    if (filtered === null) return notifications;
+
+    const lower = filtered.toLowerCase();
+    notifications = notifications.filter((n) =>
+      matchesNotificationText(n, lower)
+    );
+    return notifications;
+  }
+}
+
+export class NotificationSearchStrategyFactory {
+  static create(
+    criteria: INotificationSearchCriteria
+  ): ISearchStrategy<INotification[]> {
+    const route = criteria.route?.trim();
+    const bus = criteria.bus?.trim();
+    const q = criteria.q?.trim();
+
+    const hasRoute = Boolean(route);
+    const hasBus = Boolean(bus);
+    const hasQ = Boolean(q);
+
+    if (!hasRoute && !hasBus && !hasQ) {
+      return new RecentNotificationsStrategy();
+    }
+    if (hasRoute && !hasBus && !hasQ) {
+      return new NotificationRouteSearchStrategy(route!);
+    }
+    if (!hasRoute && hasBus && !hasQ) {
+      return new NotificationBusSearchStrategy(bus!);
+    }
+    if (!hasRoute && !hasBus && hasQ) {
+      return new NotificationSearchStrategy();
+    }
+
+    return new NotificationCompositeSearchStrategy({ route, bus });
+  }
+}
+
+// ── Concrete Strategy 6: Notification Autocomplete ───────────────────────────
+
+/**
+ * Returns short autocomplete suggestions (route IDs + vehicle IDs) for the
+ * notification search bar.
+ *
+ * Priority order:
+ *  1. Route IDs from GTFS data that match the query (always available).
+ *  2. Vehicle IDs from recent notifications that match the query.
+ *
+ * This keeps suggestions useful even when no notifications have been filed yet.
+ * Stop word filtering is applied (R2) before querying.
+ *
+ * Context : Notification search autocomplete (socket 'searchAutocomplete', context='notifications').
+ * Results : Up to 8 deduplicated short strings (route IDs / vehicle IDs).
+ */
+export class NotificationAutocompleteStrategy implements ISearchStrategy<ISearchSuggestion[]> {
+  async search(query: string): Promise<ISearchSuggestion[]> {
+    const filtered = filterStopWords(query);
+    if (filtered === null) return [];
+    const lower = filtered.toLowerCase();
+
+    const [routes, notifications] = await Promise.all([
+      TransitModel.getRoutes(),
+      NotificationModel.getRecentNotifications()
+    ]);
+
+    // 1. Route IDs from GTFS that match the query (always available)
+    const routeSuggestions: ISearchSuggestion[] = routes
+      .filter((r) => r.id.toLowerCase().includes(lower) || r.name.toLowerCase().includes(lower))
+      .slice(0, 4)
+      .map((r) => ({ label: r.id, type: 'route' as const }));
+
+    // 2. All live vehicle IDs from the GTFS-RT feed that match the query
+    const vidSuggestions: ISearchSuggestion[] = vehiclePositionsService
+      .getAllVehicles()
+      .filter((v) => v.vid.toLowerCase().includes(lower))
+      .slice(0, 3)
+      .map((v) => ({ label: v.vid, type: 'vehicle' as const, vid: v.vid }));
+
+    // 3. User-submitted notifications that match the query — labelled with
+    //    route + bus so clicking them triggers a reliable route/bus search
+    //    rather than a fragile free-text search on the message.
+    const matchingNotifs = notifications.filter(
+      (n) =>
+        n.vid.toLowerCase().includes(lower) ||
+        n.routeId.toLowerCase().includes(lower) ||
+        n.message.toLowerCase().includes(lower)
+    );
+
+    const notifSuggestions: ISearchSuggestion[] = matchingNotifs
+      .slice(0, 2)
+      .map((n) => ({
+        label: `Route ${n.routeId} · Bus #${n.vid}`,
+        type: 'notification' as const,
+        routeId: n.routeId,
+        vid: n.vid
+      }));
+
+    // 4. Service alert headerTexts that match the query
+    const alertSuggestions: ISearchSuggestion[] = alertsService
+      .getAlerts()
+      .filter(
+        (a: IServiceAlert) =>
+          a.headerText.toLowerCase().includes(lower) ||
+          a.descriptionText.toLowerCase().includes(lower) ||
+          a.routeIds.some((id) => id.toLowerCase().includes(lower))
+      )
+      .slice(0, 3)
+      .map((a: IServiceAlert) => ({ label: a.headerText, type: 'alert' as const }))
+      .filter((s) => s.label);
+
+    const seen = new Set<string>();
+    const result: ISearchSuggestion[] = [];
+    for (const s of [...routeSuggestions, ...vidSuggestions, ...notifSuggestions, ...alertSuggestions]) {
+      const key = s.label.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(s);
+      }
+      if (result.length >= 8) break;
+    }
+    return result;
+  }
+}
+
+function matchesNotificationText(
+  notification: INotification,
+  lowerQuery: string
+): boolean {
+  return (
+    notification.message.toLowerCase().includes(lowerQuery) ||
+    notification.routeId.toLowerCase().includes(lowerQuery) ||
+    notification.vid.toLowerCase().includes(lowerQuery)
+  );
 }

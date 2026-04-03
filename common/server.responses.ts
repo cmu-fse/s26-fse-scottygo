@@ -90,7 +90,8 @@ export type ClientErrorName =
   | 'SubscriptionNotFound'
   | 'DuplicateSubscription'
   | 'SubscriptionLimitReached'
-  | 'MissingSearchQuery';
+  | 'MissingSearchQuery'
+  | 'InvalidSearchField';
 
 export type ServerErrorName =
   | 'FailedAuthentication'

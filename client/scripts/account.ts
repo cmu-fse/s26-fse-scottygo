@@ -221,7 +221,8 @@ const getResponseMessage = (
     IncorrectPassword: 'Current password is incorrect',
     MissingPassword: 'Missing Password',
     MissingUsername: 'Missing Username',
-    MissingEmail: 'Missing Email'
+    MissingEmail: 'Missing Email',
+    InvalidSearchField: 'Invalid user search field'
   };
   if (typeof errorName === 'string' && errorName in errorMessages) {
     return errorMessages[errorName];
@@ -802,23 +803,27 @@ const closeCombobox = (): void => {
   userSelector.setAttribute('aria-expanded', 'false');
 };
 
-const populateUserSelector = async (): Promise<void> => {
+const populateUserSelector = async (query = ''): Promise<void> => {
   try {
     const res: AxiosResponse<IResponse> = await axios.request({
       method: 'get',
       headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-      url: '/account/users',
+      url: '/account/users/search',
+      params: {
+        field: 'username',
+        q: query
+      },
       validateStatus: () => true
     });
 
     if (res.status >= 200 && res.status < 300 && isSuccess(res.data)) {
       const users = res.data.payload as string[];
       allUsernames = users;
+    } else {
+      allUsernames = [];
     }
   } catch {
-    if (currentUserAccount) {
-      allUsernames = [currentUserAccount.credentials.username];
-    }
+    allUsernames = [];
   }
 
   refreshUserSelectorOptions();
@@ -854,8 +859,8 @@ userSelector.addEventListener('focus', async () => {
 });
 
 // Admin combobox: filter as user types
-userSelector.addEventListener('input', () => {
-  refreshUserSelectorOptions();
+userSelector.addEventListener('input', async () => {
+  await populateUserSelector(userSelector.value.trim());
   openCombobox();
 });
 

@@ -789,6 +789,14 @@ export class FilterController {
   }
 
   /**
+   * Public helper for map search stop selections.
+   * Reuses the same prediction + popup flow as marker clicks.
+   */
+  async showStopDetailsFromSearch(stop: IStop): Promise<void> {
+    await this.handleStopClick(stop);
+  }
+
+  /**
    * Handle a stop marker click: fetch predictions and show popup.
    */
   private async handleStopClick(stop: IStop): Promise<void> {

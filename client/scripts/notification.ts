@@ -3,8 +3,13 @@ export {};
 
 import './components/app-header';
 import './components/live-notifications';
-import { io } from 'socket.io-client';
+import { io, Socket } from 'socket.io-client';
 import type { INotification, IServiceAlert } from '../../common/transit.interface';
+import type {
+  ClientToServerEvents,
+  ServerToClientEvents,
+  ISearchSuggestion
+} from '../../common/socket.interface';
 
 // ── Auth ───────────────────────────────────────────────────────────────────────
 
@@ -20,13 +25,18 @@ function authHeaders(): Record<string, string> {
 
 const list = document.getElementById('notif-list')!;
 const emptyEl = document.getElementById('notif-empty')!;
+const searchWrap = document.querySelector('.notif-search-wrap') as HTMLDivElement;
 const searchInput = document.getElementById('notif-search-input') as HTMLInputElement;
 const clearBtn = document.getElementById('notif-search-clear')!;
+const suggestionsEl = document.getElementById(
+  'notif-search-suggestions'
+) as HTMLDivElement;
 
 // ── State ──────────────────────────────────────────────────────────────────────
 
 /** true while showing live notification search results (not alerts) */
 let showingNotifications = false;
+let socket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null;
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -41,10 +51,116 @@ function updateEmptyState(query?: string): void {
   const hasItems = list.children.length > 0;
   emptyEl.classList.toggle('is-visible', !hasItems);
   if (!hasItems && query) {
-    emptyEl.textContent = `No notifications found for '${query}'.`;
+    emptyEl.textContent = `No results found for '${query}'.`;
   } else if (!hasItems) {
-    emptyEl.textContent = 'No notifications found.';
+    emptyEl.textContent = 'No results found.';
   }
+}
+
+function normalizeSearchText(value: string | undefined): string {
+  return (value ?? '').trim().toLowerCase();
+}
+
+function alertMatchesSearch(
+  alert: IServiceAlert,
+  params: { route?: string; bus?: string; q?: string }
+): boolean {
+  const routeQuery = normalizeSearchText(params.route);
+  const busQuery = normalizeSearchText(params.bus);
+  const textQuery = normalizeSearchText(params.q);
+
+  const routeIds = alert.routeIds.map((id) => id.toLowerCase());
+  const searchableText = [
+    alert.headerText,
+    alert.descriptionText,
+    ...alert.routeIds
+  ]
+    .join(' ')
+    .toLowerCase();
+
+  if (routeQuery) {
+    const matchesRoute =
+      routeIds.some((id) => id.includes(routeQuery)) ||
+      searchableText.includes(routeQuery);
+    if (!matchesRoute) return false;
+  }
+
+  if (busQuery && !searchableText.includes(busQuery)) {
+    return false;
+  }
+
+  if (textQuery && !searchableText.includes(textQuery)) {
+    return false;
+  }
+
+  return true;
+}
+
+function hideSuggestions(): void {
+  suggestionsEl.hidden = true;
+  suggestionsEl.innerHTML = '';
+}
+
+const SUGGESTION_ICONS: Record<ISearchSuggestion['type'], string> = {
+  route: 'directions_bus',
+  vehicle: 'commute',
+  alert: 'warning',
+  notification: 'report'
+};
+
+function renderSuggestions(suggestions: ISearchSuggestion[]): void {
+  const query = searchInput.value.trim();
+  if (!query) {
+    hideSuggestions();
+    return;
+  }
+
+  suggestionsEl.innerHTML = '';
+  suggestionsEl.hidden = false;
+
+  if (suggestions.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'notif-search-no-suggestions';
+    empty.textContent = 'No suggestions';
+    suggestionsEl.appendChild(empty);
+    return;
+  }
+
+  suggestions.forEach(({ label, type, routeId, vid }) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'notif-search-suggestion';
+    button.dataset.type = type;
+    button.innerHTML = `
+      <span class="material-icons-outlined notif-suggestion-icon" data-type="${type}">${SUGGESTION_ICONS[type]}</span>
+      <span class="notif-suggestion-label">${label}</span>
+    `;
+    button.addEventListener('click', () => {
+      hideSuggestions();
+
+      if (type === 'notification' && (routeId || vid)) {
+        // Search by the notification's route/bus IDs — avoids stop-word
+        // mangling of the message text as a free-text query.
+        const displayTerm = routeId ?? vid ?? label;
+        searchInput.value = displayTerm;
+        clearBtn.classList.add('is-visible');
+        void searchNotifications({ route: routeId, bus: vid });
+        return;
+      }
+
+      if (type === 'vehicle' && vid) {
+        searchInput.value = vid;
+        clearBtn.classList.add('is-visible');
+        void searchNotifications({ bus: vid });
+        return;
+      }
+
+      searchInput.value = label;
+      clearBtn.classList.add('is-visible');
+      void runFullSearch(label);
+    });
+    suggestionsEl.appendChild(button);
+  });
 }
 
 // ── Notification cards ─────────────────────────────────────────────────────────
@@ -58,6 +174,7 @@ const NOTIF_ICON = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" 
 function createNotifCard(notif: INotification): HTMLLIElement {
   const li = document.createElement('li');
   li.className = 'notif-card';
+  li.dataset.category = 'notification';
 
   li.innerHTML = `
     <button class="notif-dismiss" aria-label="Dismiss notification">
@@ -67,12 +184,12 @@ function createNotifCard(notif: INotification): HTMLLIElement {
       </svg>
     </button>
     <div class="notif-card-header">
-      <span class="notif-icon">${NOTIF_ICON}</span>
+      <span class="notif-icon" data-category="notification">${NOTIF_ICON}</span>
       <span class="notif-title">Route ${notif.routeId} · Bus #${notif.vid}</span>
     </div>
     <p class="notif-body">${notif.message}</p>
     <div class="notif-card-footer">
-      <span class="notif-tag">Live Update</span>
+      <span class="notif-tag" data-category="notification">Live Update</span>
       <span class="notif-time">${formatTime(notif.createdAt)}</span>
     </div>
   `;
@@ -96,16 +213,17 @@ const ALERT_ICON = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" 
 function createAlertCard(alert: IServiceAlert): HTMLLIElement {
   const li = document.createElement('li');
   li.className = 'notif-card';
+  li.dataset.category = 'alert';
   const routes = alert.routeIds.join(', ');
 
   li.innerHTML = `
     <div class="notif-card-header">
-      <span class="notif-icon">${ALERT_ICON}</span>
+      <span class="notif-icon" data-category="alert">${ALERT_ICON}</span>
       <span class="notif-title">${alert.headerText}</span>
     </div>
     <p class="notif-body">${alert.descriptionText}</p>
     <div class="notif-card-footer">
-      <span class="notif-tag">Service Alert${routes ? ` · ${routes}` : ''}</span>
+      <span class="notif-tag" data-category="alert">Service Alert${routes ? ` · ${routes}` : ''}</span>
     </div>
   `;
 
@@ -156,18 +274,37 @@ async function searchNotifications(params: {
   const query = [params.route, params.bus, params.q].filter(Boolean).join(' ');
 
   try {
-    const res = await fetch(`/notifications/notifications?${qs}`, { headers: authHeaders() });
-    if (!res.ok) {
-      emptyEl.textContent = 'Failed to load notifications.';
+    const [notificationsRes, alertsRes] = await Promise.all([
+      fetch(`/notifications/notifications?${qs}`, { headers: authHeaders() }),
+      fetch('/notifications/alerts', { headers: authHeaders() })
+    ]);
+
+    let notifications: INotification[] = [];
+    let alerts: IServiceAlert[] = [];
+
+    if (notificationsRes.ok) {
+      const notificationsData = await notificationsRes.json();
+      notifications = notificationsData.payload ?? [];
+    }
+
+    if (alertsRes.ok) {
+      const alertsData = await alertsRes.json();
+      const allAlerts: IServiceAlert[] = alertsData.payload ?? [];
+      alerts = allAlerts.filter((alert) => alertMatchesSearch(alert, params));
+    }
+
+    if (!notificationsRes.ok && !alertsRes.ok) {
+      emptyEl.textContent = 'Failed to load search results.';
       emptyEl.classList.add('is-visible');
       return;
     }
-    const data = await res.json();
-    const notifs: INotification[] = data.payload ?? [];
-    notifs.forEach((n) => list.appendChild(createNotifCard(n)));
+
+    notifications.forEach((n) => list.appendChild(createNotifCard(n)));
+    alerts.forEach((a) => list.appendChild(createAlertCard(a)));
+
     updateEmptyState(query || undefined);
   } catch {
-    emptyEl.textContent = 'Failed to load notifications.';
+    emptyEl.textContent = 'Failed to load search results.';
     emptyEl.classList.add('is-visible');
   }
 }
@@ -187,18 +324,46 @@ function connectForAlerts(): void {
   const token = getToken();
   if (!token) return;
 
-  const socket = io({ query: { token } });
+  socket = io({ query: { token } });
   socket.on('alertUpdate', () => {
     // Refresh alert display only if we're not showing a search result
     if (!showingNotifications) {
       loadAlerts();
     }
   });
+
+  socket.on('searchSuggestions', (suggestions) => {
+    renderSuggestions(suggestions);
+  });
 }
 
 // ── Search bar ─────────────────────────────────────────────────────────────────
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+function queriesEqual(a?: string, b?: string): boolean {
+  if (!a || !b) return false;
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+async function runFullSearch(query: string): Promise<void> {
+  const trimmed = query.trim();
+  if (!trimmed) {
+    await loadAlerts();
+    return;
+  }
+
+  const preFill = getPreFill();
+  if (queriesEqual(preFill.route, trimmed)) {
+    await searchNotifications({ route: trimmed });
+    return;
+  }
+  if (queriesEqual(preFill.bus, trimmed)) {
+    await searchNotifications({ bus: trimmed });
+    return;
+  }
+  await searchNotifications({ q: trimmed });
+}
 
 function handleSearchInput(): void {
   const query = searchInput.value.trim();
@@ -207,21 +372,17 @@ function handleSearchInput(): void {
   if (debounceTimer) clearTimeout(debounceTimer);
 
   if (!query) {
+    hideSuggestions();
     loadAlerts();
     return;
   }
 
   debounceTimer = setTimeout(() => {
-    // Decide search strategy based on pre-fill context or detected pattern
-    const preFill = getPreFill();
-    if (preFill.route && query === preFill.route) {
-      searchNotifications({ route: query });
-    } else if (preFill.bus && query === preFill.bus) {
-      searchNotifications({ bus: query });
-    } else {
-      // General text search — server picks strategy based on content
-      searchNotifications({ q: query });
+    if (socket) {
+      socket.emit('searchAutocomplete', query, 'notifications');
+      return;
     }
+    void runFullSearch(query);
   }, 300);
 }
 
@@ -251,9 +412,51 @@ async function init(): Promise<void> {
 
   searchInput.addEventListener('input', handleSearchInput);
 
+  searchInput.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      hideSuggestions();
+      return;
+    }
+
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      const buttons = Array.from(
+        suggestionsEl.querySelectorAll<HTMLButtonElement>('.notif-search-suggestion')
+      );
+      if (buttons.length === 0) return;
+      e.preventDefault();
+
+      const focused = suggestionsEl.querySelector<HTMLButtonElement>('.notif-search-suggestion:focus');
+      const idx = focused ? buttons.indexOf(focused) : -1;
+
+      if (e.key === 'ArrowDown') {
+        const next = buttons[idx + 1] ?? buttons[0];
+        next.focus();
+      } else {
+        if (idx <= 0) {
+          searchInput.focus();
+        } else {
+          buttons[idx - 1].focus();
+        }
+      }
+      return;
+    }
+
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    hideSuggestions();
+    void runFullSearch(searchInput.value.trim());
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!searchWrap.contains(e.target as Node)) {
+      hideSuggestions();
+    }
+  });
+
   clearBtn.addEventListener('click', () => {
     searchInput.value = '';
     clearBtn.classList.remove('is-visible');
+    hideSuggestions();
     // Clear URL params without reload
     history.replaceState(null, '', window.location.pathname);
     loadAlerts();

@@ -350,6 +350,11 @@ export class MongoDB implements IDatabase {
     return users.map((u) => u.credentials.username);
   }
 
+  async getAllUserAccounts(): Promise<IUserAccount[]> {
+    const users = await MUser.find({}).lean();
+    return users as IUserAccount[];
+  }
+
   // ── Transit Cache Methods ──────────────────────────────────────────────
 
   async getTransitCache(cacheKey: string): Promise<ITransitCache | null> {

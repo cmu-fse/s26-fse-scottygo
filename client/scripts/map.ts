@@ -2,6 +2,7 @@ import axios, { AxiosResponse } from 'axios';
 import type { IUser, IUserAccount } from '../../common/user.interface';
 import type { IResponse } from '../../common/server.responses';
 import type { IMapProvider, IConfig } from '../../common/map.interface';
+import type { IStop } from '../../common/transit.interface';
 import { GoogleMapProvider } from './maps/google-map.provider';
 
 // Import web components
@@ -496,6 +497,37 @@ function setupMapEventListeners(): void {
     const query = customEvent.detail.query;
     console.log('Search query:', query);
     // TODO: Implement search functionality
+  });
+
+  document.addEventListener('searchSelectRoute', async (e: Event) => {
+    const customEvent = e as CustomEvent<{ routeId: string }>;
+    const routeId = customEvent.detail?.routeId;
+    if (!routeId) return;
+
+    mapStateManager.updateFilter('selectedRouteId', routeId);
+    await filterController.applyRouteFilter(routeId);
+  });
+
+  document.addEventListener('searchSelectStop', async (e: Event) => {
+    const customEvent = e as CustomEvent<{ stopId: string; stop?: IStop }>;
+    const stop = customEvent.detail?.stop;
+    if (!stop) return;
+
+    const state = mapStateManager.getState();
+    const candidateRoutes = stop.routes ?? [];
+    const routeId =
+      candidateRoutes.find((id) => id === state.selectedRouteId) ??
+      candidateRoutes[0] ??
+      state.selectedRouteId;
+
+    if (routeId) {
+      mapStateManager.updateFilter('selectedRouteId', routeId);
+      await filterController.applyRouteFilter(routeId);
+    }
+
+    mapProvider.setCenter({ lat: stop.lat, lng: stop.lon });
+    mapProvider.setZoom(15);
+    await filterController.showStopDetailsFromSearch(stop);
   });
 
   document.addEventListener('toggleLayers', () => {

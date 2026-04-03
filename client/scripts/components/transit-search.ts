@@ -65,8 +65,16 @@ export class TransitSearch extends HTMLElement {
     const layersBtn = this.querySelector('#layers-btn') as HTMLButtonElement;
 
     this.searchInput?.addEventListener('input', () => this.handleInput());
+    this.searchInput?.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const query = this.searchInput?.value.trim() ?? '';
+      if (!query) return;
+      void this.renderResults(query);
+    });
     this.searchInput?.addEventListener('focus', () => {
-      if (this.searchInput?.value.trim()) void this.renderResults(this.searchInput.value.trim());
+      const query = this.searchInput?.value.trim() ?? '';
+      if (query) void this.renderResults(query);
     });
 
     this.clearBtn?.addEventListener('click', () => this.clearSearch());
@@ -204,6 +212,8 @@ export class TransitSearch extends HTMLElement {
     this.dropdown.innerHTML = routeItems + stopItems;
     this.showDropdown();
 
+    const stopById = new Map(matchedStops.map((stop) => [stop.stopId, stop]));
+
     this.dropdown.querySelectorAll('.search-result-route').forEach((el) => {
       el.addEventListener('click', () => {
         const routeId = (el as HTMLElement).dataset.routeId!;
@@ -220,9 +230,13 @@ export class TransitSearch extends HTMLElement {
     this.dropdown.querySelectorAll('.search-result-stop').forEach((el) => {
       el.addEventListener('click', () => {
         const stopId = (el as HTMLElement).dataset.stopId!;
+        const stop = stopById.get(stopId);
         this.dispatchEvent(
           new CustomEvent('searchSelectStop', {
-            detail: { stopId },
+            detail: {
+              stopId,
+              stop
+            },
             bubbles: true
           })
         );

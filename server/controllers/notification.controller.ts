@@ -10,6 +10,11 @@ import alertsService from '../services/alerts.service';
 import jwt from 'jsonwebtoken';
 import { JWT_KEY as secretKey } from '../env';
 import * as responses from '../../common/server.responses';
+import {
+  NotificationSearchStrategyFactory,
+  SearchContext
+} from '../search/search-strategy';
+import type { INotification } from '../../common/transit.interface';
 
 export default class NotificationController extends Controller {
   public constructor(path: string) {
@@ -181,15 +186,24 @@ export default class NotificationController extends Controller {
 
   private async searchNotifications(req: Request, res: Response): Promise<void> {
     try {
-      const route = req.query.route as string | undefined;
-      const bus = req.query.bus as string | undefined;
-      const q = req.query.q as string | undefined;
+      const route = (req.query.route as string | undefined)?.trim();
+      const bus = (req.query.bus as string | undefined)?.trim();
+      const q = (req.query.q as string | undefined)?.trim();
 
-      const notifications = await NotificationModel.searchNotifications({ route, bus, q });
+      const strategy = NotificationSearchStrategyFactory.create({
+        route,
+        bus,
+        q
+      });
+      const context = new SearchContext<INotification[]>(strategy);
+      const notifications = await context.executeSearch(q ?? '');
 
       const success: responses.ISuccess = {
-        name: 'NotificationsRetrieved',
+        name: 'SearchNotificationsCompleted',
         message: `Found ${notifications.length} notifications`,
+        metadata: {
+          totalItems: notifications.length
+        },
         payload: notifications
       };
       res.status(200).json(success);
