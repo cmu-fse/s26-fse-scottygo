@@ -176,7 +176,10 @@ class GTFSService {
     read: (name: string) => string
   ): Map<string, { lat: number; lng: number }[]> {
     console.log(`[GTFS ${new Date().toISOString()}] Parsing shapes.txt...`);
-    const seqs = new Map<string, { seq: number; lat: number; lng: number }[]>();
+    const seqs = new Map<
+      string,
+      { seq: number; lat: number; lng: number }[]
+    >();
     for (const p of parse(read('shapes.txt'), CSV_OPTS) as Record<
       string,
       string
