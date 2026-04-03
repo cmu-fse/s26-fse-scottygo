@@ -156,15 +156,34 @@ async function searchNotifications(params: {
   const query = [params.route, params.bus, params.q].filter(Boolean).join(' ');
 
   try {
-    const res = await fetch(`/notifications/notifications?${qs}`, { headers: authHeaders() });
-    if (!res.ok) {
-      emptyEl.textContent = 'Failed to load notifications.';
-      emptyEl.classList.add('is-visible');
-      return;
+    // Fetch both notifications and service alerts in parallel
+    const [notifRes, alertRes] = await Promise.all([
+      fetch(`/notifications/notifications?${qs}`, { headers: authHeaders() }),
+      fetch('/notifications/alerts', { headers: authHeaders() })
+    ]);
+
+    if (notifRes.ok) {
+      const notifData = await notifRes.json();
+      const notifs: INotification[] = notifData.payload ?? [];
+      notifs.forEach((n) => list.appendChild(createNotifCard(n)));
     }
-    const data = await res.json();
-    const notifs: INotification[] = data.payload ?? [];
-    notifs.forEach((n) => list.appendChild(createNotifCard(n)));
+
+    // Filter service alerts client-side by query text
+    if (alertRes.ok) {
+      const alertData = await alertRes.json();
+      const alerts: IServiceAlert[] = alertData.payload ?? [];
+      const lower = (query || '').toLowerCase();
+      const matched = lower
+        ? alerts.filter(
+            (a) =>
+              a.headerText.toLowerCase().includes(lower) ||
+              a.descriptionText.toLowerCase().includes(lower) ||
+              a.routeIds.some((r) => r.toLowerCase().includes(lower))
+          )
+        : [];
+      matched.forEach((a) => list.appendChild(createAlertCard(a)));
+    }
+
     updateEmptyState(query || undefined);
   } catch {
     emptyEl.textContent = 'Failed to load notifications.';
@@ -230,7 +249,7 @@ function handleSearchInput(): void {
 async function init(): Promise<void> {
   const token = getToken();
   if (!token) {
-    window.location.replace('/home');
+    window.location.replace('/auth');
     return;
   }
 

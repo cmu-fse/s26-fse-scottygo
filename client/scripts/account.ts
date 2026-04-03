@@ -26,7 +26,7 @@ const getStoredUsername = (): string | null => localStorage.getItem('username');
 const handleLogout = (): void => {
   localStorage.removeItem('token');
   localStorage.removeItem('username');
-  window.location.replace('/home');
+  window.location.replace('/auth');
 };
 
 const authHeaders = (): Record<string, string> => {

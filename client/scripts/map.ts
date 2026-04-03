@@ -2,6 +2,7 @@ import axios, { AxiosResponse } from 'axios';
 import type { IUser, IUserAccount } from '../../common/user.interface';
 import type { IResponse } from '../../common/server.responses';
 import type { IMapProvider, IConfig } from '../../common/map.interface';
+import type { IStop } from '../../common/transit.interface';
 import { GoogleMapProvider } from './maps/google-map.provider';
 
 // Import web components
@@ -40,6 +41,7 @@ import type {
 import { MapStateManager } from './state/map-state';
 import { URLSyncManager } from './state/url-sync';
 import { FilterController } from './controllers/filter-controller';
+import { DirectionsController } from './controllers/directions-controller';
 import { RouteRenderer } from './renderers/route-renderer';
 import { VehicleTracker } from './trackers/vehicle-tracker';
 
@@ -95,6 +97,7 @@ console.log('showModal function registered globally');
 const mapStateManager = MapStateManager.getInstance();
 const urlSyncManager = URLSyncManager.getInstance();
 const filterController = FilterController.getInstance();
+const directionsController = DirectionsController.getInstance();
 const routeRenderer = RouteRenderer.getInstance();
 const vehicleTracker = VehicleTracker.getInstance();
 
@@ -122,7 +125,7 @@ async function getUser(username: string): Promise<IUser | null> {
     const res: AxiosResponse = await axios.request({
       method: 'get',
       headers: { Authorization: `Bearer ${token}` },
-      url: '/map/users/' + username,
+      url: '/users/' + username,
       validateStatus: () => true
     });
     // Now handle response
@@ -275,7 +278,7 @@ let userLocationMarker: IMapMarker | null = null;
 async function getMapConfig(): Promise<IConfig | null> {
   try {
     const token = localStorage.getItem('token');
-    const res: AxiosResponse = await axios.get('/map/config', {
+    const res: AxiosResponse = await axios.get('/config', {
       headers: { Authorization: `Bearer ${token}` },
       validateStatus: () => true
     });
@@ -296,7 +299,7 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
   e.preventDefault();
   const loggedIn: boolean = await isLoggedIn(); // Check if user logged in
   if (!loggedIn) {
-    window.location.replace('/home'); // Redirect to home page
+    window.location.replace('/auth'); // Redirect to auth page
     return;
   }
 
@@ -324,6 +327,20 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
     routeRenderer.initialize(mapProvider);
     vehicleTracker.initialize(mapProvider);
     vehicleTracker.setAdminProximityBypass(isAdminUser);
+    directionsController.initialize(mapProvider);
+
+    // Set up directions controller callbacks
+    directionsController.setToastCallback(showToast);
+    directionsController.setInfoPanelCallback(updateDirectionsPanel);
+    directionsController.setExitCallback(async () => {
+      // A4: Exit directions mode → return to TUC4 Step 2
+      removeDirectionsPanel();
+      await filterController.initialize();
+      // Restore nearby-stops view (Step 2) instead of showing all routes
+      if (userLocation) {
+        await filterController.showNearbyStops(userLocation);
+      }
+    });
 
     // Initialize toggle panels
     await initializeTogglePanels();
@@ -489,7 +506,19 @@ function setupMapEventListeners(): void {
     const customEvent = e as CustomEvent;
     const query = customEvent.detail.query;
     console.log('Search query:', query);
-    // TODO: Implement search functionality
+  });
+
+  document.addEventListener('searchSelectRoute', (e: Event) => {
+    const { routeId } = (e as CustomEvent).detail;
+    mapStateManager.updateFilter('selectedRouteId', routeId);
+    void filterController.applyRouteFilter(routeId);
+  });
+
+  document.addEventListener('searchSelectStop', (e: Event) => {
+    const { stop } = (e as CustomEvent).detail as { stop: IStop | undefined };
+    if (!stop) return;
+    mapProvider.setCenter({ lat: stop.lat, lng: stop.lon });
+    void filterController.showStopDetailsFromSearch(stop);
   });
 
   document.addEventListener('toggleLayers', () => {
@@ -892,61 +921,83 @@ function setupMapEventListeners(): void {
 }
 
 // Request user's geographic location (VisRoute Basic Flow step 2-3)
+// Uses watchPosition for continuous updates (TUC4 Step 8)
+let watchId: number | null = null;
+let initialLocationSet = false;
+
 function requestUserLocation(): void {
   if ('geolocation' in navigator) {
-    navigator.geolocation.getCurrentPosition(
+    watchId = navigator.geolocation.watchPosition(
       (position) => {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
-        console.log('User location:', lat, lng);
 
-        // Check if location is in Pittsburgh area (Rule R5)
-        if (isInPittsburghArea(lat, lng)) {
-          // Store and center map on user location
-          userLocation = { lat, lng };
-          mapProvider.setCenter({ lat, lng });
-          mapProvider.setZoom(15);
+        // First position: center map and validate area
+        if (!initialLocationSet) {
+          initialLocationSet = true;
+          console.log('User location:', lat, lng);
 
-          // Place a marker on the map to show user location
-          addUserLocationMarker(lat, lng);
+          if (isInPittsburghArea(lat, lng)) {
+            userLocation = { lat, lng };
+            mapProvider.setCenter({ lat, lng });
+            mapProvider.setZoom(15);
+            addUserLocationMarker(lat, lng);
 
-          // Also show the location indicator component (wait for custom element to be defined)
-          const locationIndicator =
-            document.querySelector<LocationIndicator>('location-indicator');
-          if (
-            locationIndicator &&
-            typeof locationIndicator.show === 'function'
-          ) {
-            locationIndicator.show(lat, lng);
+            const locationIndicator =
+              document.querySelector<LocationIndicator>('location-indicator');
+            if (
+              locationIndicator &&
+              typeof locationIndicator.show === 'function'
+            ) {
+              locationIndicator.show(lat, lng);
+            }
+            console.log('Centered map on user location');
+
+            // TUC4 Step 2: Show nearby stops within 1km of user location
+            filterController.setUserLocation({ lat, lng });
+            filterController.showNearbyStops({ lat, lng });
+          } else {
+            showModal(
+              'Location Out of Bounds',
+              'This transit app only supports the Pittsburgh bus system.'
+            );
+            mapProvider.setCenter({ lat: 40.4406, lng: -80.0112 });
+            mapProvider.setZoom(14);
+            console.log('Centering on default Pittsburgh location');
           }
-          console.log('Centered map on user location');
         } else {
-          // A3: Location Out of Bounds
-          showModal(
-            'Location Out of Bounds',
-            'This transit app only supports the Pittsburgh bus system.'
-          );
-          // Center on Downtown Pittsburgh (Point State Park)
-          mapProvider.setCenter({ lat: 40.4406, lng: -80.0112 });
-          mapProvider.setZoom(14);
-          console.log('Centering on default Pittsburgh location');
+          // Subsequent positions: update marker, feed directions controller
+          userLocation = { lat, lng };
+          if (userLocationMarker) {
+            userLocationMarker.setPosition({ lat, lng });
+          } else {
+            addUserLocationMarker(lat, lng);
+          }
+          // Keep filter controller in sync for walk-time estimates
+          filterController.setUserLocation({ lat, lng });
         }
+
+        // Always feed location to directions controller (TUC4 Step 8)
+        directionsController.updateUserLocation({ lat, lng });
       },
       (error) => {
-        // A6: Location Access Denied
+        if (initialLocationSet) return; // Only show error on first failure
         console.warn('Location access denied:', error.message);
         showModal(
           'Location Access Denied',
           'Location access denied. Centering on Downtown Pittsburgh by default.'
         );
-        // Center on default Pittsburgh coordinates (Point State Park)
         mapProvider.setCenter({ lat: 40.4406, lng: -80.0112 });
         mapProvider.setZoom(14);
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 5000, // Accept cached position up to 5s old
+        timeout: 10000
       }
     );
   } else {
     console.warn('Geolocation not supported');
-    // A5: Unable To Access Location
     showModal(
       'Geolocation Unavailable',
       'Geolocation is not supported by your browser. Centering on Downtown Pittsburgh.'
@@ -980,6 +1031,72 @@ function addUserLocationMarker(lat: number, lng: number): void {
     icon: icon
   });
   console.log('User location marker added to map');
+}
+
+// ── Toast Notification (TUC4 Step 11) ────────────────────────────────
+function showToast(message: string): void {
+  // Remove existing toast if any
+  const existing = document.getElementById('map-toast');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.id = 'map-toast';
+  toast.className = 'map-toast';
+  toast.textContent = message;
+
+  const container = document.querySelector('.map-container');
+  if (container) container.appendChild(toast);
+
+  // Auto-dismiss after 4 seconds
+  setTimeout(() => {
+    toast.classList.add('map-toast--fade');
+    setTimeout(() => toast.remove(), 400);
+  }, 4000);
+}
+
+// ── Directions Info Panel (TUC4 Step 6) ──────────────────────────────
+function updateDirectionsPanel(
+  info: { durationMin: number; eta: string } | null
+): void {
+  // Remove existing panel
+  removeDirectionsPanel();
+
+  if (!info) return;
+
+  const panel = document.createElement('div');
+  panel.id = 'directions-panel';
+  panel.className = 'directions-panel';
+
+  const stopName =
+    directionsController.targetStop?.stopName ?? 'Selected Stop';
+
+  panel.innerHTML = `
+    <div class="directions-panel__header">
+      <span class="material-icons-outlined directions-panel__icon">directions_walk</span>
+      <strong class="directions-panel__title">Walking to ${stopName}</strong>
+      <button class="directions-panel__close" aria-label="Exit directions">&times;</button>
+    </div>
+    <div class="directions-panel__info">
+      <span class="directions-panel__duration">${info.durationMin} min walk</span>
+      <span class="directions-panel__eta">ETA ${info.eta}</span>
+    </div>
+  `;
+
+  const container = document.querySelector('.map-container');
+  if (container) container.appendChild(panel);
+
+  // Close button: exit directions mode (A4)
+  const closeBtn = panel.querySelector('.directions-panel__close');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => {
+      directionsController.exitDirections();
+    });
+  }
+}
+
+function removeDirectionsPanel(): void {
+  const existing = document.getElementById('directions-panel');
+  if (existing) existing.remove();
 }
 
 // Check if coordinates are within Pittsburgh area (Rule R5)

@@ -364,7 +364,7 @@ function initSheet(): void {
 async function init(): Promise<void> {
   const token = localStorage.getItem('token');
   if (!token) {
-    window.location.replace('/home');
+    window.location.replace('/auth');
     return;
   }
 

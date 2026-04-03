@@ -143,7 +143,7 @@ export class TransitSearch extends HTMLElement {
     let matchedStops: IStop[] = [];
 
     try {
-      const res = await fetch(`/map/search?q=${encodeURIComponent(query)}`, {
+      const res = await fetch(`/search?q=${encodeURIComponent(query)}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 

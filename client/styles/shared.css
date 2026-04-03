@@ -112,6 +112,11 @@ body {
   margin: 0;
 }
 
+.dropdown-title-link {
+  text-decoration: none;
+  color: inherit;
+}
+
 .dropdown-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

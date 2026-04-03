@@ -135,45 +135,54 @@ body.dark .circle-btn.primary {
 .search-bar {
   display: flex;
   position: absolute;
-  top: 20px;
+  top: 16px;
   left: 50%;
   transform: translateX(-50%);
-  max-width: 66.67%; /* Constrain to 2/3 of screen width */
-  width: calc(100% - 40px); /* Full width minus margins */
-  gap: 12px;
+  max-width: 520px;
+  width: calc(100% - 32px);
+  gap: 10px;
   z-index: 30;
 }
 
-.search-box {
+.search-wrapper {
   flex: 1;
   min-width: 0;
+  position: relative;
+}
+
+.search-box {
   display: flex;
   align-items: center;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(12px);
-  padding: 0 16px;
-  border-radius: 14px;
-  height: 56px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  background: #fff;
+  padding: 0 14px;
+  border-radius: 28px;
+  height: 48px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.04);
   transition: box-shadow 0.2s ease;
 }
 
 .search-box:focus-within {
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.06);
 }
 
 body.dark .search-box {
-  background: rgba(31, 41, 55, 0.95);
+  background: #1f2937;
   color: var(--white);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 
-.search-box .material-icons-outlined {
-  color: var(--gray-700);
-  font-size: 24px;
+body.dark .search-box:focus-within {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
 }
 
-body.dark .search-box .material-icons-outlined {
-  color: var(--gray-100);
+.search-box .search-icon {
+  color: #5f6368;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+body.dark .search-box .search-icon {
+  color: #9aa0a6;
 }
 
 .search-box input {
@@ -181,30 +190,190 @@ body.dark .search-box .material-icons-outlined {
   outline: none;
   flex: 1;
   min-width: 0;
-  margin-left: 12px;
-  font-size: 16px;
+  margin-left: 10px;
+  font-size: 15px;
   background: transparent;
-  color: inherit;
-  font-family: 'Inter', sans-serif;
+  color: #202124;
+  font-family: 'Inter', -apple-system, system-ui, sans-serif;
+  line-height: 48px;
+}
+
+body.dark .search-box input {
+  color: #e8eaed;
 }
 
 .search-box input::placeholder {
-  color: var(--gray-700);
-  opacity: 0.6;
+  color: #5f6368;
+  opacity: 1;
 }
 
 body.dark .search-box input::placeholder {
-  color: var(--gray-100);
-  opacity: 0.6;
+  color: #9aa0a6;
+  opacity: 1;
 }
 
+/* Clear button */
+.search-clear-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  color: #5f6368;
+  flex-shrink: 0;
+  padding: 0;
+  transition: background 0.15s ease;
+}
+
+.search-clear-btn .material-icons-outlined {
+  font-size: 18px;
+}
+
+.search-clear-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+body.dark .search-clear-btn {
+  color: #9aa0a6;
+}
+
+body.dark .search-clear-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.search-box:focus-within .search-clear-btn,
+.search-clear-btn.is-visible {
+  display: flex;
+}
+
+/* Search dropdown */
+.search-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 6px 0;
+  z-index: 40;
+}
+
+body.dark .search-dropdown {
+  background: #1f2937;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.search-dropdown::-webkit-scrollbar {
+  width: 4px;
+}
+
+.search-dropdown::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+}
+
+body.dark .search-dropdown::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Result items */
+.search-result-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.search-result-item:hover,
+.search-result-item:focus {
+  background: rgba(0, 0, 0, 0.04);
+  outline: none;
+}
+
+body.dark .search-result-item:hover,
+body.dark .search-result-item:focus {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.search-result-icon {
+  font-size: 20px;
+  color: #5f6368;
+  flex-shrink: 0;
+}
+
+.search-result-route .search-result-icon {
+  color: var(--primary, #c41230);
+}
+
+body.dark .search-result-icon {
+  color: #9aa0a6;
+}
+
+body.dark .search-result-route .search-result-icon {
+  color: #f28b82;
+}
+
+.search-result-content {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.search-result-name {
+  font-size: 14px;
+  color: #202124;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+body.dark .search-result-name {
+  color: #e8eaed;
+}
+
+.search-result-badges {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.search-result-badges .route-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  line-height: 1.4;
+}
+
+.search-no-results {
+  padding: 16px;
+  text-align: center;
+  color: #5f6368;
+  font-size: 14px;
+}
+
+body.dark .search-no-results {
+  color: #9aa0a6;
+}
+
+/* Layers button */
 .layers-btn {
-  flex: 0 0 56px;
-  width: 56px;
-  min-width: 56px;
-  height: 56px;
-  min-height: 56px;
-  border-radius: 14px;
+  flex: 0 0 48px;
+  width: 48px;
+  min-width: 48px;
+  height: 48px;
+  min-height: 48px;
+  border-radius: 50%;
   background: var(--primary);
   color: white;
   border: none;
@@ -212,13 +381,17 @@ body.dark .search-box input::placeholder {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(196, 18, 48, 0.3);
+  box-shadow: 0 2px 6px rgba(196, 18, 48, 0.3);
   transition: all 0.2s ease;
 }
 
+.layers-btn .material-icons-outlined {
+  font-size: 22px;
+}
+
 .layers-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(196, 18, 48, 0.4);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(196, 18, 48, 0.4);
 }
 
 .layers-btn:active {
@@ -1188,11 +1361,9 @@ body.dark .route-btn:hover {
 /* Responsive Design */
 @media (max-width: 768px) {
   .search-bar {
-    top: 16px;
-    left: 50%;
-    transform: translateX(-50%);
-    max-width: 75%; /* Slightly wider on mobile */
-    width: calc(100% - 32px); /* Full width minus margins */
+    top: 12px;
+    max-width: none;
+    width: calc(100% - 24px);
   }
 
   .control-panel {
@@ -1201,17 +1372,17 @@ body.dark .route-btn:hover {
 
   .zoom-panel {
     right: 16px;
-    bottom: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   }
 
   route-bell {
     right: 16px;
-    bottom: 184px; /* 16 + 160 + 8 */
+    bottom: calc(184px + env(safe-area-inset-bottom, 0px)); /* 16 + 160 + 8 */
   }
 
   .dark-btn {
     left: 16px;
-    bottom: 30px;
+    bottom: calc(30px + env(safe-area-inset-bottom, 0px));
   }
 
   .system-panel {
@@ -1233,6 +1404,19 @@ body.dark .route-btn:hover {
 
   .route-selector-panel {
     left: 80px;
+  }
+
+  .map-popup {
+    position: fixed;
+    top: auto;
+    bottom: calc(100vh - 100dvh + env(safe-area-inset-bottom, 0px));
+    left: 0;
+    transform: none;
+    border-radius: 16px 16px 0 0;
+    width: 100%;
+    max-width: 100%;
+    max-height: 40dvh;
+    padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -1446,11 +1630,13 @@ body.dark .service-status-banner__close:hover {
 
 .map-popup {
   position: absolute;
-  bottom: 24px;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
   left: 50%;
   transform: translateX(-50%);
   z-index: 500;
   width: min(380px, calc(100% - 32px));
+  max-height: calc(50vh - env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
   background: rgba(255, 255, 255, 0.97);
   backdrop-filter: blur(12px);
   border-radius: 16px;
@@ -2136,4 +2322,222 @@ body.dark .bus-report__nav-btn--skip {
 body.dark .bus-report__nav-btn--back:hover:not(:disabled),
 body.dark .bus-report__nav-btn--skip:hover {
   background: #4b5563;
+}
+
+/* ============================================
+   STOP POPUP – MINIMIZE BUTTON (TUC4 A3)
+   ============================================ */
+
+.map-popup__minimize {
+  background: none;
+  border: none;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 0 2px;
+  font-weight: bold;
+}
+
+.map-popup__minimize:hover {
+  color: #1f2937;
+}
+
+body.dark .map-popup__minimize {
+  color: #9ca3af;
+}
+
+body.dark .map-popup__minimize:hover {
+  color: #f3f4f6;
+}
+
+/* ============================================
+   STOP POPUP – WALKING TIME (TUC4 R4)
+   ============================================ */
+
+.map-popup__walk-time {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0 2px;
+  font-size: 0.82rem;
+  color: #4b5563;
+}
+
+.map-popup__walk-icon {
+  font-size: 16px;
+  color: #4285F4;
+}
+
+body.dark .map-popup__walk-time {
+  color: #9ca3af;
+}
+
+body.dark .map-popup__walk-icon {
+  color: #8ab4f8;
+}
+
+/* ============================================
+   STOP POPUP – DIRECTIONS BUTTON (TUC4 Step 5)
+   ============================================ */
+
+.map-popup__directions-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px 0;
+  border: none;
+  border-radius: 10px;
+  background: #4285F4;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.map-popup__directions-btn:hover {
+  background: #3367d6;
+}
+
+.map-popup__directions-btn .material-icons-outlined {
+  font-size: 20px;
+}
+
+body.dark .map-popup__directions-btn {
+  background: #5a9cf5;
+}
+
+body.dark .map-popup__directions-btn:hover {
+  background: #4285f4;
+}
+
+/* ============================================
+   DIRECTIONS PANEL (TUC4 Step 6)
+   Shown at top of map during walking mode
+   ============================================ */
+
+.directions-panel {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  width: min(380px, calc(100% - 32px));
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(12px);
+  border-radius: 14px;
+  padding: 12px 16px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.16);
+  font-size: 14px;
+  color: #1f2937;
+  animation: mapPopupSlideUp 0.25s ease-out;
+}
+
+.directions-panel__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.directions-panel__icon {
+  font-size: 22px;
+  color: #4285F4;
+  flex-shrink: 0;
+}
+
+.directions-panel__title {
+  font-size: 15px;
+  font-weight: 600;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.directions-panel__close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 0 2px;
+}
+
+.directions-panel__close:hover {
+  color: #1f2937;
+}
+
+.directions-panel__info {
+  display: flex;
+  gap: 16px;
+  margin-top: 6px;
+  padding-left: 28px;
+}
+
+.directions-panel__duration {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.directions-panel__eta {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+body.dark .directions-panel {
+  background: rgba(31, 41, 55, 0.97);
+  color: #f3f4f6;
+}
+
+body.dark .directions-panel__close {
+  color: #9ca3af;
+}
+
+body.dark .directions-panel__close:hover {
+  color: #f3f4f6;
+}
+
+body.dark .directions-panel__duration {
+  color: #f3f4f6;
+}
+
+body.dark .directions-panel__eta {
+  color: #9ca3af;
+}
+
+/* ============================================
+   TOAST NOTIFICATION (TUC4 Step 11)
+   Non-intrusive arrival-at-stop notification
+   ============================================ */
+
+.map-toast {
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 600;
+  background: #1f2937;
+  color: #fff;
+  padding: 10px 24px;
+  border-radius: 24px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  animation: mapPopupSlideUp 0.25s ease-out;
+  transition: opacity 0.4s;
+}
+
+.map-toast--fade {
+  opacity: 0;
+}
+
+body.dark .map-toast {
+  background: #374151;
 }
