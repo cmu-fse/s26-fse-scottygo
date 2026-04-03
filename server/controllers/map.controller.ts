@@ -13,7 +13,10 @@ import {
   TransitSearchStrategy,
   SearchContext
 } from '../search/search-strategy';
-import type { IRoute, ITransitSearchResult } from '../../common/transit.interface';
+import type {
+  IRoute,
+  ITransitSearchResult
+} from '../../common/transit.interface';
 
 export default class MapController extends Controller {
   public constructor(path: string) {
@@ -27,7 +30,11 @@ export default class MapController extends Controller {
 
     // Search endpoints (SearchInfo UC — R1 contextual search)
     // Auth middleware is applied inline so the page route above stays open.
-    this.router.get('/routes/search', this.authorize, this.searchRoutes.bind(this));
+    this.router.get(
+      '/routes/search',
+      this.authorize,
+      this.searchRoutes.bind(this)
+    );
     this.router.get('/search', this.authorize, this.searchTransit.bind(this));
   }
 
@@ -182,7 +189,9 @@ export default class MapController extends Controller {
     }
 
     try {
-      const context = new SearchContext<ITransitSearchResult>(new TransitSearchStrategy());
+      const context = new SearchContext<ITransitSearchResult>(
+        new TransitSearchStrategy()
+      );
       const results = await context.executeSearch(q);
       const total = results.routes.length + results.stops.length;
       const success: responses.ISuccess = {

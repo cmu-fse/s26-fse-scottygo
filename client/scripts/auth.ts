@@ -553,4 +553,3 @@ declineOk?.addEventListener('click', () => {
   closeModal(declineModal);
   window.location.href = '/home';
 });
-

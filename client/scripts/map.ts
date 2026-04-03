@@ -189,7 +189,9 @@ async function getUser(username: string): Promise<IUser | null> {
 }
 
 // Get current user account information for role-based UI behavior.
-async function getCurrentUserAccount(username: string): Promise<IUserAccount | null> {
+async function getCurrentUserAccount(
+  username: string
+): Promise<IUserAccount | null> {
   try {
     const token = localStorage.getItem('token');
     const res: AxiosResponse = await axios.request({
@@ -258,7 +260,6 @@ function showSubscriptionToast(message: string): void {
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 5000);
 }
-
 
 // ─── Map provider ──────────────────────────────────────────────────────────────
 
@@ -347,7 +348,11 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
     await filterController.initialize();
 
     // Pass stop data to the search component so it can show stop results
-    const transitSearch = document.querySelector('transit-search') as (HTMLElement & { setStopsData?: (d: Record<string, unknown[]>) => void }) | null;
+    const transitSearch = document.querySelector('transit-search') as
+      | (HTMLElement & {
+          setStopsData?: (d: Record<string, unknown[]>) => void;
+        })
+      | null;
     if (transitSearch && typeof transitSearch.setStopsData === 'function') {
       transitSearch.setStopsData(filterController.getStopsData());
     }
@@ -360,10 +365,15 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
 
     // Show/hide the route bell whenever the selected route changes
     mapStateManager.subscribe((state) => {
-      const bell = document.querySelector('route-bell') as IRouteBellElement | null;
+      const bell = document.querySelector(
+        'route-bell'
+      ) as IRouteBellElement | null;
       if (!bell || typeof bell.showBell !== 'function') return;
       if (state.selectedRouteId) {
-        bell.showBell(state.selectedRouteId, isRouteSubscribed(state.selectedRouteId));
+        bell.showBell(
+          state.selectedRouteId,
+          isRouteSubscribed(state.selectedRouteId)
+        );
       } else {
         bell.hideBell();
       }
@@ -378,7 +388,6 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
 
     // Request user location for centering map
     requestUserLocation();
-
   } else {
     console.error('Map could not be initialized: config unavailable');
     showModal(
@@ -836,29 +845,50 @@ function setupMapEventListeners(): void {
       const res = await axios.post(
         '/notifications/subscriptions',
         { routeId },
-        { headers: { Authorization: `Bearer ${token}` }, validateStatus: () => true }
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          validateStatus: () => true
+        }
       );
       if (res.status === 201 && res.data.name === 'RouteSubscribed') {
         subscribedRoutes.add(routeId);
-        document.dispatchEvent(new CustomEvent('notifRouteJoin', { detail: { routeId } }));
+        document.dispatchEvent(
+          new CustomEvent('notifRouteJoin', { detail: { routeId } })
+        );
         showSubscriptionToast(`Subscribed to Route ${routeId}.`);
-      } else if (res.status === 409 && res.data.name === 'SubscriptionLimitReached') {
-        showSubscriptionToast('Subscription limit reached (10). Please remove a subscription first.');
+      } else if (
+        res.status === 409 &&
+        res.data.name === 'SubscriptionLimitReached'
+      ) {
+        showSubscriptionToast(
+          'Subscription limit reached (10). Please remove a subscription first.'
+        );
         // Revert bell to unsubscribed state
-        const bell = document.querySelector('route-bell') as IRouteBellElement | null;
+        const bell = document.querySelector(
+          'route-bell'
+        ) as IRouteBellElement | null;
         bell?.showBell(routeId, false);
-      } else if (res.status === 409 && res.data.name === 'DuplicateSubscription') {
+      } else if (
+        res.status === 409 &&
+        res.data.name === 'DuplicateSubscription'
+      ) {
         // Already subscribed server-side — sync local state
         subscribedRoutes.add(routeId);
-        document.dispatchEvent(new CustomEvent('notifRouteJoin', { detail: { routeId } }));
+        document.dispatchEvent(
+          new CustomEvent('notifRouteJoin', { detail: { routeId } })
+        );
       } else {
         showSubscriptionToast('Failed to subscribe. Please try again.');
-        const bell = document.querySelector('route-bell') as IRouteBellElement | null;
+        const bell = document.querySelector(
+          'route-bell'
+        ) as IRouteBellElement | null;
         bell?.showBell(routeId, false);
       }
     } catch {
       showSubscriptionToast('Failed to subscribe. Please try again.');
-      const bell = document.querySelector('route-bell') as IRouteBellElement | null;
+      const bell = document.querySelector(
+        'route-bell'
+      ) as IRouteBellElement | null;
       bell?.showBell(routeId, false);
     }
   });
@@ -867,31 +897,49 @@ function setupMapEventListeners(): void {
     const { routeId } = (e as CustomEvent<{ routeId: string }>).detail;
     const token = localStorage.getItem('token');
     try {
-      const res = await axios.delete(`/notifications/subscriptions/${routeId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-        validateStatus: () => true
-      });
+      const res = await axios.delete(
+        `/notifications/subscriptions/${routeId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          validateStatus: () => true
+        }
+      );
       if (res.status === 200 || res.status === 404) {
         subscribedRoutes.delete(routeId);
-        document.dispatchEvent(new CustomEvent('notifRouteLeave', { detail: { routeId } }));
+        document.dispatchEvent(
+          new CustomEvent('notifRouteLeave', { detail: { routeId } })
+        );
         showSubscriptionToast(`Unsubscribed from Route ${routeId}.`);
       } else {
         showSubscriptionToast('Failed to unsubscribe. Please try again.');
         // Revert bell to subscribed state
-        const bell = document.querySelector('route-bell') as IRouteBellElement | null;
+        const bell = document.querySelector(
+          'route-bell'
+        ) as IRouteBellElement | null;
         bell?.showBell(routeId, true);
       }
     } catch {
       showSubscriptionToast('Failed to unsubscribe. Please try again.');
-      const bell = document.querySelector('route-bell') as IRouteBellElement | null;
+      const bell = document.querySelector(
+        'route-bell'
+      ) as IRouteBellElement | null;
       bell?.showBell(routeId, true);
     }
   });
 
   // Bus Report Form — opened by vehicle-tracker with lat/lon already checked
   document.addEventListener('busReport', (e: Event) => {
-    const { vid, routeId, lat, lon } = (e as CustomEvent<{ vid: string; routeId: string; lat: number; lon: number }>).detail;
-    const form = document.querySelector('bus-report-form') as BusReportFormElement | null;
+    const { vid, routeId, lat, lon } = (
+      e as CustomEvent<{
+        vid: string;
+        routeId: string;
+        lat: number;
+        lon: number;
+      }>
+    ).detail;
+    const form = document.querySelector(
+      'bus-report-form'
+    ) as BusReportFormElement | null;
     if (form && typeof form.open === 'function') {
       form.open(vid, routeId, lat, lon);
     }
@@ -906,12 +954,16 @@ function setupMapEventListeners(): void {
         validateStatus: () => true
       });
       if (res.status === 201) {
-        showSubscriptionToast(res.data.message ?? 'Report submitted. Thank you!');
+        showSubscriptionToast(
+          res.data.message ?? 'Report submitted. Thank you!'
+        );
       } else {
         console.error('Report submission failed:', res.status, res.data);
         // Show the server's message when available (e.g. ProximityViolation, VehicleNotFound)
         const serverMsg: string | undefined = res.data?.message;
-        showSubscriptionToast(serverMsg ?? 'Failed to submit report. Please try again.');
+        showSubscriptionToast(
+          serverMsg ?? 'Failed to submit report. Please try again.'
+        );
       }
     } catch (err) {
       console.error('Report submission error:', err);
@@ -1029,4 +1081,3 @@ function isInPittsburghArea(lat: number, lng: number): boolean {
 
   return lat >= MIN_LAT && lat <= MAX_LAT && lng >= MIN_LNG && lng <= MAX_LNG;
 }
-

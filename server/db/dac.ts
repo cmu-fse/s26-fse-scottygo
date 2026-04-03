@@ -101,7 +101,10 @@ export interface IDatabase {
   // Notification (TUC3) methods
   getSubscriptionsByUserId(userId: string): Promise<ISubscription[]>;
 
-  findSubscription(userId: string, routeId: string): Promise<ISubscription | null>;
+  findSubscription(
+    userId: string,
+    routeId: string
+  ): Promise<ISubscription | null>;
 
   countSubscriptionsByUserId(userId: string): Promise<number>;
 
@@ -115,7 +118,9 @@ export interface IDatabase {
 
   saveNotification(notification: INotification): Promise<INotification>;
 
-  getRecentNotifications(filter: Record<string, unknown>): Promise<INotification[]>;
+  getRecentNotifications(
+    filter: Record<string, unknown>
+  ): Promise<INotification[]>;
 }
 
 /* Data Access Class */

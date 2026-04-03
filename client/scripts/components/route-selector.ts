@@ -279,7 +279,9 @@ export class RouteSelectorPanel
       newRouteList.scrollTop = scrollTop;
     }
 
-    const newInput = this.querySelector('.route-search-input') as HTMLInputElement;
+    const newInput = this.querySelector(
+      '.route-search-input'
+    ) as HTMLInputElement;
     if (newInput) {
       const selection = cursorPos ?? this.searchValue.length;
       newInput.focus();
@@ -294,9 +296,12 @@ export class RouteSelectorPanel
       headers.Authorization = `Bearer ${token}`;
     }
 
-    const res = await fetch(`/map/routes/search?q=${encodeURIComponent(query)}`, {
-      headers
-    });
+    const res = await fetch(
+      `/map/routes/search?q=${encodeURIComponent(query)}`,
+      {
+        headers
+      }
+    );
 
     if (!res.ok) {
       return [];

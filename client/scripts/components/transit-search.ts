@@ -148,8 +148,8 @@ export class TransitSearch extends HTMLElement {
       });
 
       if (res.ok) {
-        const data = await res.json() as {
-          payload?: { routes: IRoute[]; stops: IStop[] }
+        const data = (await res.json()) as {
+          payload?: { routes: IRoute[]; stops: IStop[] };
         };
         matchedRoutes = data.payload?.routes ?? [];
         matchedStops = data.payload?.stops ?? [];

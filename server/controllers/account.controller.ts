@@ -197,9 +197,9 @@ export default class AccountController extends Controller {
         return;
       }
 
-      const rawField =
-        ((req.query.field as string | undefined)?.trim().toLowerCase() ??
-          'username') as UserSearchField;
+      const rawField = ((req.query.field as string | undefined)
+        ?.trim()
+        .toLowerCase() ?? 'username') as UserSearchField;
 
       if (rawField !== 'username' && rawField !== 'email') {
         const error: responses.IAppError = {
@@ -212,7 +212,9 @@ export default class AccountController extends Controller {
       }
 
       const q = (req.query.q as string | undefined)?.trim() ?? '';
-      const context = new SearchContext<string[]>(new UserSearchStrategy(rawField));
+      const context = new SearchContext<string[]>(
+        new UserSearchStrategy(rawField)
+      );
       const usernames = await context.executeSearch(q);
 
       const successRes: responses.ISuccess = {

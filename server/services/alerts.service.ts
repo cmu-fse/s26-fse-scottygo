@@ -55,7 +55,9 @@ class AlertsService {
 
   start(): void {
     if (this.intervalId) return;
-    console.log(`${tag()} Starting alert feed polling (every ${POLL_INTERVAL_MS / 1000}s)`);
+    console.log(
+      `${tag()} Starting alert feed polling (every ${POLL_INTERVAL_MS / 1000}s)`
+    );
 
     // Initial fetch
     this.fetchAlerts().catch(() => {});
@@ -102,8 +104,7 @@ class AlertsService {
 
         const alert = entity.alert;
 
-        const headerText =
-          alert.headerText?.translation?.[0]?.text ?? '';
+        const headerText = alert.headerText?.translation?.[0]?.text ?? '';
         const descriptionText =
           alert.descriptionText?.translation?.[0]?.text ?? '';
 
@@ -123,9 +124,7 @@ class AlertsService {
               start: ap.start
                 ? new Date(Number(ap.start) * 1000).toISOString()
                 : '',
-              end: ap.end
-                ? new Date(Number(ap.end) * 1000).toISOString()
-                : ''
+              end: ap.end ? new Date(Number(ap.end) * 1000).toISOString() : ''
             });
           }
         }

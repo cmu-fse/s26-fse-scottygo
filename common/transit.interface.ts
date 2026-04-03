@@ -109,7 +109,11 @@ export interface INearbyStopsPayload {
 
 // ── Live Notification (TUC3) ───────────────────────────────────────────
 
-export type ICrowdedness = 'Empty' | 'Few Seats Taken' | 'Standing Room' | 'Packed';
+export type ICrowdedness =
+  | 'Empty'
+  | 'Few Seats Taken'
+  | 'Standing Room'
+  | 'Packed';
 export type IPrioritySeating = 'Available' | 'Occupied';
 export type IBusCondition = 'Clean' | 'Dirty' | 'Average';
 

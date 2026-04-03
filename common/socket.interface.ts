@@ -5,7 +5,11 @@ import { INotification, IServiceAlert } from './transit.interface';
 
 export type ISearchAutocompleteContext = 'transit' | 'notifications';
 
-export type ISearchSuggestionType = 'route' | 'vehicle' | 'alert' | 'notification';
+export type ISearchSuggestionType =
+  | 'route'
+  | 'vehicle'
+  | 'alert'
+  | 'notification';
 
 export interface ISearchSuggestion {
   label: string;

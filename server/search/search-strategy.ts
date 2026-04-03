@@ -23,25 +23,136 @@ import { NotificationModel } from '../models/notification.model';
 import gtfsService from '../services/gtfs.service';
 import alertsService from '../services/alerts.service';
 import vehiclePositionsService from '../services/vehicle-positions.service';
-import type { IRoute, INotification, IServiceAlert, ITransitSearchResult } from '../../common/transit.interface';
+import type {
+  IRoute,
+  INotification,
+  IServiceAlert,
+  ITransitSearchResult
+} from '../../common/transit.interface';
 import type { ISearchSuggestion } from '../../common/socket.interface';
 
 // ── Stop Word List (R2) ───────────────────────────────────────────────────────
 
 const STOP_WORDS = new Set([
-  'a', 'able', 'about', 'across', 'after', 'all', 'almost', 'also', 'am',
-  'among', 'an', 'and', 'any', 'are', 'as', 'at', 'be', 'because', 'been',
-  'but', 'by', 'can', 'cannot', 'could', 'dear', 'did', 'do', 'does',
-  'either', 'else', 'ever', 'every', 'for', 'from', 'get', 'got', 'had',
-  'has', 'have', 'he', 'her', 'hers', 'him', 'his', 'how', 'however', 'i',
-  'if', 'in', 'into', 'is', 'it', 'its', 'just', 'least', 'let', 'like',
-  'likely', 'may', 'me', 'might', 'most', 'must', 'my', 'neither', 'no',
-  'nor', 'not', 'of', 'off', 'often', 'on', 'only', 'or', 'other', 'our',
-  'own', 'rather', 'said', 'say', 'says', 'she', 'should', 'since', 'so',
-  'some', 'than', 'that', 'the', 'their', 'them', 'then', 'there', 'these',
-  'they', 'this', 'tis', 'to', 'too', 'twas', 'us', 'wants', 'was', 'we',
-  'were', 'what', 'when', 'where', 'which', 'while', 'who', 'whom', 'why',
-  'will', 'with', 'would', 'yet', 'you', 'your'
+  'a',
+  'able',
+  'about',
+  'across',
+  'after',
+  'all',
+  'almost',
+  'also',
+  'am',
+  'among',
+  'an',
+  'and',
+  'any',
+  'are',
+  'as',
+  'at',
+  'be',
+  'because',
+  'been',
+  'but',
+  'by',
+  'can',
+  'cannot',
+  'could',
+  'dear',
+  'did',
+  'do',
+  'does',
+  'either',
+  'else',
+  'ever',
+  'every',
+  'for',
+  'from',
+  'get',
+  'got',
+  'had',
+  'has',
+  'have',
+  'he',
+  'her',
+  'hers',
+  'him',
+  'his',
+  'how',
+  'however',
+  'i',
+  'if',
+  'in',
+  'into',
+  'is',
+  'it',
+  'its',
+  'just',
+  'least',
+  'let',
+  'like',
+  'likely',
+  'may',
+  'me',
+  'might',
+  'most',
+  'must',
+  'my',
+  'neither',
+  'no',
+  'nor',
+  'not',
+  'of',
+  'off',
+  'often',
+  'on',
+  'only',
+  'or',
+  'other',
+  'our',
+  'own',
+  'rather',
+  'said',
+  'say',
+  'says',
+  'she',
+  'should',
+  'since',
+  'so',
+  'some',
+  'than',
+  'that',
+  'the',
+  'their',
+  'them',
+  'then',
+  'there',
+  'these',
+  'they',
+  'this',
+  'tis',
+  'to',
+  'too',
+  'twas',
+  'us',
+  'wants',
+  'was',
+  'we',
+  'were',
+  'what',
+  'when',
+  'where',
+  'which',
+  'while',
+  'who',
+  'whom',
+  'why',
+  'will',
+  'with',
+  'would',
+  'yet',
+  'you',
+  'your'
 ]);
 
 /**
@@ -243,7 +354,9 @@ export class SubscriptionSearchStrategy implements ISearchStrategy<IRoute[]> {
  * Criteria: Keywords matching notification message content, route IDs, or vehicle IDs.
  * Results : Matching INotification objects, newest first.
  */
-export class NotificationSearchStrategy implements ISearchStrategy<INotification[]> {
+export class NotificationSearchStrategy implements ISearchStrategy<
+  INotification[]
+> {
   async search(query: string): Promise<INotification[]> {
     const filtered = filterStopWords(query);
     if (filtered === null) return [];
@@ -260,17 +373,17 @@ export interface INotificationSearchCriteria {
   q?: string;
 }
 
-export class RecentNotificationsStrategy
-  implements ISearchStrategy<INotification[]>
-{
+export class RecentNotificationsStrategy implements ISearchStrategy<
+  INotification[]
+> {
   async search(_query: string): Promise<INotification[]> {
     return NotificationModel.getRecentNotifications();
   }
 }
 
-export class NotificationRouteSearchStrategy
-  implements ISearchStrategy<INotification[]>
-{
+export class NotificationRouteSearchStrategy implements ISearchStrategy<
+  INotification[]
+> {
   constructor(private readonly routeId: string) {}
 
   async search(_query: string): Promise<INotification[]> {
@@ -278,9 +391,9 @@ export class NotificationRouteSearchStrategy
   }
 }
 
-export class NotificationBusSearchStrategy
-  implements ISearchStrategy<INotification[]>
-{
+export class NotificationBusSearchStrategy implements ISearchStrategy<
+  INotification[]
+> {
   constructor(private readonly vid: string) {}
 
   async search(_query: string): Promise<INotification[]> {
@@ -288,9 +401,9 @@ export class NotificationBusSearchStrategy
   }
 }
 
-export class NotificationCompositeSearchStrategy
-  implements ISearchStrategy<INotification[]>
-{
+export class NotificationCompositeSearchStrategy implements ISearchStrategy<
+  INotification[]
+> {
   constructor(
     private readonly criteria: {
       route?: string;
@@ -363,7 +476,9 @@ export class NotificationSearchStrategyFactory {
  * Context : Notification search autocomplete (socket 'searchAutocomplete', context='notifications').
  * Results : Up to 8 deduplicated short strings (route IDs / vehicle IDs).
  */
-export class NotificationAutocompleteStrategy implements ISearchStrategy<ISearchSuggestion[]> {
+export class NotificationAutocompleteStrategy implements ISearchStrategy<
+  ISearchSuggestion[]
+> {
   async search(query: string): Promise<ISearchSuggestion[]> {
     const filtered = filterStopWords(query);
     if (filtered === null) return [];
@@ -376,7 +491,11 @@ export class NotificationAutocompleteStrategy implements ISearchStrategy<ISearch
 
     // 1. Route IDs from GTFS that match the query (always available)
     const routeSuggestions: ISearchSuggestion[] = routes
-      .filter((r) => r.id.toLowerCase().includes(lower) || r.name.toLowerCase().includes(lower))
+      .filter(
+        (r) =>
+          r.id.toLowerCase().includes(lower) ||
+          r.name.toLowerCase().includes(lower)
+      )
       .slice(0, 4)
       .map((r) => ({ label: r.id, type: 'route' as const }));
 
@@ -416,12 +535,20 @@ export class NotificationAutocompleteStrategy implements ISearchStrategy<ISearch
           a.routeIds.some((id) => id.toLowerCase().includes(lower))
       )
       .slice(0, 3)
-      .map((a: IServiceAlert) => ({ label: a.headerText, type: 'alert' as const }))
+      .map((a: IServiceAlert) => ({
+        label: a.headerText,
+        type: 'alert' as const
+      }))
       .filter((s) => s.label);
 
     const seen = new Set<string>();
     const result: ISearchSuggestion[] = [];
-    for (const s of [...routeSuggestions, ...vidSuggestions, ...notifSuggestions, ...alertSuggestions]) {
+    for (const s of [
+      ...routeSuggestions,
+      ...vidSuggestions,
+      ...notifSuggestions,
+      ...alertSuggestions
+    ]) {
       const key = s.label.toLowerCase();
       if (!seen.has(key)) {
         seen.add(key);

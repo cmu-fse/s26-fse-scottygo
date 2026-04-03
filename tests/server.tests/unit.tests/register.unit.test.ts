@@ -297,11 +297,7 @@ describe('Register Use Case unit tests', () => {
     // --- Negative: missing special character ---
 
     test('rejects password without a special character', async () => {
-      const req = makeRegisterReq(
-        'ValidUser',
-        'Pass1234',
-        'validuser@cmu.edu'
-      );
+      const req = makeRegisterReq('ValidUser', 'Pass1234', 'validuser@cmu.edu');
       const res = createMockResponse();
 
       const error: IAppError = {

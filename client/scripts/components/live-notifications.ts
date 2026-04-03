@@ -16,7 +16,10 @@
  */
 
 import { io, Socket } from 'socket.io-client';
-import type { ServerToClientEvents, ClientToServerEvents } from '../../../common/socket.interface';
+import type {
+  ServerToClientEvents,
+  ClientToServerEvents
+} from '../../../common/socket.interface';
 import type { INotification } from '../../../common/transit.interface';
 
 const MUTED_ROUTES_KEY = 'scottygo_muted_routes';
@@ -133,7 +136,9 @@ function getContainer(): HTMLElement {
 }
 
 function formatElapsed(isoTimestamp: string): string {
-  const mins = Math.round((Date.now() - new Date(isoTimestamp).getTime()) / 60_000);
+  const mins = Math.round(
+    (Date.now() - new Date(isoTimestamp).getTime()) / 60_000
+  );
   if (mins < 1) return 'just now';
   if (mins < 60) return `${mins}m ago`;
   return `${Math.floor(mins / 60)}h ago`;
@@ -174,7 +179,9 @@ function showPopup(notif: INotification): void {
   setTimeout(() => {
     if (card.isConnected) {
       card.classList.add('is-dismissing');
-      card.addEventListener('animationend', () => card.remove(), { once: true });
+      card.addEventListener('animationend', () => card.remove(), {
+        once: true
+      });
     }
   }, 30_000);
 }
