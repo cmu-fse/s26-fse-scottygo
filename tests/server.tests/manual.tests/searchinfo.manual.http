@@ -1,0 +1,189 @@
+// REST manual tests for SearchInfo use case
+// Spec source: docs/REST_API/REST_SearchInfo.md
+//
+// Base URL
+@baseUrl = http://localhost:8080
+
+// Replace these after login requests
+@adminToken = <ADMIN_TOKEN>
+@memberToken = <MEMBER_TOKEN>
+
+// ============================================================================
+// SETUP: Get auth tokens (replace credentials as needed)
+// ============================================================================
+
+// Login as Admin
+// Expected: 200 OK, payload contains token
+POST {{baseUrl}}/auth/tokens/Admin
+Content-Type: application/json
+
+{
+  "password": "admin"
+}
+###
+
+// Login as Member (replace username/password with an existing member)
+// Expected: 200 OK, payload contains token
+POST {{baseUrl}}/auth/tokens/<MEMBER_USERNAME>
+Content-Type: application/json
+
+{
+  "password": "<MEMBER_PASSWORD>"
+}
+###
+
+// ============================================================================
+// 1) GET /map/routes/search?q=<keywords>
+// ============================================================================
+
+// Basic success (Route Search)
+// Expected: 200, name=SearchTransitCompleted, payload is IRoute[]
+GET {{baseUrl}}/map/routes/search?q=61C
+Authorization: Bearer {{memberToken}}
+###
+
+// Success with stopwords only
+// Expected: 200, payload [] (stopword filtering rule)
+GET {{baseUrl}}/map/routes/search?q=the%20and%20or
+Authorization: Bearer {{memberToken}}
+###
+
+// Missing q
+// Expected: 400, name=MissingSearchQuery
+GET {{baseUrl}}/map/routes/search
+Authorization: Bearer {{memberToken}}
+###
+
+// Missing token
+// Expected: 401, name=MissingToken
+GET {{baseUrl}}/map/routes/search?q=61C
+###
+
+// Invalid token
+// Expected: 401, name=InvalidToken
+GET {{baseUrl}}/map/routes/search?q=61C
+Authorization: Bearer invalid.token.value
+###
+
+// ============================================================================
+// 2) GET /map/search?q=<keywords>
+// ============================================================================
+
+// Basic success (Transit Search: routes + stops)
+// Expected: 200, name=SearchTransitCompleted, payload has routes[] and stops[]
+GET {{baseUrl}}/map/search?q=east%20busway
+Authorization: Bearer {{memberToken}}
+###
+
+// Success with stopId-like query
+// Expected: 200 with matching stops and/or routes
+GET {{baseUrl}}/map/search?q=7079
+Authorization: Bearer {{memberToken}}
+###
+
+// Stopwords only
+// Expected: 200 with empty routes/stops payload
+GET {{baseUrl}}/map/search?q=the%20and%20to
+Authorization: Bearer {{memberToken}}
+###
+
+// Missing q
+// Expected: 400, name=MissingSearchQuery
+GET {{baseUrl}}/map/search
+Authorization: Bearer {{memberToken}}
+###
+
+// Missing token
+// Expected: 401, name=MissingToken
+GET {{baseUrl}}/map/search?q=east
+###
+
+// Invalid token
+// Expected: 401, name=InvalidToken
+GET {{baseUrl}}/map/search?q=east
+Authorization: Bearer invalid.token.value
+###
+
+// ============================================================================
+// 3) Notification Search (SearchInfo)
+// ============================================================================
+
+// NOTE:
+// The SearchInfo doc lists GET /notifications/search.
+// Current implementation in NotificationController uses GET /notifications/notifications.
+// The tests below use the implemented endpoint.
+
+// 3.1 Basic free-text search
+// Expected: 200, name=NotificationsRetrieved, payload is notification array
+GET {{baseUrl}}/notifications/notifications?q=packed
+Authorization: Bearer {{memberToken}}
+###
+
+// 3.2 Route filter only
+// Expected: 200 with route-specific notifications (or empty payload)
+GET {{baseUrl}}/notifications/notifications?route=61C
+Authorization: Bearer {{memberToken}}
+###
+
+// 3.3 Vehicle filter only
+// Expected: 200 with bus-specific notifications (or empty payload)
+GET {{baseUrl}}/notifications/notifications?bus=3245
+Authorization: Bearer {{memberToken}}
+###
+
+// 3.4 Composite search
+// Expected: 200 filtered by route + bus + q (or empty payload)
+GET {{baseUrl}}/notifications/notifications?route=61C&bus=3245&q=packed
+Authorization: Bearer {{memberToken}}
+###
+
+// 3.5 Empty query params (recent notifications)
+// Expected: 200 with recent notifications list (can be empty)
+GET {{baseUrl}}/notifications/notifications
+Authorization: Bearer {{memberToken}}
+###
+
+// Missing token
+// Expected: 401, name=MissingToken
+GET {{baseUrl}}/notifications/notifications?q=packed
+###
+
+// Invalid token
+// Expected: 401, name=InvalidToken
+GET {{baseUrl}}/notifications/notifications?q=packed
+Authorization: Bearer invalid.token.value
+###
+
+// Optional compatibility check against documented path
+// Expected: 404 on current implementation OR 200 if route has been added
+GET {{baseUrl}}/notifications/search?q=packed
+Authorization: Bearer {{memberToken}}
+###
+
+// ============================================================================
+// 4) Account User Search (Referenced by SearchInfo error table)
+// ============================================================================
+
+// Admin search by username
+// Expected: 200, name=UsersSearchCompleted, payload is username[]
+GET {{baseUrl}}/account/users/search?field=username&q=admin
+Authorization: Bearer {{adminToken}}
+###
+
+// Admin search by email
+// Expected: 200, name=UsersSearchCompleted
+GET {{baseUrl}}/account/users/search?field=email&q=@cmu.edu
+Authorization: Bearer {{adminToken}}
+###
+
+// Invalid field
+// Expected: 400, name=InvalidSearchField
+GET {{baseUrl}}/account/users/search?field=role&q=admin
+Authorization: Bearer {{adminToken}}
+###
+
+// Member not authorized
+// Expected: 403, name=UnauthorizedRequest
+GET {{baseUrl}}/account/users/search?field=username&q=admin
+Authorization: Bearer {{memberToken}}
+###
