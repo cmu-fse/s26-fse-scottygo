@@ -40,28 +40,26 @@ import { IConfig } from '../../../common/map.interface';
 
 const TEST_PORT = 8383;
 const TEST_URL = `http://localhost:${TEST_PORT}`;
+const RUN_TRANSIT_E2E = process.env.RUN_TRANSIT_E2E === 'true';
+const describeE2E = RUN_TRANSIT_E2E ? describe : describe.skip;
 const TEST_DB_URL =
   process.env.TEST_DB_URL ??
   (process.env.DB_URL && process.env.DEV_DB
     ? `${process.env.DB_URL}${process.env.DEV_DB}`
     : '');
 
-if (!TEST_DB_URL) {
-  throw new Error(
-    'Missing DB_URL/DEV_DB (or TEST_DB_URL override). Refusing to run DB-writing tests without explicit DEV database configuration.'
-  );
-}
-
 let app: App;
 let server: HttpServer;
 let memberToken: string;
 let gtfsAvailable = false;
 
-const testUser = {
+const baseTestUser = {
   credentials: { username: 'e2euser', password: 'E2ETest123!' },
   email: 'e2euser@cmu.edu',
   agreed: true
 };
+
+type IE2ETestUser = typeof baseTestUser;
 
 async function request(
   method: string,
@@ -82,22 +80,60 @@ async function request(
   return { status: response.status, data };
 }
 
-async function setupUser(userData: typeof testUser): Promise<string> {
-  await request('POST', '/auth/users', {
+function summarizeResponse(data: responses.IResponse): string {
+  const payload = data as Partial<responses.IAppError> &
+    Partial<responses.ISuccess>;
+  const name = payload.name ?? 'UnknownResponse';
+  const message = payload.message ?? '';
+  return message ? `${name}: ${message}` : name;
+}
+
+async function setupUser(userData: IE2ETestUser): Promise<string> {
+  const registerRes = await request('POST', '/auth/users', {
     credentials: userData.credentials,
     email: userData.email,
     agreed: userData.agreed
   });
-  await request('PATCH', `/auth/users/${userData.credentials.username}`, {
-    password: userData.credentials.password
-  });
-  const res = await request(
+
+  if (registerRes.status !== 201) {
+    throw new Error(
+      `E2E setup failed during register (${registerRes.status}) ${summarizeResponse(registerRes.data)}`
+    );
+  }
+
+  const agreeRes = await request(
+    'PATCH',
+    `/auth/users/${userData.credentials.username}`,
+    {
+      password: userData.credentials.password
+    }
+  );
+
+  if (agreeRes.status !== 200) {
+    throw new Error(
+      `E2E setup failed during terms-agree (${agreeRes.status}) ${summarizeResponse(agreeRes.data)}`
+    );
+  }
+
+  const loginRes = await request(
     'POST',
     `/auth/tokens/${userData.credentials.username}`,
     { password: userData.credentials.password }
   );
-  const success = res.data as responses.ISuccess;
+
+  if (loginRes.status !== 200) {
+    throw new Error(
+      `E2E setup failed during login (${loginRes.status}) ${summarizeResponse(loginRes.data)}`
+    );
+  }
+
+  const success = loginRes.data as responses.ISuccess;
   const payload = success.payload as responses.IAuthenticatedUser;
+
+  if (!payload?.token) {
+    throw new Error('E2E setup failed: auth response missing token payload');
+  }
+
   return payload.token;
 }
 
@@ -106,6 +142,16 @@ async function setupUser(userData: typeof testUser): Promise<string> {
 // ---------------------------------------------------------------------------
 
 beforeAll(async () => {
+  if (!RUN_TRANSIT_E2E) {
+    return;
+  }
+
+  if (!TEST_DB_URL) {
+    throw new Error(
+      'Missing DB_URL/DEV_DB (or TEST_DB_URL override). Refusing to run DB-writing tests without explicit DEV database configuration.'
+    );
+  }
+
   const db = new MongoDB(TEST_DB_URL);
   app = new App(
     [
@@ -126,7 +172,30 @@ beforeAll(async () => {
   server = await app.listen();
   await new Promise((resolve) => setTimeout(resolve, 2000));
 
-  memberToken = await setupUser(testUser);
+  let setupError: unknown;
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    const uniqueSuffix = `${Math.floor(10_000 + Math.random() * 90_000)}`;
+    const runUser: IE2ETestUser = {
+      ...baseTestUser,
+      credentials: {
+        ...baseTestUser.credentials,
+        username: `e2e${uniqueSuffix}`
+      },
+      email: `e2e${uniqueSuffix}@cmu.edu`
+    };
+
+    try {
+      memberToken = await setupUser(runUser);
+      setupError = undefined;
+      break;
+    } catch (error) {
+      setupError = error;
+    }
+  }
+
+  if (setupError) {
+    throw setupError;
+  }
 
   // Wait for GTFS to finish loading (it downloads a real zip file)
   console.log('[E2E] Waiting for GTFS feed to load (up to 120s)...');
@@ -146,6 +215,10 @@ beforeAll(async () => {
 }, 150_000);
 
 afterAll(async () => {
+  if (!RUN_TRANSIT_E2E) {
+    return;
+  }
+
   if (app && app.io) {
     await new Promise<void>((resolve) => app.io.close(() => resolve()));
   }
@@ -174,7 +247,7 @@ function expectValidRoute(route: IRoute): void {
 // GET /transit/routes — real TrueTime data
 // ============================================================================
 
-describe('E2E: GET /transit/routes', () => {
+describeE2E('E2E: GET /transit/routes', () => {
   test('returns real PRT routes with valid IRoute shape', async () => {
     const res = await request('GET', '/transit/routes');
 
@@ -213,7 +286,7 @@ describe('E2E: GET /transit/routes', () => {
 // GET /transit/routes/:id — real route geometry
 // ============================================================================
 
-describe('E2E: GET /transit/routes/:id', () => {
+describeE2E('E2E: GET /transit/routes/:id', () => {
   test('returns real geometry for P1 with valid IPattern shape', async () => {
     const res = await request('GET', '/transit/routes/P1');
 
@@ -273,7 +346,7 @@ describe('E2E: GET /transit/routes/:id', () => {
 // GET /transit/vehicles/:routeId — real-time vehicle positions
 // ============================================================================
 
-describe('E2E: GET /transit/vehicles/:routeId', () => {
+describeE2E('E2E: GET /transit/vehicles/:routeId', () => {
   test('returns vehicle data (may be empty if no buses running)', async () => {
     const res = await request('GET', '/transit/vehicles/P1');
 
@@ -313,7 +386,7 @@ describe('E2E: GET /transit/vehicles/:routeId', () => {
 // GET /transit/stops/:routeId — real stops for a route
 // ============================================================================
 
-describe('E2E: GET /transit/stops/:routeId', () => {
+describeE2E('E2E: GET /transit/stops/:routeId', () => {
   test('returns real stops for P1 INBOUND with valid IStop shape', async () => {
     const res = await request('GET', '/transit/stops/P1?dir=INBOUND');
 
@@ -360,7 +433,7 @@ describe('E2E: GET /transit/stops/:routeId', () => {
 // GET /transit/stops/:stopId/predictions — real arrival predictions
 // ============================================================================
 
-describe('E2E: GET /transit/stops/:stopId/predictions', () => {
+describeE2E('E2E: GET /transit/stops/:stopId/predictions', () => {
   test('returns predictions (may be empty if no service)', async () => {
     // Get a real stop ID first
     const stopsRes = await request('GET', '/transit/stops/P1?dir=INBOUND');
@@ -395,7 +468,7 @@ describe('E2E: GET /transit/stops/:stopId/predictions', () => {
 // GET /transit/detours/:routeId — real detour data
 // ============================================================================
 
-describe('E2E: GET /transit/detours/:routeId', () => {
+describeE2E('E2E: GET /transit/detours/:routeId', () => {
   test('returns detour data (may be empty if none active)', async () => {
     const res = await request('GET', '/transit/detours/P1');
 
@@ -423,7 +496,7 @@ describe('E2E: GET /transit/detours/:routeId', () => {
 // POST /transit/routes/available — GTFS-based date/time filtering
 // ============================================================================
 
-describe('E2E: POST /transit/routes/available', () => {
+describeE2E('E2E: POST /transit/routes/available', () => {
   test("filters routes by today's date and returns valid routes", async () => {
     if (!gtfsAvailable) return; // skip when GTFS feed is unavailable
 
@@ -511,7 +584,7 @@ describe('E2E: POST /transit/routes/available', () => {
 // GET /map/config — real map configuration
 // ============================================================================
 
-describe('E2E: GET /map/config', () => {
+describeE2E('E2E: GET /map/config', () => {
   test('returns valid map config with auth token', async () => {
     const res = await request('GET', '/config', undefined, memberToken);
 
@@ -541,7 +614,7 @@ describe('E2E: GET /map/config', () => {
 // Cross-endpoint consistency: route from /routes should work in other endpoints
 // ============================================================================
 
-describe('E2E: Cross-endpoint consistency', () => {
+describeE2E('E2E: Cross-endpoint consistency', () => {
   test('a route from /routes has geometry, stops, and accepts vehicles request', async () => {
     // 1. Get a real route ID
     const routesRes = await request('GET', '/transit/routes');

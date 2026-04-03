@@ -53,6 +53,18 @@ jest.mock('../../../server/services/memory-monitor.service', () => ({
   }
 }));
 
+jest.mock('../../../server/services/alerts.service', () => ({
+  __esModule: true,
+  default: {
+    start: jest.fn(),
+    stop: jest.fn(),
+    getAlerts: jest.fn().mockReturnValue([]),
+    isHealthy: jest.fn().mockReturnValue(true),
+    getLastError: jest.fn().mockReturnValue(null),
+    onAlertsChanged: null
+  }
+}));
+
 const TEST_PORT = 8185;
 const TEST_URL = `http://localhost:${TEST_PORT}`;
 

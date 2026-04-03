@@ -1,0 +1,42 @@
+name: Transit Live E2E
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Nightly at 07:00 UTC
+    - cron: '0 7 * * *'
+
+jobs:
+  transit-e2e:
+    name: Transit E2E (Live Upstream Dependencies)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        node-version: [20.x]
+
+    steps:
+      - name: Check out repository code...
+        uses: actions/checkout@v4
+
+      - name: Create env file...
+        env:
+          DOT_ENV: ${{ secrets.DOT_ENV }}
+        run: |
+          touch .env
+          echo "MY_VAR=xyz" >> .env
+          echo "${{ env.DOT_ENV }}" >> .env
+
+      - name: Setup Node.js with version ${{ matrix.node-version }}...
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Clean install npm...
+        run: npm ci
+
+      - name: Run live transit E2E suite...
+        env:
+          RUN_TRANSIT_E2E: 'true'
+        run: npm run test:rest:e2e:transitAPI
