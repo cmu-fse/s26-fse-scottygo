@@ -39,6 +39,11 @@ export const TRUETIME_BASE_URL: string =
 // Note: Tripshot API for CMU Shuttle is public and doesn't require API keys
 // The base URL is hardcoded in the tripshot.service.ts file
 
+// Gemini API (LLM content moderation for TUC3)
+export const GEMINI_API_KEY: string = process.env.GEMINI_API_KEY ?? '';
+export const GEMINI_MODEL: string =
+  process.env.GEMINI_MODEL ?? 'gemini-3.1-flash-lite-preview';
+
 // Set the HOST URL depending on the build environment and where the app is served from
 export const HOST: string =
   ENV === 'RENDER'

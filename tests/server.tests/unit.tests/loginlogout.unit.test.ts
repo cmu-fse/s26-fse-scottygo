@@ -31,7 +31,7 @@ const createMockResponse = (): MockResponse => {
 
 describe('LoginLogout Use Case unit tests', () => {
   const authController = new AuthController('/auth');
-  const mapController = new MapController('/map');
+  const mapController = new MapController('/');
 
   const activeAgreedUser: IUser = {
     _id: 'user-id-1',

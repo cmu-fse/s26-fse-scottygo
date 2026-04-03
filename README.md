@@ -9,6 +9,7 @@ Sigrid is now enabled for this repo. You have new GitHub Actions workflow files.
 ## Repo Artifacts
 
 - Quick link: [Memory Monitoring Runbook](docs/MemoryMonitoringRunbook.md)
+- Quick link: [REST API Document Conversion Guide](docs/REST_API/README_Document_Conversion.md)
 
 ## Selected Technology
 

@@ -11,7 +11,10 @@ import {
 } from '../../common/user.interface';
 import {
   ITransitCache,
-  ITransitCacheType
+  ITransitCacheType,
+  ISubscription,
+  IBusReport,
+  INotification
 } from '../../common/transit.interface';
 
 export interface IMemorySampleRecord {
@@ -78,10 +81,14 @@ export interface IDatabase {
 
   getAllUsernames(): Promise<string[]>;
 
+  getAllUserAccounts(): Promise<IUserAccount[]>;
+
   seedDefaultAdmin(): Promise<void>;
 
   // Transit cache methods
   getTransitCache(cacheKey: string): Promise<ITransitCache | null>;
+
+  getAllTransitCaches(): Promise<ITransitCache[]>;
 
   upsertTransitCache(entry: ITransitCache): Promise<void>;
 
@@ -90,6 +97,30 @@ export interface IDatabase {
   saveMemorySample(sample: IMemorySampleRecord): Promise<void>;
 
   getRecentMemorySamples(limit: number): Promise<IMemorySampleRecord[]>;
+
+  // Notification (TUC3) methods
+  getSubscriptionsByUserId(userId: string): Promise<ISubscription[]>;
+
+  findSubscription(
+    userId: string,
+    routeId: string
+  ): Promise<ISubscription | null>;
+
+  countSubscriptionsByUserId(userId: string): Promise<number>;
+
+  saveSubscription(sub: ISubscription): Promise<ISubscription>;
+
+  deleteSubscription(userId: string, routeId: string): Promise<boolean>;
+
+  saveBusReport(report: IBusReport): Promise<IBusReport>;
+
+  getLatestReportByVehicle(vid: string): Promise<IBusReport | null>;
+
+  saveNotification(notification: INotification): Promise<INotification>;
+
+  getRecentNotifications(
+    filter: Record<string, unknown>
+  ): Promise<INotification[]>;
 }
 
 /* Data Access Class */

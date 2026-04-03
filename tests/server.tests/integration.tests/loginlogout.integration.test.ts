@@ -7,7 +7,6 @@ import { Server as HttpServer } from 'http';
 import App from '../../../server/app';
 import { MongoDB } from '../../../server/db/mongo.db';
 import AuthController from '../../../server/controllers/auth.controller';
-import HomeController from '../../../server/controllers/home.controller';
 import MapController from '../../../server/controllers/map.controller';
 import DAC from '../../../server/db/dac';
 import * as responses from '../../../common/server.responses';
@@ -125,9 +124,8 @@ beforeAll(async () => {
   const db = new MongoDB(TEST_DB_URL);
   app = new App(
     [
-      new HomeController('/'),
       new AuthController('/auth'),
-      new MapController('/map')
+      new MapController('/')
     ],
     {
       clientDir: './.dist/client',
@@ -225,14 +223,14 @@ describe('LoginLogout Integration Tests', () => {
   });
 
   test('logout succeeds by removing token on client and blocking protected access', async () => {
-    const res = await request('GET', '/map/config');
+    const res = await request('GET', '/config');
 
     expect(res.status).toBe(401);
     expect((res.data as responses.IAppError).name).toBe('MissingToken');
   });
 
   test('logout is unsuccessful when token is still present and protected access is still allowed', async () => {
-    const res = await request('GET', '/map/config', undefined, userToken);
+    const res = await request('GET', '/config', undefined, userToken);
 
     expect(res.status).toBe(200);
     const success = res.data as responses.ISuccess;

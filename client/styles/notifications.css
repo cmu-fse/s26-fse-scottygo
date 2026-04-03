@@ -1,0 +1,210 @@
+.content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 16px 24px;
+  overflow-y: auto;
+}
+
+/* Search bar */
+.notif-search {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  align-items: center;
+  background: #f5f5f5;
+  border-radius: 12px;
+  padding: 10px 14px;
+  gap: 8px;
+  margin-bottom: 20px;
+  color: #888;
+}
+
+#notif-search-input {
+  flex: 1;
+  border: none;
+  background: none;
+  font-size: 15px;
+  color: #333;
+  outline: none;
+}
+
+#notif-search-input::placeholder {
+  color: #aaa;
+}
+
+.notif-search-clear {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  color: #aaa;
+  line-height: 0;
+}
+
+.notif-search-clear.is-visible {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notif-search-clear:hover {
+  color: #555;
+}
+
+/* Notification list */
+.notif-list {
+  list-style: none;
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Empty state */
+.notif-empty {
+  display: none;
+  color: #aaa;
+  font-size: 15px;
+  margin-top: 32px;
+}
+
+.notif-empty.is-visible {
+  display: block;
+}
+
+/* Notification card */
+.notif-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 14px 14px 12px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  border-left: 4px solid #ccc;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.notif-card[data-category='accessibility'] {
+  border-left-color: #f59e0b;
+}
+
+.notif-card[data-category='capacity'] {
+  border-left-color: #ef4444;
+}
+
+.notif-card[data-category='condition'] {
+  border-left-color: #3b82f6;
+}
+
+.notif-card[data-category='delay'] {
+  border-left-color: #8b5cf6;
+}
+
+/* Dismiss button */
+.notif-dismiss {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #bbb;
+  padding: 2px;
+  line-height: 0;
+  border-radius: 4px;
+}
+
+.notif-dismiss:hover {
+  color: #666;
+  background: #f0f0f0;
+}
+
+/* Card header row: icon + title */
+.notif-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 24px;
+}
+
+.notif-icon {
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.notif-icon[data-category='accessibility'] {
+  color: #f59e0b;
+}
+
+.notif-icon[data-category='capacity'] {
+  color: #ef4444;
+}
+
+.notif-icon[data-category='condition'] {
+  color: #3b82f6;
+}
+
+.notif-icon[data-category='delay'] {
+  color: #8b5cf6;
+}
+
+.notif-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #111;
+}
+
+/* Card body text */
+.notif-body {
+  font-size: 14px;
+  color: #444;
+  line-height: 1.4;
+}
+
+/* Footer row: tag + timestamp */
+.notif-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.notif-tag {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #f0f0f0;
+  color: #555;
+}
+
+.notif-tag[data-category='accessibility'] {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.notif-tag[data-category='capacity'] {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.notif-tag[data-category='condition'] {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.notif-tag[data-category='delay'] {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.notif-time {
+  font-size: 12px;
+  color: #aaa;
+}

@@ -142,7 +142,7 @@ This section covers the live notification endpoints, including route subscriptio
   "condition": "Dirty",
   "comment": "Very crowded today",
   "lat": 40.4418,
-  "lon": -79.9440
+  "lon": -79.944
 }
 ```
 
@@ -261,7 +261,7 @@ This section covers the live notification endpoints, including route subscriptio
     "condition": "Dirty",
     "comment": "Very crowded today",
     "lat": 40.4418,
-    "lon": -79.9440,
+    "lon": -79.944,
     "createdAt": "2026-03-27T10:15:00Z"
   }
 }
@@ -280,7 +280,7 @@ This section covers the live notification endpoints, including route subscriptio
     "routeId": "61C",
     "crowdedness": "Standing Room",
     "lat": 40.4418,
-    "lon": -79.9440,
+    "lon": -79.944,
     "createdAt": "2026-03-27T10:20:00Z"
   }
 }

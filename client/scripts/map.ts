@@ -1,13 +1,20 @@
 import axios, { AxiosResponse } from 'axios';
-import type { IUser } from '../../common/user.interface';
+import type { IUser, IUserAccount } from '../../common/user.interface';
 import type { IResponse } from '../../common/server.responses';
 import type { IMapProvider, IConfig } from '../../common/map.interface';
+import type { IStop } from '../../common/transit.interface';
 import { GoogleMapProvider } from './maps/google-map.provider';
 
 // Import web components
+import './components/app-header';
 import './components/transit-search';
 import './components/map-controls';
 import './components/zoom-controls';
+import './components/route-bell';
+import './components/live-notifications';
+import './components/bus-report-form';
+import type { BusReportFormElement } from './components/bus-report-form';
+import type { IRouteBellElement } from './components/route-bell';
 import { LocationIndicator } from './components/location-indicator';
 import './components/toggle-panel';
 import './components/time-picker';
@@ -34,6 +41,7 @@ import type {
 import { MapStateManager } from './state/map-state';
 import { URLSyncManager } from './state/url-sync';
 import { FilterController } from './controllers/filter-controller';
+import { DirectionsController } from './controllers/directions-controller';
 import { RouteRenderer } from './renderers/route-renderer';
 import { VehicleTracker } from './trackers/vehicle-tracker';
 
@@ -89,6 +97,7 @@ console.log('showModal function registered globally');
 const mapStateManager = MapStateManager.getInstance();
 const urlSyncManager = URLSyncManager.getInstance();
 const filterController = FilterController.getInstance();
+const directionsController = DirectionsController.getInstance();
 const routeRenderer = RouteRenderer.getInstance();
 const vehicleTracker = VehicleTracker.getInstance();
 
@@ -116,7 +125,7 @@ async function getUser(username: string): Promise<IUser | null> {
     const res: AxiosResponse = await axios.request({
       method: 'get',
       headers: { Authorization: `Bearer ${token}` },
-      url: '/map/users/' + username,
+      url: '/users/' + username,
       validateStatus: () => true
     });
     // Now handle response
@@ -181,6 +190,80 @@ async function getUser(username: string): Promise<IUser | null> {
   }
 }
 
+// Get current user account information for role-based UI behavior.
+async function getCurrentUserAccount(username: string): Promise<IUserAccount | null> {
+  try {
+    const token = localStorage.getItem('token');
+    const res: AxiosResponse = await axios.request({
+      method: 'get',
+      headers: { Authorization: `Bearer ${token}` },
+      url: `/account/users/${encodeURIComponent(username)}`,
+      validateStatus: () => true
+    });
+
+    const response: IResponse = res.data;
+    if (res.status === 200 && response.name === 'AccountRetrieved') {
+      return response.payload as IUserAccount;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// ─── Subscription helpers ──────────────────────────────────────────────────────
+// Subscriptions are authoritative on the server. We keep a local Set as a fast
+// cache so the bell icon renders synchronously; it is synced from the API on load.
+
+const subscribedRoutes = new Set<string>();
+
+function isRouteSubscribed(routeId: string): boolean {
+  return subscribedRoutes.has(routeId);
+}
+
+async function syncSubscriptionsFromServer(): Promise<void> {
+  const token = localStorage.getItem('token');
+  if (!token) return;
+  try {
+    const res = await axios.get('/notifications/subscriptions', {
+      headers: { Authorization: `Bearer ${token}` },
+      validateStatus: () => true
+    });
+    if (res.status === 200 && res.data.name === 'SubscriptionsRetrieved') {
+      subscribedRoutes.clear();
+      (res.data.payload as { routeId: string }[]).forEach((s) =>
+        subscribedRoutes.add(s.routeId)
+      );
+    }
+  } catch {
+    // Best-effort — bell state may be stale until next load
+  }
+}
+
+function showSubscriptionToast(message: string): void {
+  const toast = document.createElement('div');
+  toast.className = 'toast-notification';
+  toast.textContent = message;
+  toast.style.cssText = `
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 8px;
+    z-index: 10000;
+    font-size: 14px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  `;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 5000);
+}
+
+
+// ─── Map provider ──────────────────────────────────────────────────────────────
+
 // Map provider instance — depends on IMapProvider, not Google Maps directly
 const mapProvider: IMapProvider = new GoogleMapProvider();
 
@@ -195,7 +278,7 @@ let userLocationMarker: IMapMarker | null = null;
 async function getMapConfig(): Promise<IConfig | null> {
   try {
     const token = localStorage.getItem('token');
-    const res: AxiosResponse = await axios.get('/map/config', {
+    const res: AxiosResponse = await axios.get('/config', {
       headers: { Authorization: `Bearer ${token}` },
       validateStatus: () => true
     });
@@ -216,9 +299,13 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
   e.preventDefault();
   const loggedIn: boolean = await isLoggedIn(); // Check if user logged in
   if (!loggedIn) {
-    window.location.replace('/home'); // Redirect to home page
+    window.location.replace('/auth'); // Redirect to auth page
     return;
   }
+
+  const username = localStorage.getItem('username');
+  const userAccount = username ? await getCurrentUserAccount(username) : null;
+  const isAdminUser = userAccount?.privilegeLevel === 'Administrator';
 
   // Initialize map via provider abstraction
   const config = await getMapConfig();
@@ -239,6 +326,21 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
     // Initialize all components
     routeRenderer.initialize(mapProvider);
     vehicleTracker.initialize(mapProvider);
+    vehicleTracker.setAdminProximityBypass(isAdminUser);
+    directionsController.initialize(mapProvider);
+
+    // Set up directions controller callbacks
+    directionsController.setToastCallback(showToast);
+    directionsController.setInfoPanelCallback(updateDirectionsPanel);
+    directionsController.setExitCallback(async () => {
+      // A4: Exit directions mode → return to TUC4 Step 2
+      removeDirectionsPanel();
+      await filterController.initialize();
+      // Restore nearby-stops view (Step 2) instead of showing all routes
+      if (userLocation) {
+        await filterController.showNearbyStops(userLocation);
+      }
+    });
 
     // Initialize toggle panels
     await initializeTogglePanels();
@@ -260,8 +362,22 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
     // Initialize filter controller (fetches and renders routes)
     await filterController.initialize();
 
+    // Sync subscription state from server so bell icons are accurate
+    await syncSubscriptionsFromServer();
+
     // Setup event listeners for filter panels
     setupMapEventListeners();
+
+    // Show/hide the route bell whenever the selected route changes
+    mapStateManager.subscribe((state) => {
+      const bell = document.querySelector('route-bell') as IRouteBellElement | null;
+      if (!bell || typeof bell.showBell !== 'function') return;
+      if (state.selectedRouteId) {
+        bell.showBell(state.selectedRouteId, isRouteSubscribed(state.selectedRouteId));
+      } else {
+        bell.hideBell();
+      }
+    });
 
     // After initialization, if a route was restored from URL, apply route filter to render stops
     const restoredState = mapStateManager.getState();
@@ -272,6 +388,7 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
 
     // Request user location for centering map
     requestUserLocation();
+
   } else {
     console.error('Map could not be initialized: config unavailable');
     showModal(
@@ -389,12 +506,24 @@ function setupMapEventListeners(): void {
     const customEvent = e as CustomEvent;
     const query = customEvent.detail.query;
     console.log('Search query:', query);
-    // TODO: Implement search functionality
+  });
+
+  document.addEventListener('searchSelectRoute', (e: Event) => {
+    const { routeId } = (e as CustomEvent).detail;
+    mapStateManager.updateFilter('selectedRouteId', routeId);
+    void filterController.applyRouteFilter(routeId);
+  });
+
+  document.addEventListener('searchSelectStop', (e: Event) => {
+    const { stop } = (e as CustomEvent).detail as { stop: IStop | undefined };
+    if (!stop) return;
+    mapProvider.setCenter({ lat: stop.lat, lng: stop.lon });
+    void filterController.showStopDetailsFromSearch(stop);
   });
 
   document.addEventListener('toggleLayers', () => {
-    console.log('Toggle layers clicked');
-    // TODO: Implement layer toggle functionality
+    const mode = mapProvider.toggleLayers();
+    showSubscriptionToast(`Map layer: ${mode}`);
   });
 
   // Map Control Events (Filters)
@@ -690,6 +819,97 @@ function setupMapEventListeners(): void {
     await filterController.applyDateTimeFilter();
   });
 
+  // Bell subscription events
+  document.addEventListener('bellSubscribe', async (e: Event) => {
+    const { routeId } = (e as CustomEvent<{ routeId: string }>).detail;
+    const token = localStorage.getItem('token');
+    try {
+      const res = await axios.post(
+        '/notifications/subscriptions',
+        { routeId },
+        { headers: { Authorization: `Bearer ${token}` }, validateStatus: () => true }
+      );
+      if (res.status === 201 && res.data.name === 'RouteSubscribed') {
+        subscribedRoutes.add(routeId);
+        document.dispatchEvent(new CustomEvent('notifRouteJoin', { detail: { routeId } }));
+        showSubscriptionToast(`Subscribed to Route ${routeId}.`);
+      } else if (res.status === 409 && res.data.name === 'SubscriptionLimitReached') {
+        showSubscriptionToast('Subscription limit reached (10). Please remove a subscription first.');
+        // Revert bell to unsubscribed state
+        const bell = document.querySelector('route-bell') as IRouteBellElement | null;
+        bell?.showBell(routeId, false);
+      } else if (res.status === 409 && res.data.name === 'DuplicateSubscription') {
+        // Already subscribed server-side — sync local state
+        subscribedRoutes.add(routeId);
+        document.dispatchEvent(new CustomEvent('notifRouteJoin', { detail: { routeId } }));
+      } else {
+        showSubscriptionToast('Failed to subscribe. Please try again.');
+        const bell = document.querySelector('route-bell') as IRouteBellElement | null;
+        bell?.showBell(routeId, false);
+      }
+    } catch {
+      showSubscriptionToast('Failed to subscribe. Please try again.');
+      const bell = document.querySelector('route-bell') as IRouteBellElement | null;
+      bell?.showBell(routeId, false);
+    }
+  });
+
+  document.addEventListener('bellUnsubscribe', async (e: Event) => {
+    const { routeId } = (e as CustomEvent<{ routeId: string }>).detail;
+    const token = localStorage.getItem('token');
+    try {
+      const res = await axios.delete(`/notifications/subscriptions/${routeId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        validateStatus: () => true
+      });
+      if (res.status === 200 || res.status === 404) {
+        subscribedRoutes.delete(routeId);
+        document.dispatchEvent(new CustomEvent('notifRouteLeave', { detail: { routeId } }));
+        showSubscriptionToast(`Unsubscribed from Route ${routeId}.`);
+      } else {
+        showSubscriptionToast('Failed to unsubscribe. Please try again.');
+        // Revert bell to subscribed state
+        const bell = document.querySelector('route-bell') as IRouteBellElement | null;
+        bell?.showBell(routeId, true);
+      }
+    } catch {
+      showSubscriptionToast('Failed to unsubscribe. Please try again.');
+      const bell = document.querySelector('route-bell') as IRouteBellElement | null;
+      bell?.showBell(routeId, true);
+    }
+  });
+
+  // Bus Report Form — opened by vehicle-tracker with lat/lon already checked
+  document.addEventListener('busReport', (e: Event) => {
+    const { vid, routeId, lat, lon } = (e as CustomEvent<{ vid: string; routeId: string; lat: number; lon: number }>).detail;
+    const form = document.querySelector('bus-report-form') as BusReportFormElement | null;
+    if (form && typeof form.open === 'function') {
+      form.open(vid, routeId, lat, lon);
+    }
+  });
+
+  document.addEventListener('busReportSubmitted', async (e: Event) => {
+    const detail = (e as CustomEvent).detail as Record<string, unknown>;
+    const token = localStorage.getItem('token');
+    try {
+      const res = await axios.post('/notifications/reports', detail, {
+        headers: { Authorization: `Bearer ${token}` },
+        validateStatus: () => true
+      });
+      if (res.status === 201) {
+        showSubscriptionToast(res.data.message ?? 'Report submitted. Thank you!');
+      } else {
+        console.error('Report submission failed:', res.status, res.data);
+        // Show the server's message when available (e.g. ProximityViolation, VehicleNotFound)
+        const serverMsg: string | undefined = res.data?.message;
+        showSubscriptionToast(serverMsg ?? 'Failed to submit report. Please try again.');
+      }
+    } catch (err) {
+      console.error('Report submission error:', err);
+      showSubscriptionToast('Failed to submit report. Please try again.');
+    }
+  });
+
   // Route Selector Events
   document.addEventListener('routeSelected', async (e: Event) => {
     const customEvent = e as CustomEvent<IRouteSelection>;
@@ -701,61 +921,83 @@ function setupMapEventListeners(): void {
 }
 
 // Request user's geographic location (VisRoute Basic Flow step 2-3)
+// Uses watchPosition for continuous updates (TUC4 Step 8)
+let watchId: number | null = null;
+let initialLocationSet = false;
+
 function requestUserLocation(): void {
   if ('geolocation' in navigator) {
-    navigator.geolocation.getCurrentPosition(
+    watchId = navigator.geolocation.watchPosition(
       (position) => {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
-        console.log('User location:', lat, lng);
 
-        // Check if location is in Pittsburgh area (Rule R5)
-        if (isInPittsburghArea(lat, lng)) {
-          // Store and center map on user location
-          userLocation = { lat, lng };
-          mapProvider.setCenter({ lat, lng });
-          mapProvider.setZoom(15);
+        // First position: center map and validate area
+        if (!initialLocationSet) {
+          initialLocationSet = true;
+          console.log('User location:', lat, lng);
 
-          // Place a marker on the map to show user location
-          addUserLocationMarker(lat, lng);
+          if (isInPittsburghArea(lat, lng)) {
+            userLocation = { lat, lng };
+            mapProvider.setCenter({ lat, lng });
+            mapProvider.setZoom(15);
+            addUserLocationMarker(lat, lng);
 
-          // Also show the location indicator component (wait for custom element to be defined)
-          const locationIndicator =
-            document.querySelector<LocationIndicator>('location-indicator');
-          if (
-            locationIndicator &&
-            typeof locationIndicator.show === 'function'
-          ) {
-            locationIndicator.show(lat, lng);
+            const locationIndicator =
+              document.querySelector<LocationIndicator>('location-indicator');
+            if (
+              locationIndicator &&
+              typeof locationIndicator.show === 'function'
+            ) {
+              locationIndicator.show(lat, lng);
+            }
+            console.log('Centered map on user location');
+
+            // TUC4 Step 2: Show nearby stops within 1km of user location
+            filterController.setUserLocation({ lat, lng });
+            filterController.showNearbyStops({ lat, lng });
+          } else {
+            showModal(
+              'Location Out of Bounds',
+              'This transit app only supports the Pittsburgh bus system.'
+            );
+            mapProvider.setCenter({ lat: 40.4406, lng: -80.0112 });
+            mapProvider.setZoom(14);
+            console.log('Centering on default Pittsburgh location');
           }
-          console.log('Centered map on user location');
         } else {
-          // A3: Location Out of Bounds
-          showModal(
-            'Location Out of Bounds',
-            'This transit app only supports the Pittsburgh bus system.'
-          );
-          // Center on Downtown Pittsburgh (Point State Park)
-          mapProvider.setCenter({ lat: 40.4406, lng: -80.0112 });
-          mapProvider.setZoom(14);
-          console.log('Centering on default Pittsburgh location');
+          // Subsequent positions: update marker, feed directions controller
+          userLocation = { lat, lng };
+          if (userLocationMarker) {
+            userLocationMarker.setPosition({ lat, lng });
+          } else {
+            addUserLocationMarker(lat, lng);
+          }
+          // Keep filter controller in sync for walk-time estimates
+          filterController.setUserLocation({ lat, lng });
         }
+
+        // Always feed location to directions controller (TUC4 Step 8)
+        directionsController.updateUserLocation({ lat, lng });
       },
       (error) => {
-        // A6: Location Access Denied
+        if (initialLocationSet) return; // Only show error on first failure
         console.warn('Location access denied:', error.message);
         showModal(
           'Location Access Denied',
           'Location access denied. Centering on Downtown Pittsburgh by default.'
         );
-        // Center on default Pittsburgh coordinates (Point State Park)
         mapProvider.setCenter({ lat: 40.4406, lng: -80.0112 });
         mapProvider.setZoom(14);
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 5000, // Accept cached position up to 5s old
+        timeout: 10000
       }
     );
   } else {
     console.warn('Geolocation not supported');
-    // A5: Unable To Access Location
     showModal(
       'Geolocation Unavailable',
       'Geolocation is not supported by your browser. Centering on Downtown Pittsburgh.'
@@ -791,6 +1033,72 @@ function addUserLocationMarker(lat: number, lng: number): void {
   console.log('User location marker added to map');
 }
 
+// ── Toast Notification (TUC4 Step 11) ────────────────────────────────
+function showToast(message: string): void {
+  // Remove existing toast if any
+  const existing = document.getElementById('map-toast');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.id = 'map-toast';
+  toast.className = 'map-toast';
+  toast.textContent = message;
+
+  const container = document.querySelector('.map-container');
+  if (container) container.appendChild(toast);
+
+  // Auto-dismiss after 4 seconds
+  setTimeout(() => {
+    toast.classList.add('map-toast--fade');
+    setTimeout(() => toast.remove(), 400);
+  }, 4000);
+}
+
+// ── Directions Info Panel (TUC4 Step 6) ──────────────────────────────
+function updateDirectionsPanel(
+  info: { durationMin: number; eta: string } | null
+): void {
+  // Remove existing panel
+  removeDirectionsPanel();
+
+  if (!info) return;
+
+  const panel = document.createElement('div');
+  panel.id = 'directions-panel';
+  panel.className = 'directions-panel';
+
+  const stopName =
+    directionsController.targetStop?.stopName ?? 'Selected Stop';
+
+  panel.innerHTML = `
+    <div class="directions-panel__header">
+      <span class="material-icons-outlined directions-panel__icon">directions_walk</span>
+      <strong class="directions-panel__title">Walking to ${stopName}</strong>
+      <button class="directions-panel__close" aria-label="Exit directions">&times;</button>
+    </div>
+    <div class="directions-panel__info">
+      <span class="directions-panel__duration">${info.durationMin} min walk</span>
+      <span class="directions-panel__eta">ETA ${info.eta}</span>
+    </div>
+  `;
+
+  const container = document.querySelector('.map-container');
+  if (container) container.appendChild(panel);
+
+  // Close button: exit directions mode (A4)
+  const closeBtn = panel.querySelector('.directions-panel__close');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => {
+      directionsController.exitDirections();
+    });
+  }
+}
+
+function removeDirectionsPanel(): void {
+  const existing = document.getElementById('directions-panel');
+  if (existing) existing.remove();
+}
+
 // Check if coordinates are within Pittsburgh area (Rule R5)
 function isInPittsburghArea(lat: number, lng: number): boolean {
   const MIN_LAT = 40.1;
@@ -801,26 +1109,3 @@ function isInPittsburghArea(lat: number, lng: number): boolean {
   return lat >= MIN_LAT && lat <= MAX_LAT && lng >= MIN_LNG && lng <= MAX_LNG;
 }
 
-// Menu toggle process
-const menuIcon = document.getElementById('menu-icon');
-const dropdownMenu = document.getElementById('dropdown-menu');
-const backIcon = document.getElementById('back-icon');
-
-menuIcon?.addEventListener('click', () => {
-  menuIcon.classList.toggle('is-active');
-  dropdownMenu?.classList.toggle('is-active');
-  backIcon?.classList.toggle('is-hidden');
-});
-
-// Logout process
-const menuLogoutBtn = document.getElementById(
-  'menu-logout-btn'
-) as HTMLAnchorElement | null;
-
-const handleLogout = () => {
-  localStorage.removeItem('token');
-  localStorage.removeItem('username');
-  window.location.replace('/home');
-};
-
-menuLogoutBtn?.addEventListener('click', handleLogout);

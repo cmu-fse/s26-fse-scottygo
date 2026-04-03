@@ -85,4 +85,5 @@ export interface IMapProvider {
     east: number;
     west: number;
   }): void;
+  toggleLayers(): string;
 }

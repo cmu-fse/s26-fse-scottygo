@@ -12,7 +12,6 @@ import { Server as HttpServer } from 'http';
 import App from '../../../server/app';
 import { MongoDB } from '../../../server/db/mongo.db';
 import AuthController from '../../../server/controllers/auth.controller';
-import HomeController from '../../../server/controllers/home.controller';
 import MapController from '../../../server/controllers/map.controller';
 import BusController from '../../../server/controllers/transit.controller';
 import DAC from '../../../server/db/dac';
@@ -294,9 +293,8 @@ beforeAll(async () => {
   const db = new MongoDB(TEST_DB_URL);
   app = new App(
     [
-      new HomeController('/'),
       new AuthController('/auth'),
-      new MapController('/map'),
+      new MapController('/'),
       new BusController('/transit')
     ],
     {
@@ -444,7 +442,7 @@ describe('TUC 1: Visualize Routes — Integration Tests', () => {
   // 5. POSITIVE: GET /map/config with auth — map configuration defaults
   // --------------------------------------------------------------------------
   test('(+) GET /map/config — authenticated request returns IConfig with CMU campus center', async () => {
-    const res = await request('GET', '/map/config', undefined, memberToken);
+    const res = await request('GET', '/config', undefined, memberToken);
 
     expect(res.status).toBe(200);
     const success = res.data as responses.ISuccess;
@@ -518,7 +516,7 @@ describe('TUC 1: Visualize Routes — Integration Tests', () => {
   // 10. NEGATIVE: GET /map/config without auth token — 401
   // --------------------------------------------------------------------------
   test('(-) GET /map/config without token — 401 MissingToken', async () => {
-    const res = await request('GET', '/map/config');
+    const res = await request('GET', '/config');
 
     expect(res.status).toBe(401);
     const error = res.data as responses.IAppError;
@@ -532,7 +530,7 @@ describe('TUC 1: Visualize Routes — Integration Tests', () => {
   test('(-) GET /map/config with invalid token — 401 InvalidToken', async () => {
     const res = await request(
       'GET',
-      '/map/config',
+      '/config',
       undefined,
       'this.is.not.a.valid.jwt'
     );

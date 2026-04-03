@@ -6,7 +6,13 @@ import {
   IPrediction,
   IDetour,
   IPattern,
-  IBulkTransitData
+  IBulkTransitData,
+  ITransitSearchResult,
+  INearbyStopsPayload,
+  ISubscription,
+  IBusReport,
+  INotification,
+  IServiceAlert
 } from './transit.interface';
 import { IConfig } from './map.interface';
 
@@ -43,7 +49,17 @@ export type SuccessName =
   | 'PredictionsRetrieved'
   | 'DetoursRetrieved'
   | 'BulkDataRetrieved'
-  | 'ConfigFound';
+  | 'NearbyStopsRetrieved'
+  | 'ConfigFound'
+  | 'SubscriptionsRetrieved'
+  | 'RouteSubscribed'
+  | 'RouteUnsubscribed'
+  | 'ReportSubmitted'
+  | 'NotificationsRetrieved'
+  | 'AlertsRetrieved'
+  | 'SearchTransitCompleted'
+  | 'SearchNotificationsCompleted'
+  | 'UsersSearchCompleted';
 
 export type ClientErrorName =
   | 'MissingEmail'
@@ -68,7 +84,16 @@ export type ClientErrorName =
   | 'ServiceUnavailable'
   | 'RouteNotFound'
   | 'StopNotFound'
-  | 'MissingParameter';
+  | 'MissingParameter'
+  | 'EmptyReport'
+  | 'InvalidReportField'
+  | 'ProximityViolation'
+  | 'VehicleNotFound'
+  | 'SubscriptionNotFound'
+  | 'DuplicateSubscription'
+  | 'SubscriptionLimitReached'
+  | 'MissingSearchQuery'
+  | 'InvalidSearchField';
 
 export type ServerErrorName =
   | 'FailedAuthentication'
@@ -77,7 +102,9 @@ export type ServerErrorName =
   | 'GetRequestFailure'
   | 'PatchRequestFailure'
   | 'MongoDBError'
-  | 'UpstreamError';
+  | 'UpstreamError'
+  | 'ReportSubmissionFailure'
+  | 'AlertFeedUnavailable';
 
 export type IPayload =
   | IUser
@@ -94,7 +121,15 @@ export type IPayload =
   | IDetour[]
   | IPattern[]
   | IBulkTransitData
+  | INearbyStopsPayload
   | IConfig
+  | ISubscription
+  | ISubscription[]
+  | IBusReport
+  | INotification
+  | INotification[]
+  | IServiceAlert[]
+  | ITransitSearchResult
   | null;
 
 export interface ISuccess {

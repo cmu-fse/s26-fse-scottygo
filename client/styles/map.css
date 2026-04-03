@@ -8,12 +8,6 @@
   --gray-800: #1f2937;
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
 html,
 body {
   height: 100%;
@@ -44,151 +38,6 @@ body.dark {
   background-color: var(--bg-dark);
 }
 
-/* Header Styles */
-.app-header {
-  background-color: #c41230;
-  height: 56px; /* Typical mobile header height */
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 16px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  position: relative;
-}
-
-.back-icon {
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  color: white;
-  transition: opacity 0.3s ease-in-out;
-}
-
-.back-icon.is-hidden {
-  opacity: 0;
-  pointer-events: none;
-}
-
-.menu-icon {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  width: 24px;
-  height: 18px;
-  cursor: pointer;
-  position: relative;
-  z-index: 100;
-}
-
-.menu-icon span {
-  display: block;
-  height: 2px;
-  width: 100%;
-  background-color: white;
-  border-radius: 2px;
-  transition: all 0.3s ease-in-out;
-  transform-origin: center;
-}
-
-/* Menu Icon Animation */
-.menu-icon.is-active span:nth-child(1) {
-  transform: translateY(8px) rotate(45deg);
-}
-
-.menu-icon.is-active span:nth-child(2) {
-  opacity: 0;
-}
-
-.menu-icon.is-active span:nth-child(3) {
-  transform: translateY(-8px) rotate(-45deg);
-}
-
-/* Dropdown Menu */
-.dropdown-menu {
-  position: absolute;
-  top: 56px;
-  left: 0;
-  right: 0;
-  background-color: #c41230;
-  width: 100%;
-  border-radius: 0 0 24px 24px;
-  transform: translateY(-100%);
-  opacity: 0;
-  visibility: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  z-index: 90;
-  padding-bottom: 24px;
-}
-
-.dropdown-menu.is-active {
-  transform: translateY(0);
-  opacity: 1;
-  visibility: visible;
-}
-
-.dropdown-header {
-  padding: 12px 16px 8px;
-  text-align: center;
-  margin-bottom: 8px;
-}
-
-.dropdown-header h2 {
-  color: white;
-  font-size: 32px;
-  font-weight: 600;
-  margin: 0;
-}
-
-.dropdown-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-  padding: 0 16px;
-  max-width: 600px;
-  margin: 0 auto;
-}
-
-.dropdown-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  text-decoration: none;
-  color: white;
-  padding: 12px 4px;
-  border-radius: 8px;
-  transition: background-color 0.2s;
-  gap: 12px;
-}
-
-.dropdown-item:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-.icon-circle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 56px;
-  height: 56px;
-  background-color: white;
-  border-radius: 50%;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.dropdown-item svg {
-  color: #c41230;
-  width: 28px;
-  height: 28px;
-}
-
-.dropdown-item span {
-  font-size: 12px;
-  font-weight: 500;
-  text-align: center;
-  line-height: 1.2;
-}
-
 /* Content Styles */
 .content {
   flex: 1;
@@ -213,6 +62,12 @@ body.dark {
   height: 100%;
   z-index: 1;
   touch-action: none;
+}
+
+/* Hide Google Maps native controls — all are disabled via API options but the
+   rotate control can still inject itself via gm-control-active */
+#map .gm-control-active {
+  display: none !important;
 }
 
 /* ============================================
@@ -280,71 +135,245 @@ body.dark .circle-btn.primary {
 .search-bar {
   display: flex;
   position: absolute;
-  top: 20px;
+  top: 16px;
   left: 50%;
   transform: translateX(-50%);
-  max-width: 66.67%; /* Constrain to 2/3 of screen width */
-  width: calc(100% - 40px); /* Full width minus margins */
-  gap: 12px;
+  max-width: 520px;
+  width: calc(100% - 32px);
+  gap: 10px;
   z-index: 30;
 }
 
-.search-box {
+.search-wrapper {
   flex: 1;
+  min-width: 0;
+  position: relative;
+}
+
+.search-box {
   display: flex;
   align-items: center;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(12px);
-  padding: 0 16px;
-  border-radius: 14px;
-  height: 56px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  background: #fff;
+  padding: 0 14px;
+  border-radius: 28px;
+  height: 48px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.04);
   transition: box-shadow 0.2s ease;
 }
 
 .search-box:focus-within {
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.06);
 }
 
 body.dark .search-box {
-  background: rgba(31, 41, 55, 0.95);
+  background: #1f2937;
   color: var(--white);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 
-.search-box .material-icons-outlined {
-  color: var(--gray-700);
-  font-size: 24px;
+body.dark .search-box:focus-within {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
 }
 
-body.dark .search-box .material-icons-outlined {
-  color: var(--gray-100);
+.search-box .search-icon {
+  color: #5f6368;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+body.dark .search-box .search-icon {
+  color: #9aa0a6;
 }
 
 .search-box input {
   border: none;
   outline: none;
   flex: 1;
-  margin-left: 12px;
-  font-size: 16px;
+  min-width: 0;
+  margin-left: 10px;
+  font-size: 15px;
   background: transparent;
-  color: inherit;
-  font-family: 'Inter', sans-serif;
+  color: #202124;
+  font-family: 'Inter', -apple-system, system-ui, sans-serif;
+  line-height: 48px;
+}
+
+body.dark .search-box input {
+  color: #e8eaed;
 }
 
 .search-box input::placeholder {
-  color: var(--gray-700);
-  opacity: 0.6;
+  color: #5f6368;
+  opacity: 1;
 }
 
 body.dark .search-box input::placeholder {
-  color: var(--gray-100);
-  opacity: 0.6;
+  color: #9aa0a6;
+  opacity: 1;
 }
 
+/* Clear button */
+.search-clear-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  color: #5f6368;
+  flex-shrink: 0;
+  padding: 0;
+  transition: background 0.15s ease;
+}
+
+.search-clear-btn .material-icons-outlined {
+  font-size: 18px;
+}
+
+.search-clear-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+body.dark .search-clear-btn {
+  color: #9aa0a6;
+}
+
+body.dark .search-clear-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.search-box:focus-within .search-clear-btn,
+.search-clear-btn.is-visible {
+  display: flex;
+}
+
+/* Search dropdown */
+.search-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 6px 0;
+  z-index: 40;
+}
+
+body.dark .search-dropdown {
+  background: #1f2937;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.search-dropdown::-webkit-scrollbar {
+  width: 4px;
+}
+
+.search-dropdown::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+}
+
+body.dark .search-dropdown::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Result items */
+.search-result-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.search-result-item:hover,
+.search-result-item:focus {
+  background: rgba(0, 0, 0, 0.04);
+  outline: none;
+}
+
+body.dark .search-result-item:hover,
+body.dark .search-result-item:focus {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.search-result-icon {
+  font-size: 20px;
+  color: #5f6368;
+  flex-shrink: 0;
+}
+
+.search-result-route .search-result-icon {
+  color: var(--primary, #c41230);
+}
+
+body.dark .search-result-icon {
+  color: #9aa0a6;
+}
+
+body.dark .search-result-route .search-result-icon {
+  color: #f28b82;
+}
+
+.search-result-content {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.search-result-name {
+  font-size: 14px;
+  color: #202124;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+body.dark .search-result-name {
+  color: #e8eaed;
+}
+
+.search-result-badges {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.search-result-badges .route-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  line-height: 1.4;
+}
+
+.search-no-results {
+  padding: 16px;
+  text-align: center;
+  color: #5f6368;
+  font-size: 14px;
+}
+
+body.dark .search-no-results {
+  color: #9aa0a6;
+}
+
+/* Layers button */
 .layers-btn {
-  width: 56px;
-  height: 56px;
-  border-radius: 14px;
+  flex: 0 0 48px;
+  width: 48px;
+  min-width: 48px;
+  height: 48px;
+  min-height: 48px;
+  border-radius: 50%;
   background: var(--primary);
   color: white;
   border: none;
@@ -352,13 +381,17 @@ body.dark .search-box input::placeholder {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(196, 18, 48, 0.3);
+  box-shadow: 0 2px 6px rgba(196, 18, 48, 0.3);
   transition: all 0.2s ease;
 }
 
+.layers-btn .material-icons-outlined {
+  font-size: 22px;
+}
+
 .layers-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(196, 18, 48, 0.4);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(196, 18, 48, 0.4);
 }
 
 .layers-btn:active {
@@ -386,11 +419,31 @@ body.dark .control-panel {
   background: rgba(31, 41, 55, 0.95);
 }
 
+/* Route Bell Component — sits above the zoom panel, hidden until a route is selected */
+route-bell {
+  position: absolute;
+  right: 20px;
+  /* 20px (zoom-panel bottom) + 3×48px (buttons) + 2×8px (gaps) + 8px (gap to bell) = 188px */
+  bottom: 188px;
+  display: none;
+  z-index: 20;
+}
+
+.bell-btn.bell-subscribed {
+  background: var(--primary);
+  color: white;
+}
+
+body.dark .bell-btn.bell-subscribed {
+  background: var(--primary);
+  color: white;
+}
+
 /* Zoom Controls Component */
 .zoom-panel {
   position: absolute;
   right: 20px;
-  bottom: 120px;
+  bottom: 20px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1308,11 +1361,9 @@ body.dark .route-btn:hover {
 /* Responsive Design */
 @media (max-width: 768px) {
   .search-bar {
-    top: 16px;
-    left: 50%;
-    transform: translateX(-50%);
-    max-width: 75%; /* Slightly wider on mobile */
-    width: calc(100% - 32px); /* Full width minus margins */
+    top: 12px;
+    max-width: none;
+    width: calc(100% - 24px);
   }
 
   .control-panel {
@@ -1321,12 +1372,17 @@ body.dark .route-btn:hover {
 
   .zoom-panel {
     right: 16px;
-    bottom: 100px;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+
+  route-bell {
+    right: 16px;
+    bottom: calc(184px + env(safe-area-inset-bottom, 0px)); /* 16 + 160 + 8 */
   }
 
   .dark-btn {
     left: 16px;
-    bottom: 30px;
+    bottom: calc(30px + env(safe-area-inset-bottom, 0px));
   }
 
   .system-panel {
@@ -1348,6 +1404,19 @@ body.dark .route-btn:hover {
 
   .route-selector-panel {
     left: 80px;
+  }
+
+  .map-popup {
+    position: fixed;
+    top: auto;
+    bottom: calc(100vh - 100dvh + env(safe-area-inset-bottom, 0px));
+    left: 0;
+    transform: none;
+    border-radius: 16px 16px 0 0;
+    width: 100%;
+    max-width: 100%;
+    max-height: 40dvh;
+    padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -1561,11 +1630,13 @@ body.dark .service-status-banner__close:hover {
 
 .map-popup {
   position: absolute;
-  bottom: 24px;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
   left: 50%;
   transform: translateX(-50%);
   z-index: 500;
   width: min(380px, calc(100% - 32px));
+  max-height: calc(50vh - env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
   background: rgba(255, 255, 255, 0.97);
   backdrop-filter: blur(12px);
   border-radius: 16px;
@@ -1746,6 +1817,63 @@ body.dark .service-status-banner__close:hover {
   color: #854d0e;
 }
 
+.map-popup__value--live {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.map-popup__live-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #16a34a;
+  flex-shrink: 0;
+}
+
+.map-popup__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.map-popup__action-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 8px;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.map-popup__action-btn .material-icons-outlined {
+  font-size: 18px;
+}
+
+.map-popup__action-btn--report {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+.map-popup__action-btn--report:hover {
+  background: #e5e7eb;
+}
+
+.map-popup__action-btn--check {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+.map-popup__action-btn--check:hover {
+  background: #e5e7eb;
+}
+
 /* ── Dark mode ─── */
 
 body.dark .map-popup {
@@ -1789,4 +1917,627 @@ body.dark .map-popup__source--live {
 body.dark .map-popup__source--static {
   background: #713f12;
   color: #fef08a;
+}
+
+/* ============================================
+   MAP NOTIFICATION POPUPS
+   Stacked toast-style cards in top-right corner
+   that appear for subscribed routes.
+   ============================================ */
+
+.map-notif-container {
+  position: absolute;
+  top: 80px;
+  right: 20px;
+  z-index: 400;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+  width: min(320px, calc(100% - 40px));
+}
+
+@keyframes mapNotifSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(32px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes mapNotifFadeOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+    max-height: 200px;
+    margin-bottom: 0;
+  }
+  to {
+    opacity: 0;
+    transform: translateX(32px);
+    max-height: 0;
+    margin-bottom: -10px;
+  }
+}
+
+.map-notif-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 12px 12px 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14);
+  border-left: 4px solid #ccc;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  pointer-events: auto;
+  animation: mapNotifSlideIn 0.3s ease-out;
+  overflow: hidden;
+}
+
+.map-notif-card.is-dismissing {
+  animation: mapNotifFadeOut 0.3s ease-in forwards;
+}
+
+.map-notif-card[data-category='accessibility'] { border-left-color: #f59e0b; }
+.map-notif-card[data-category='capacity']      { border-left-color: #ef4444; }
+.map-notif-card[data-category='condition']     { border-left-color: #3b82f6; }
+.map-notif-card[data-category='delay']         { border-left-color: #8b5cf6; }
+
+.map-notif-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-right: 20px;
+}
+
+.map-notif-icon { flex-shrink: 0; line-height: 0; }
+.map-notif-icon[data-category='accessibility'] { color: #f59e0b; }
+.map-notif-icon[data-category='capacity']      { color: #ef4444; }
+.map-notif-icon[data-category='condition']     { color: #3b82f6; }
+.map-notif-icon[data-category='delay']         { color: #8b5cf6; }
+
+.map-notif-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111;
+  line-height: 1.2;
+}
+
+.map-notif-body {
+  font-size: 13px;
+  color: #444;
+  line-height: 1.4;
+}
+
+.map-notif-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 2px;
+}
+
+.map-notif-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #f0f0f0;
+  color: #555;
+}
+
+.map-notif-tag[data-category='accessibility'] { background: #fef3c7; color: #b45309; }
+.map-notif-tag[data-category='capacity']      { background: #fee2e2; color: #b91c1c; }
+.map-notif-tag[data-category='condition']     { background: #dbeafe; color: #1d4ed8; }
+.map-notif-tag[data-category='delay']         { background: #ede9fe; color: #6d28d9; }
+
+.map-notif-time {
+  font-size: 11px;
+  color: #aaa;
+}
+
+.map-notif-dismiss {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #bbb;
+  padding: 2px;
+  line-height: 0;
+  border-radius: 4px;
+}
+
+.map-notif-dismiss:hover {
+  color: #666;
+  background: #f0f0f0;
+}
+
+/* Each card is position:relative to anchor the dismiss button */
+.map-notif-card { position: relative; }
+
+@media (max-width: 768px) {
+  .map-notif-container {
+    top: 70px;
+    right: 12px;
+    width: min(290px, calc(100% - 24px));
+  }
+}
+
+/* ============================================
+   BUS REPORT FORM
+   Centered multi-step modal triggered from the
+   map popup's Report button.
+   ============================================ */
+
+bus-report-form {
+  display: contents;
+}
+
+.bus-report-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.45);
+  align-items: center;
+  justify-content: center;
+}
+
+bus-report-form.is-open .bus-report-backdrop {
+  display: flex;
+}
+
+.bus-report {
+  background: #faf9f7;
+  border-radius: 20px;
+  padding: 22px 20px 18px;
+  width: min(380px, calc(100vw - 32px));
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.22);
+  font-family: inherit;
+  color: #1f2937;
+  animation: busReportFadeIn 0.2s ease-out;
+}
+
+@keyframes busReportFadeIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* Header */
+.bus-report__header {
+  margin-bottom: 12px;
+}
+
+.bus-report__title {
+  font-size: 17px;
+  font-weight: 700;
+  display: block;
+}
+
+.bus-report__subtitle {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 2px 0 0;
+}
+
+/* Progress bar */
+.bus-report__progress {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+
+.bus-report__bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: #e5e7eb;
+}
+
+.bus-report__bar--filled {
+  background: var(--primary);
+}
+
+/* Step body */
+.bus-report__body {
+  min-height: 110px;
+}
+
+.bus-report__question {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 14px;
+}
+
+.bus-report__hint {
+  font-size: 12px;
+  color: #9ca3af;
+  margin: -10px 0 10px;
+}
+
+/* Option chips */
+.bus-report__options {
+  display: flex;
+  gap: 8px;
+}
+
+.bus-report__options--wrap {
+  flex-wrap: wrap;
+}
+
+.bus-report__option {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1.5px solid #d1d5db;
+  background: #fff;
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  color: #1f2937;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.bus-report__option:hover {
+  border-color: var(--primary);
+}
+
+.bus-report__option--active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+/* Comments textarea */
+.bus-report__textarea {
+  width: 100%;
+  height: 90px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-family: inherit;
+  font-size: 14px;
+  color: #1f2937;
+  resize: none;
+  box-sizing: border-box;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.bus-report__textarea:focus {
+  border-color: var(--primary);
+}
+
+.bus-report__char-count {
+  font-size: 12px;
+  color: #9ca3af;
+  text-align: right;
+  margin: 4px 0 0;
+}
+
+/* Navigation row */
+.bus-report__nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.bus-report__nav-btn {
+  border: none;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.bus-report__nav-btn--back {
+  width: 40px;
+  height: 40px;
+  background: #f3f4f6;
+  color: #1f2937;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.bus-report__nav-btn--back:hover:not(:disabled) {
+  background: #e5e7eb;
+}
+
+.bus-report__nav-btn--back:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.bus-report__nav-btn--skip {
+  flex: 1;
+  padding: 10px;
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+.bus-report__nav-btn--skip:hover {
+  background: #e5e7eb;
+}
+
+.bus-report__nav-btn--next {
+  flex: 1;
+  padding: 10px 20px;
+  background: var(--primary);
+  color: #fff;
+}
+
+.bus-report__nav-btn--next:hover {
+  background: #a30f27;
+}
+
+/* Dark mode */
+body.dark .bus-report {
+  background: #1f2937;
+  color: #f3f4f6;
+}
+
+body.dark .bus-report__subtitle {
+  color: #9ca3af;
+}
+
+body.dark .bus-report__bar {
+  background: #374151;
+}
+
+body.dark .bus-report__option {
+  background: #374151;
+  border-color: #4b5563;
+  color: #f3f4f6;
+}
+
+body.dark .bus-report__option--active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+body.dark .bus-report__textarea {
+  background: #374151;
+  border-color: #4b5563;
+  color: #f3f4f6;
+}
+
+body.dark .bus-report__nav-btn--back,
+body.dark .bus-report__nav-btn--skip {
+  background: #374151;
+  color: #f3f4f6;
+}
+
+body.dark .bus-report__nav-btn--back:hover:not(:disabled),
+body.dark .bus-report__nav-btn--skip:hover {
+  background: #4b5563;
+}
+
+/* ============================================
+   STOP POPUP – MINIMIZE BUTTON (TUC4 A3)
+   ============================================ */
+
+.map-popup__minimize {
+  background: none;
+  border: none;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 0 2px;
+  font-weight: bold;
+}
+
+.map-popup__minimize:hover {
+  color: #1f2937;
+}
+
+body.dark .map-popup__minimize {
+  color: #9ca3af;
+}
+
+body.dark .map-popup__minimize:hover {
+  color: #f3f4f6;
+}
+
+/* ============================================
+   STOP POPUP – WALKING TIME (TUC4 R4)
+   ============================================ */
+
+.map-popup__walk-time {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0 2px;
+  font-size: 0.82rem;
+  color: #4b5563;
+}
+
+.map-popup__walk-icon {
+  font-size: 16px;
+  color: #4285F4;
+}
+
+body.dark .map-popup__walk-time {
+  color: #9ca3af;
+}
+
+body.dark .map-popup__walk-icon {
+  color: #8ab4f8;
+}
+
+/* ============================================
+   STOP POPUP – DIRECTIONS BUTTON (TUC4 Step 5)
+   ============================================ */
+
+.map-popup__directions-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px 0;
+  border: none;
+  border-radius: 10px;
+  background: #4285F4;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.map-popup__directions-btn:hover {
+  background: #3367d6;
+}
+
+.map-popup__directions-btn .material-icons-outlined {
+  font-size: 20px;
+}
+
+body.dark .map-popup__directions-btn {
+  background: #5a9cf5;
+}
+
+body.dark .map-popup__directions-btn:hover {
+  background: #4285f4;
+}
+
+/* ============================================
+   DIRECTIONS PANEL (TUC4 Step 6)
+   Shown at top of map during walking mode
+   ============================================ */
+
+.directions-panel {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  width: min(380px, calc(100% - 32px));
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(12px);
+  border-radius: 14px;
+  padding: 12px 16px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.16);
+  font-size: 14px;
+  color: #1f2937;
+  animation: mapPopupSlideUp 0.25s ease-out;
+}
+
+.directions-panel__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.directions-panel__icon {
+  font-size: 22px;
+  color: #4285F4;
+  flex-shrink: 0;
+}
+
+.directions-panel__title {
+  font-size: 15px;
+  font-weight: 600;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.directions-panel__close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 0 2px;
+}
+
+.directions-panel__close:hover {
+  color: #1f2937;
+}
+
+.directions-panel__info {
+  display: flex;
+  gap: 16px;
+  margin-top: 6px;
+  padding-left: 28px;
+}
+
+.directions-panel__duration {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.directions-panel__eta {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+body.dark .directions-panel {
+  background: rgba(31, 41, 55, 0.97);
+  color: #f3f4f6;
+}
+
+body.dark .directions-panel__close {
+  color: #9ca3af;
+}
+
+body.dark .directions-panel__close:hover {
+  color: #f3f4f6;
+}
+
+body.dark .directions-panel__duration {
+  color: #f3f4f6;
+}
+
+body.dark .directions-panel__eta {
+  color: #9ca3af;
+}
+
+/* ============================================
+   TOAST NOTIFICATION (TUC4 Step 11)
+   Non-intrusive arrival-at-stop notification
+   ============================================ */
+
+.map-toast {
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 600;
+  background: #1f2937;
+  color: #fff;
+  padding: 10px 24px;
+  border-radius: 24px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  animation: mapPopupSlideUp 0.25s ease-out;
+  transition: opacity 0.4s;
+}
+
+.map-toast--fade {
+  opacity: 0;
+}
+
+body.dark .map-toast {
+  background: #374151;
 }

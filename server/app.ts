@@ -5,18 +5,28 @@ import Controller from './controllers/controller';
 import gtfsService from './services/gtfs.service';
 import vehiclePositionsService from './services/vehicle-positions.service';
 import tripUpdatesService from './services/trip-updates.service';
+import alertsService from './services/alerts.service';
 import memoryMonitorService from './services/memory-monitor.service';
 import { TransitModel } from './models/transit.model';
+import { NotificationModel } from './models/notification.model';
 import { JWT_KEY as secretKey, STAGE } from './env';
 import { Server as SocketServer, Socket } from 'socket.io';
 import {
   ClientToServerEvents,
-  ServerToClientEvents
+  ServerToClientEvents,
+  ISearchAutocompleteContext,
+  ISearchSuggestion
 } from '../common/socket.interface';
-import { ExtendedError } from 'socket.io/dist/namespace';
+import { ExtendedError } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { User } from './models/user.model';
 import { ITokenPayload } from '../common/user.interface';
+import {
+  NotificationAutocompleteStrategy,
+  SearchContext,
+  TransitSearchStrategy
+} from './search/search-strategy';
+import type { ITransitSearchResult } from '../common/transit.interface';
 
 class App {
   public app: Express;
@@ -142,6 +152,15 @@ class App {
         return;
       }
       memoryMonitorService.capture('realtime-pollers.started');
+
+      // Start GTFS-RT alerts polling and wire up Socket.io push (TUC3)
+      alertsService.onAlertsChanged = (alerts) => {
+        this.io.emit('alertUpdate', alerts);
+      };
+      alertsService.start();
+
+      // Initialize last-known bus status map from DB (TUC3 R12)
+      await NotificationModel.initialize();
 
       // Schedule a daily cache refresh (every 24 h).
       const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
@@ -279,7 +298,7 @@ class App {
 
   public validateToken = (
     socket: Socket,
-    next: (err?: ExtendedError | undefined) => void
+    next: (err?: Error | undefined) => void
   ) => {
     const token = socket.handshake.query.token as string;
     if (!token) {
@@ -307,6 +326,7 @@ class App {
         memoryMonitorService.stop();
         vehiclePositionsService.stop();
         tripUpdatesService.stop();
+        alertsService.stop();
         if (this.dailyRefreshIntervalId) {
           clearInterval(this.dailyRefreshIntervalId);
           this.dailyRefreshIntervalId = null;
@@ -380,6 +400,66 @@ class App {
             `[Socket ${new Date().toISOString()}] Client ${socket.id} unsubscribed from ${roomName}`
           );
         });
+
+        // Handle subscribeRoute event (TUC3 — Observer Pattern R4)
+        socket.on('subscribeRoute', (data: { routeId: string }) => {
+          if (!data?.routeId) return;
+          const roomName = `route:${data.routeId}`;
+          socket.join(roomName);
+          console.log(
+            `[Socket ${new Date().toISOString()}] Client ${socket.id} subscribed to ${roomName}`
+          );
+        });
+
+        // Handle unsubscribeRoute event (TUC3)
+        socket.on('unsubscribeRoute', (data: { routeId: string }) => {
+          if (!data?.routeId) return;
+          const roomName = `route:${data.routeId}`;
+          socket.leave(roomName);
+          console.log(
+            `[Socket ${new Date().toISOString()}] Client ${socket.id} unsubscribed from ${roomName}`
+          );
+        });
+
+        // Handle contextual autocomplete for SearchInfo (transit, notifications)
+        socket.on(
+          'searchAutocomplete',
+          async (query: string, context: ISearchAutocompleteContext) => {
+            const trimmed = query.trim();
+            if (!trimmed) {
+              socket.emit('searchSuggestions', []);
+              return;
+            }
+
+            try {
+              if (context === 'transit') {
+                const searchContext = new SearchContext<ITransitSearchResult>(
+                  new TransitSearchStrategy()
+                );
+                const results = await searchContext.executeSearch(trimmed);
+                const suggestions = this.buildTransitSuggestions(results);
+                socket.emit('searchSuggestions', suggestions);
+                return;
+              }
+
+              if (context === 'notifications') {
+                const searchContext = new SearchContext<ISearchSuggestion[]>(
+                  new NotificationAutocompleteStrategy()
+                );
+                const suggestions = await searchContext.executeSearch(trimmed);
+                socket.emit('searchSuggestions', suggestions);
+                return;
+              }
+
+              socket.emit('searchSuggestions', []);
+            } catch (error) {
+              console.error(
+                `[Socket ${new Date().toISOString()}] Error in searchAutocomplete: ${error}`
+              );
+              socket.emit('searchSuggestions', []);
+            }
+          }
+        );
       });
 
       try {
@@ -394,6 +474,41 @@ class App {
         reject(err);
       }
     });
+  }
+
+  private buildTransitSuggestions(results: ITransitSearchResult): string[] {
+    const suggestions: string[] = [];
+
+    for (const route of results.routes) {
+      suggestions.push(route.id);
+      if (route.name && route.name.toLowerCase() !== route.id.toLowerCase()) {
+        suggestions.push(route.name);
+      }
+    }
+
+    for (const stop of results.stops) {
+      suggestions.push(stop.stopName);
+      suggestions.push(stop.stopId);
+    }
+
+    return this.uniqueSuggestions(suggestions, 5);
+  }
+
+  private uniqueSuggestions(values: string[], limit: number): string[] {
+    const deduped: string[] = [];
+    const seen = new Set<string>();
+
+    for (const value of values) {
+      const trimmed = value.trim();
+      if (!trimmed) continue;
+      const key = trimmed.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      deduped.push(trimmed);
+      if (deduped.length >= limit) break;
+    }
+
+    return deduped;
   }
 }
 

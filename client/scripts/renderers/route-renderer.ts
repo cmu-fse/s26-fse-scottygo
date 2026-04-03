@@ -502,10 +502,19 @@ export class RouteRenderer {
   /**
    * Generate SVG marker icon as data URL
    */
-  private createDotMarker(color: string, size: number = 12): string {
+  private createDotMarker(color: string, _size: number = 12): string {
+    // Bus-stop pin: teardrop shape with a bus-stop icon inside
+    const w = 24;
+    const h = 32;
     const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-        <circle cx="${size / 2}" cy="${size / 2}" r="${size / 2 - 1}" fill="${color}" stroke="white" stroke-width="1.5"/>
+      <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+        <path d="M12 0C6 0 1 5 1 11c0 8 11 20 11 20s11-12 11-20C23 5 18 0 12 0z"
+              fill="${color}" stroke="white" stroke-width="1.5"/>
+        <circle cx="12" cy="11" r="5.5" fill="white"/>
+        <rect x="9" y="7.5" width="6" height="5" rx="1" fill="${color}"/>
+        <rect x="9.5" y="8.5" width="2" height="1.5" rx="0.3" fill="white"/>
+        <rect x="12.5" y="8.5" width="2" height="1.5" rx="0.3" fill="white"/>
+        <rect x="9" y="12" width="6" height="0.8" fill="${color}"/>
       </svg>
     `;
     return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg.trim());
