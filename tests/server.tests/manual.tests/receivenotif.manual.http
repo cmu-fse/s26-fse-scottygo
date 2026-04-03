@@ -1,0 +1,521 @@
+// REST manual tests for TUC3: Live Notification (LiveNotif)
+// Base URL: http://localhost:8080
+//
+// Notes:
+// 1) Assumption from UC: Member is logged in (replace <TOKEN> with a valid JWT).
+// 2) Run the SETUP requests in order (register, then login) to obtain a token.
+// 3) Replace placeholder values (vid, routeId, lat/lon) where noted.
+// 4) Socket.io (Observer Pattern) events cannot be tested here; use a WS client
+//    (e.g. Postman WebSocket, wscat) to verify liveNotification push events.
+
+// ============================================================================
+// SETUP: Register and log in (run in order)
+// ============================================================================
+
+// Step 1: Register a new test user.
+// Expected: 201 Created, returns new user
+POST http://localhost:8080/auth/users
+Content-Type: application/json
+
+{
+    "credentials": {
+        "username": "testuser1",
+        "password": "Test123!@"
+    },
+    "email": "testuser1@cmu.edu",
+    "agreed": true
+}
+###
+
+// Step 2: Login to get a JWT token — copy the returned token into <TOKEN> below.
+// Expected: 200 OK, token in response
+POST http://localhost:8080/auth/tokens/testuser1
+Content-Type: application/json
+
+{
+    "password": "Test123!@"
+}
+###
+
+// ============================================================================
+// BASIC FLOW — Subscribe to a Route (Map Page / Subscribe Page)
+// ============================================================================
+
+// Step 3-4: Subscribe to route 61C.
+// Expected: 201 Created, RouteSubscribed, payload contains new ISubscription
+POST http://localhost:8080/notifications/subscriptions
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+
+{
+    "routeId": "61C"
+}
+###
+
+// Subscribe to a second route (P1) to confirm multiple subscriptions work.
+// Expected: 201 Created, RouteSubscribed
+POST http://localhost:8080/notifications/subscriptions
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+
+
+{
+    "routeId": "P1"
+}
+###
+
+// ============================================================================
+// BASIC FLOW — Manage Subscriptions (Subscribe Page load)
+// ============================================================================
+
+// Retrieve all active subscriptions for the authenticated user.
+// Expected: 200 OK, SubscriptionsRetrieved, payload is ISubscription[]
+GET http://localhost:8080/notifications/subscriptions
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+
+###
+
+// ============================================================================
+// BASIC FLOW — Unsubscribe from a Route
+// ============================================================================
+
+// Unsubscribe from route P1 (added in setup above).
+// Expected: 200 OK, RouteUnsubscribed, payload null
+DELETE http://localhost:8080/notifications/subscriptions/P1
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+
+###
+
+// Confirm P1 is gone — payload should no longer contain P1.
+// Expected: 200 OK, SubscriptionsRetrieved (P1 absent)
+GET http://localhost:8080/notifications/subscriptions
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+
+###
+
+// ============================================================================
+// BASIC FLOW — Submit a Bus Report (Map Page)
+// ============================================================================
+
+// Step 1: Get active vehicles for route 61C — copy a vid and its lat/lon from the response.
+// Expected: 200 OK, VehiclesLocated, payload is IVehicle[]
+GET http://localhost:8080/transit/vehicles/61C
+###
+
+// Step 2: Submit a full report using a vid and lat/lon from the response above.
+// lat/lon must be within 0.5 miles of the bus.
+// Step 10: Submit a full report (crowdedness + condition + comment).
+// Expected: 201 Created, ReportSubmitted, payload is IBusReport
+POST http://localhost:8080/notifications/reports
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+
+
+{
+    "vid": "3516",
+    "routeId": "61C",
+    "crowdedness": "Packed",
+    "condition": "Dirty",
+    "comment": "Very crowded today",
+    "lat": 40.409114837646484,
+    "lon": -79.90263366699219
+}
+###
+
+// Submit a second report with changed crowdedness only (minimal valid report).
+// Expected: 201 Created, ReportSubmitted; server should publish a liveNotification
+//           to route:61C room if crowdedness changed from the last known status.
+POST http://localhost:8080/notifications/reports
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+
+{
+    "vid": "3516",
+    "routeId": "61C",
+    "crowdedness": "Empty",
+    "lat": 40.409114837646484,
+    "lon": -79.90263366699219
+}
+###
+
+// ============================================================================
+// BASIC FLOW — View Notifications (Notification Page, no filter)
+// ============================================================================
+
+// Returns all notifications from the last 30 minutes (R3).
+// Expected: 200 OK, NotificationsRetrieved, payload is INotification[]
+GET http://localhost:8080/notifications/notifications
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+###
+
+// Filter by route — RouteSearchStrategy (R13).
+// Expected: 200 OK, NotificationsRetrieved, all items have routeId == 61C
+GET http://localhost:8080/notifications/notifications?route=61C
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+###
+
+// Filter by bus — BusSearchStrategy (R13).
+// Expected: 200 OK, NotificationsRetrieved, all items have vid == 3301
+GET http://localhost:8080/notifications/notifications?bus=3516
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+###
+
+// Free-text search — TextSearchStrategy (A13).
+// Expected: 200 OK, NotificationsRetrieved; payload contains notifications
+//           whose message contains "packed" (case-insensitive)
+GET http://localhost:8080/notifications/notifications?q=packed
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+###
+
+// Composite search — route + bus → CompositeSearchStrategy.
+// Expected: 200 OK, NotificationsRetrieved; results match both filters
+GET http://localhost:8080/notifications/notifications?route=61C&bus=3516
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+###
+
+// ============================================================================
+// BASIC FLOW — Get Service Alerts (Notification Page default view)
+// ============================================================================
+
+// A15 baseline: fetch GTFS-RT alerts shown when no search is active.
+// Expected: 200 OK, AlertsRetrieved, payload is IServiceAlert[]
+GET http://localhost:8080/notifications/alerts
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+###
+
+// ============================================================================
+// ALTERNATIVE FLOW A1 — Already Subscribed → Unsubscribe (toggle)
+// ============================================================================
+
+// Re-subscribe to 61C (was subscribed in basic flow above).
+// If still subscribed, this should return 409 DuplicateSubscription.
+// Expected: 409 Conflict, DuplicateSubscription
+POST http://localhost:8080/notifications/subscriptions
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+
+{
+    "routeId": "61C"
+}
+###
+
+// To exercise the unsubscribe toggle (A1): delete existing 61C subscription.
+// Expected: 200 OK, RouteUnsubscribed
+DELETE http://localhost:8080/notifications/subscriptions/61C
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+###
+
+// ============================================================================
+// ALTERNATIVE FLOW A2 — Subscription Limit Reached (R1: max 10)
+// ============================================================================
+
+// Pre-condition: ensure user has 10 active subscriptions, then attempt an 11th.
+// Add routes one by one (adjust route IDs to valid ones in your environment).
+POST http://localhost:8080/notifications/subscriptions
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+
+{ "routeId": "11" }
+###
+
+POST http://localhost:8080/notifications/subscriptions
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+
+{ "routeId": "71B" }
+###
+
+POST http://localhost:8080/notifications/subscriptions
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+
+{ "routeId": "61C" }
+###
+
+POST http://localhost:8080/notifications/subscriptions
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+
+{ "routeId": "61D" }
+###
+
+POST http://localhost:8080/notifications/subscriptions
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+
+
+{ "routeId": "P1" }
+###
+
+POST http://localhost:8080/notifications/subscriptions
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+
+
+{ "routeId": "P2" }
+###
+
+POST http://localhost:8080/notifications/subscriptions
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+>
+
+{ "routeId": "P3" }
+###
+
+POST http://localhost:8080/notifications/subscriptions
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+
+
+{ "routeId": "28X" }
+###
+
+POST http://localhost:8080/notifications/subscriptions
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+
+
+{ "routeId": "G2" }
+###
+
+POST http://localhost:8080/notifications/subscriptions
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+
+{ "routeId": "67" }
+###
+
+// Attempt an 11th subscription — should be rejected (R1).
+// Expected: 409 Conflict, SubscriptionLimitReached
+POST http://localhost:8080/notifications/subscriptions
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+
+{
+    "routeId": "54C"
+}
+###
+
+// ============================================================================
+// ALTERNATIVE FLOW A3 — Check Notifications from Bus (pre-filled search)
+// ============================================================================
+
+// When user taps Check on Map Page, app navigates to notification page with
+// bus=<vid>. Simulate that pre-filled search here.
+// Expected: 200 OK, NotificationsRetrieved; results scoped to vid 3301
+GET http://localhost:8080/notifications/notifications?bus=3516
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+
+###
+
+// ============================================================================
+// ALTERNATIVE FLOW A5 — All Questions Skipped (empty report body)
+// ============================================================================
+
+// Submit a report with no optional fields (vid, routeId, lat, lon only).
+// Expected: 400 Bad Request, EmptyReport
+POST http://localhost:8080/notifications/reports
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+
+{
+    "vid": "3301",
+    "routeId": "61C",
+    "lat": 40.4418,
+    "lon": -79.9440
+}
+###
+
+// ============================================================================
+// ALTERNATIVE FLOW A16 — Member Not Near Bus (ProximityViolation, R9)
+// ============================================================================
+// Submit a report from a location far from the bus (lat/lon in Seattle).
+// Expected: 403 Forbidden, ProximityViolation
+POST http://localhost:8080/notifications/reports
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+
+{
+    "vid": "3516",
+    "routeId": "61C",
+    "crowdedness": "Packed",
+    "lat": 47.6062,
+    "lon": -122.3321
+}
+###
+
+// ============================================================================
+// ALTERNATIVE FLOW A18 — No Status Change (report stored, no notification)
+// ============================================================================
+// Step 1: Get active vehicles for route 61C — copy a vid and its lat/lon from the response.
+// Expected: 200 OK, VehiclesLocated, payload is IVehicle[]
+GET http://localhost:8080/transit/vehicles/61C
+###
+
+// Submit the exact same status as the last report for vid 3301.
+// Server should store the report but NOT publish a liveNotification.
+// Expected: 201 Created, ReportSubmitted (same message as normal flow).
+//           Verify in server logs / Socket.io client: no liveNotification emitted.
+POST http://localhost:8080/notifications/reports
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+
+{
+    "vid": "3516",
+    "routeId": "61C",
+    "crowdedness": "Empty",
+    "lat": 40.419921875,
+    "lon": -79.92830657958984
+}
+###
+
+// ============================================================================
+// ALTERNATIVE FLOW A19 — Inappropriate Comment Flagged (LLM moderation, R11)
+// ============================================================================
+
+// Submit a report with a comment that should be flagged by the LLM.
+// Expected: 201 Created, ReportSubmitted; message indicates comment was flagged:
+//   "Your comment was flagged and will not be included in the notification."
+//   payload should NOT contain the comment field.
+POST http://localhost:8080/notifications/reports
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+
+{
+    "vid": "3516",
+    "routeId": "61C",
+    "crowdedness": "Standing Room",
+    "comment": "This is an inappropriate and offensive comment!",
+    "lat": 40.419921875,
+    "lon": -79.92830657958984
+}
+###
+
+// ============================================================================
+// ALTERNATIVE FLOW A12 — No Matching Results
+// ============================================================================
+
+// Search for a route with no recent notifications.
+// Expected: 200 OK, NotificationsRetrieved, payload is []
+GET http://localhost:8080/notifications/notifications?route=ROUTE_WITH_NO_NOTIFS
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+###
+
+// Free-text search with no matches.
+// Expected: 200 OK, NotificationsRetrieved, payload is []
+GET http://localhost:8080/notifications/notifications?q=xyznosuchterm
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+###
+
+// ============================================================================
+// ERROR HANDLING — Authentication
+// ============================================================================
+
+// Missing Authorization header.
+// Expected: 401 Unauthorized, MissingToken
+GET http://localhost:8080/notifications/subscriptions
+###
+
+// Invalid / expired token.
+// Expected: 401 Unauthorized, InvalidToken
+GET http://localhost:8080/notifications/subscriptions
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkC1
+###
+
+// ============================================================================
+// ERROR HANDLING — Subscription errors
+// ============================================================================
+
+// Subscribe to a route that does not exist.
+// Expected: 404 Not Found, RouteNotFound
+POST http://localhost:8080/notifications/subscriptions
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+
+{
+    "routeId": "INVALID_ROUTEaa"
+}
+###
+
+// Subscribe with missing routeId field.
+// Expected: 400 Bad Request, MissingParameter
+POST http://localhost:8080/notifications/subscriptions
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+
+
+{}
+###
+
+// Unsubscribe from a route the user is not subscribed to.
+// Expected: 404 Not Found, SubscriptionNotFound
+DELETE http://localhost:8080/notifications/subscriptions/NOT_SUBSCRIBED_ROUTE
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+
+###
+
+// ============================================================================
+// ERROR HANDLING — Report errors
+// ============================================================================
+
+// Submit a report with missing required field vid.
+// Expected: 400 Bad Request, MissingParameter
+POST http://localhost:8080/notifications/reports
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+
+
+{
+    "routeId": "61C",
+    "crowdedness": "Packed",
+    "lat": 40.4418,
+    "lon": -79.9440
+}
+###
+
+// Submit a report with missing required field lat/lon.
+// Expected: 400 Bad Request, MissingParameter
+POST http://localhost:8080/notifications/reports
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+
+
+{
+    "vid": "3301",
+    "routeId": "61C",
+    "crowdedness": "Packed"
+}
+###
+
+// Submit a report with an invalid enum value for crowdedness.
+// Expected: 400 Bad Request, InvalidReportField
+POST http://localhost:8080/notifications/reports
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+
+
+{
+    "vid": "3301",
+    "routeId": "61C",
+    "crowdedness": "SuperPacked",
+    "lat": 40.4418,
+    "lon": -79.9440
+}
+###
+
+// Submit a report referencing a vehicle ID not in the vehicle positions store.
+// Expected: 404 Not Found, VehicleNotFound
+POST http://localhost:8080/notifications/reports
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmY2RlMDU1Zi1iMGEyLTRjZGMtOThmNC0xOGEzNjdkYWEwYjMiLCJ1c2VybmFtZSI6InRlc3R1c2VyMSIsImlhdCI6MTc3NTIyOTUxN30.EcL9b4j8ZpBnhl4_ENzaPvw2ocDPtaXcjC6YoRMFkCU
+
+
+{
+    "vid": "UNKNOWN_VID",
+    "routeId": "61C",
+    "crowdedness": "Packed",
+    "lat": 40.4418,
+    "lon": -79.9440
+}
+###

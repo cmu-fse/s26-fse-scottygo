@@ -817,6 +817,14 @@ const registerRouteSelectionEvents = (): void => {
   document.addEventListener('routeSelected', async (e: Event) => {
     const customEvent = e as CustomEvent<IRouteSelection>;
     const route = customEvent.detail.route;
+    if (!route) {
+      console.log('Route deselected, returning to nearby stops view');
+      await filterController.clearRouteFilter();
+      if (userLocation) {
+        await filterController.showNearbyStops(userLocation);
+      }
+      return;
+    }
     console.log('Route selected:', route);
     mapStateManager.updateFilter('selectedRouteId', route);
     await filterController.applyRouteFilter(route);

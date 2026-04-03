@@ -436,6 +436,17 @@ export class FilterController {
   }
 
   /**
+   * Clear the active route filter and re-render all filtered routes
+   */
+  async clearRouteFilter(): Promise<void> {
+    this.stateManager.updateFilter('selectedRouteId', null);
+    this.vehicleTracker.stopPolling();
+    this.routeRenderer.clearAllRoutes();
+    await this.renderFilteredRoutes();
+    this.urlSync.updateURL(this.stateManager.getState());
+  }
+
+  /**
    * Apply date/time filter
    */
   async applyDateTimeFilter(): Promise<void> {
@@ -593,6 +604,8 @@ export class FilterController {
       // Fetch and render stops for each enabled direction
       for (const direction of directions) {
         const stops = await this.fetchStops(state.selectedRouteId, direction);
+        // Guard against deselection that may have occurred during the async fetch
+        if (this.stateManager.getState().selectedRouteId !== state.selectedRouteId) return;
         if (stops.length > 0) {
           this.routeRenderer.renderStopMarkers(
             state.selectedRouteId,
