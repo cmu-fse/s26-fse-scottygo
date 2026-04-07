@@ -16,6 +16,10 @@ export interface TripshotStop {
   stopId: string;
   name: string;
   location: TripshotLocation;
+  // Fields present in liveStatus vias but not routeSummary (optional for back-compat)
+  gtfsId?: string | null;
+  terminal?: boolean;
+  onDemand?: boolean;
 }
 
 export interface TripshotViaStop {
