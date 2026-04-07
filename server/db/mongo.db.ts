@@ -246,6 +246,11 @@ export class MongoDB implements IDatabase {
     return user;
   }
 
+  async getAllUserAccounts(): Promise<IUserAccount[]> {
+    const users: IUserAccount[] = await MUser.find().lean();
+    return users;
+  }
+
   async updateUserStatus(
     username: string,
     status: IAccountStatus
