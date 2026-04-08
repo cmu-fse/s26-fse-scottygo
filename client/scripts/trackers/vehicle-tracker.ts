@@ -506,7 +506,9 @@ export class VehicleTracker {
     }
 
     // Report button — proximity check using cached location (R9, R10, A16, A17)
-    const reportBtn = popup.querySelector('.map-popup__action-btn--report') as HTMLButtonElement | null;
+    const reportBtn = popup.querySelector(
+      '.map-popup__action-btn--report'
+    ) as HTMLButtonElement | null;
     if (reportBtn) {
       reportBtn.addEventListener('click', () => {
         if (!this.userLocation) {

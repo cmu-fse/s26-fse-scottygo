@@ -22,8 +22,17 @@ import {
 } from '../search/search-strategy';
 
 export default class AccountController extends Controller {
-  public constructor(path: string) {
+  private static instance: AccountController | null = null;
+
+  private constructor(path: string) {
     super(path);
+  }
+
+  public static getInstance(path: string): AccountController {
+    if (!AccountController.instance) {
+      AccountController.instance = new AccountController(path);
+    }
+    return AccountController.instance;
   }
 
   public initializeRoutes(): void {
