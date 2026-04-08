@@ -23,8 +23,17 @@ const DEFAULT_MAP_CENTER = { lat: 40.4433, lon: -79.9436 };
 const DEFAULT_MAP_ZOOM = 14;
 
 export default class MapController extends Controller {
-  public constructor(path: string) {
+  private static instance: MapController | null = null;
+
+  private constructor(path: string) {
     super(path);
+  }
+
+  public static getInstance(path: string): MapController {
+    if (!MapController.instance) {
+      MapController.instance = new MapController(path);
+    }
+    return MapController.instance;
   }
 
   public initializeRoutes(): void {

@@ -1,0 +1,18 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+title ManageAcct - Singleton Design Pattern
+
+class Serve <<Client>> {
+  +bootstrap() : void
+}
+
+class AccountController <<Singleton>> {
+  -{static} instance : AccountController
+  -AccountController(path : string)
+  +{static} getInstance(path : string) : AccountController
+}
+
+Serve ..> AccountController : uses getInstance("/account")
+
+@enduml

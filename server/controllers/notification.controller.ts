@@ -12,8 +12,17 @@ import { JWT_KEY as secretKey } from '../env';
 import * as responses from '../../common/server.responses';
 
 export default class NotificationController extends Controller {
-  public constructor(path: string) {
+  private static instance: NotificationController | null = null;
+
+  private constructor(path: string) {
     super(path);
+  }
+
+  public static getInstance(path: string): NotificationController {
+    if (!NotificationController.instance) {
+      NotificationController.instance = new NotificationController(path);
+    }
+    return NotificationController.instance;
   }
 
   public initializeRoutes(): void {

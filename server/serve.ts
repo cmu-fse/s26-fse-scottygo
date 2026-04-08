@@ -14,11 +14,11 @@ import SubscriptionsController from './controllers/subscriptions.controller';
 const app = new App(
   [
     new AuthController('/auth'),
-    new AccountController('/account'),
-    new MapController('/'),
-    new BusController('/transit'),
-    new NotificationController('/notifications'),
-    new SubscriptionsController('/subscriptions')
+    AccountController.getInstance('/account'),
+    MapController.getInstance('/'),
+    BusController.getInstance('/transit'),
+    NotificationController.getInstance('/notifications'),
+    SubscriptionsController.getInstance('/subscriptions')
   ],
   {
     clientDir: path.join(__dirname, '../.dist/client'),
