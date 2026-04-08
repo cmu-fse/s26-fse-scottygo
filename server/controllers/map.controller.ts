@@ -19,8 +19,17 @@ import type {
 } from '../../common/transit.interface';
 
 export default class MapController extends Controller {
-  public constructor(path: string) {
+  private static instance: MapController | null = null;
+
+  private constructor(path: string) {
     super(path);
+  }
+
+  public static getInstance(path: string): MapController {
+    if (!MapController.instance) {
+      MapController.instance = new MapController(path);
+    }
+    return MapController.instance;
   }
 
   public initializeRoutes(): void {

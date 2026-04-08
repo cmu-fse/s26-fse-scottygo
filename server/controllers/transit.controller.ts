@@ -31,6 +31,8 @@ export function parseLimit(
 }
 
 export default class BusController extends Controller {
+  private static instance: BusController | null = null;
+
   private static readonly MEMORY_LIMIT_DEFAULT = 120;
 
   private static readonly MEMORY_LIMIT_MAX = 2000;
@@ -39,8 +41,15 @@ export default class BusController extends Controller {
 
   private static readonly MEMORY_SUMMARY_LIMIT_MAX = 5000;
 
-  public constructor(path: string) {
+  private constructor(path: string) {
     super(path);
+  }
+
+  public static getInstance(path: string): BusController {
+    if (!BusController.instance) {
+      BusController.instance = new BusController(path);
+    }
+    return BusController.instance;
   }
 
   public initializeRoutes(): void {
@@ -56,10 +65,7 @@ export default class BusController extends Controller {
     );
     this.router.get('/routes/:id', this.getPatterns.bind(this));
     this.router.get('/vehicles/:routeId', this.getVehicles.bind(this));
-    this.router.get(
-      '/stops/nearbystops',
-      this.getNearbyStops.bind(this)
-    );
+    this.router.get('/stops/nearbystops', this.getNearbyStops.bind(this));
     this.router.get('/stops/:routeId', this.getStops.bind(this));
     this.router.get(
       '/stops/:stopId/predictions',
