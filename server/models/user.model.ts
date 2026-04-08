@@ -17,10 +17,7 @@ import {
   validateEmailFormat,
   validatePasswordStrength
 } from './user.validation';
-import {
-  ensureNotLastAdmin,
-  isLastAdministrator
-} from './user.admin-rules';
+import { ensureNotLastAdmin, isLastAdministrator } from './user.admin-rules';
 
 export class User implements IUser {
   credentials: ILogin;

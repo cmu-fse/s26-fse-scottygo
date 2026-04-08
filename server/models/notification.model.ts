@@ -91,10 +91,13 @@ export class NotificationModel {
     return await DAC.db.getSubscriptionsByUserId(userId);
   }
 
-  static async subscribe(userId: string, routeId: string): Promise<ISubscription> {
+  static async subscribe(
+    userId: string,
+    routeId: string
+  ): Promise<ISubscription> {
     // Validate that the route exists
     const routes = await TransitModel.getRoutes();
-    const routeExists = routes.some(r => r.id === routeId);
+    const routeExists = routes.some((r) => r.id === routeId);
     if (!routeExists) {
       const error: IAppError = {
         type: 'ClientError',

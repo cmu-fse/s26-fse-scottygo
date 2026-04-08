@@ -4,9 +4,5 @@
     "types": ["jest", "node"],
     "rootDir": "../"
   },
-  "include": [
-    "./**/*.ts",
-    "../common/**/*.ts",
-    "../server/**/*.ts"
-  ]
+  "include": ["./**/*.ts", "../common/**/*.ts", "../server/**/*.ts"]
 }

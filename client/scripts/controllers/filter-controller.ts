@@ -605,7 +605,10 @@ export class FilterController {
       for (const direction of directions) {
         const stops = await this.fetchStops(state.selectedRouteId, direction);
         // Guard against deselection that may have occurred during the async fetch
-        if (this.stateManager.getState().selectedRouteId !== state.selectedRouteId) return;
+        if (
+          this.stateManager.getState().selectedRouteId !== state.selectedRouteId
+        )
+          return;
         if (stops.length > 0) {
           this.routeRenderer.renderStopMarkers(
             state.selectedRouteId,

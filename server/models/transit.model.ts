@@ -492,8 +492,9 @@ export class TransitModel {
     >();
 
     for (const route of routes) {
-      const directions =
-        filters?.direction ? [filters.direction] : route.directions;
+      const directions = filters?.direction
+        ? [filters.direction]
+        : route.directions;
 
       for (const dir of directions) {
         const stops = await TransitModel.getStops(route.id, dir);
@@ -551,10 +552,7 @@ export class TransitModel {
 
     // TUC4 A6: if no stops within the default 1 km radius, automatically
     // double to 2 km (~30 min walk) and flag the expansion in the response.
-    if (
-      nearbyStops.length === 0 &&
-      radiusMeters === DEFAULT_NEARBY_RADIUS_M
-    ) {
+    if (nearbyStops.length === 0 && radiusMeters === DEFAULT_NEARBY_RADIUS_M) {
       radiusMeters = EXPANDED_NEARBY_RADIUS_M;
       expandedRadiusApplied = true;
       nearbyStops = buildNearbyStops(radiusMeters);

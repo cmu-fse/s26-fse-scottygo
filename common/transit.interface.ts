@@ -174,4 +174,3 @@ export interface ITransitCache {
   lastUpdated: Date;
   expiresAt: Date;
 }
-
