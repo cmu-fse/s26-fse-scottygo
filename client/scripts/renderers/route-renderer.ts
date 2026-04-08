@@ -162,8 +162,6 @@ export class RouteRenderer {
     // Clear existing polylines for this route
     this.clearRoutePolylines(routeId);
 
-    const polylines: IMapPolyline[] = [];
-
     // Validate route data structure
     if (!routeData || typeof routeData !== 'object') {
       console.warn(`Invalid route data for route ${routeId}:`, routeData);
@@ -172,88 +170,105 @@ export class RouteRenderer {
 
     // Check if it's the custom format (array of direction/path objects)
     if (Array.isArray(routeData)) {
-      // Custom format: [{direction: "INBOUND", path: [{lat, lng}, ...]}, ...]
-      routeData.forEach((segment: RoutePathSegment) => {
-        if (
-          segment.path &&
-          Array.isArray(segment.path) &&
-          segment.path.length > 0
-        ) {
-          const polyline = this.mapProvider!.addPolyline({
-            path: segment.path,
-            color: color,
-            weight: 4,
-            opacity: 1.0
-          });
-
-          // Store with direction-specific key
-          const directionKey = `${routeId}_${segment.direction}`;
-          if (!this.routePolylines.has(directionKey)) {
-            this.routePolylines.set(directionKey, []);
-          }
-          this.routePolylines.get(directionKey)!.push(polyline);
-        }
-      });
+      this.renderCustomFormatPolylines(routeId, routeData, color);
     } else {
-      // GeoJSON format
-      const geoJson = routeData as GeoJSON;
-
-      // Handle both Feature and FeatureCollection
-      const features: GeoJSONFeature[] =
-        geoJson.type === 'FeatureCollection'
-          ? (geoJson as GeoJSONFeatureCollection).features
-          : [geoJson as GeoJSONFeature];
-
-      if (!features || !Array.isArray(features)) {
-        console.warn(`No valid features found for route ${routeId}`);
-        return;
-      }
-
-      features.forEach((feature: GeoJSONFeature) => {
-        // Validate feature structure
-        if (
-          !feature ||
-          !feature.geometry ||
-          typeof feature.geometry !== 'object'
-        ) {
-          console.warn(`Invalid feature geometry for route ${routeId}`);
-          return;
-        }
-
-        if (feature.geometry.type === 'LineString') {
-          // Validate coordinates
-          if (
-            !feature.geometry.coordinates ||
-            !Array.isArray(feature.geometry.coordinates)
-          ) {
-            console.warn(`Invalid coordinates for route ${routeId}`);
-            return;
-          }
-
-          // GeoJSON uses [lng, lat], need to convert to {lat, lng}
-          const path = feature.geometry.coordinates.map((coord: number[]) => ({
-            lat: coord[1],
-            lng: coord[0]
-          }));
-
-          const polyline = this.mapProvider!.addPolyline({
-            path,
-            color: color,
-            weight: 4,
-            opacity: 1.0
-          });
-
-          polylines.push(polyline);
-        }
-      });
-
-      // For GeoJSON format, store without direction (or use a default key)
-      if (polylines.length > 0) {
-        this.routePolylines.set(routeId, polylines);
-      }
+      this.renderGeoJSONPolylines(routeId, routeData as GeoJSON, color);
     }
 
     console.log(`Rendered route ${routeId} with polylines`);
+  }
+
+  /**
+   * Render polylines from the custom direction/path array format.
+   */
+  private renderCustomFormatPolylines(
+    routeId: string,
+    segments: RoutePathSegment[],
+    color: string
+  ): void {
+    segments.forEach((segment: RoutePathSegment) => {
+      if (
+        segment.path &&
+        Array.isArray(segment.path) &&
+        segment.path.length > 0
+      ) {
+        const polyline = this.mapProvider!.addPolyline({
+          path: segment.path,
+          color: color,
+          weight: 4,
+          opacity: 1.0
+        });
+
+        // Store with direction-specific key
+        const directionKey = `${routeId}_${segment.direction}`;
+        if (!this.routePolylines.has(directionKey)) {
+          this.routePolylines.set(directionKey, []);
+        }
+        this.routePolylines.get(directionKey)!.push(polyline);
+      }
+    });
+  }
+
+  /**
+   * Render polylines from GeoJSON Feature or FeatureCollection format.
+   */
+  private renderGeoJSONPolylines(
+    routeId: string,
+    geoJson: GeoJSON,
+    color: string
+  ): void {
+    const features: GeoJSONFeature[] =
+      geoJson.type === 'FeatureCollection'
+        ? (geoJson as GeoJSONFeatureCollection).features
+        : [geoJson as GeoJSONFeature];
+
+    if (!features || !Array.isArray(features)) {
+      console.warn(`No valid features found for route ${routeId}`);
+      return;
+    }
+
+    const polylines: IMapPolyline[] = [];
+
+    features.forEach((feature: GeoJSONFeature) => {
+      if (
+        !feature ||
+        !feature.geometry ||
+        typeof feature.geometry !== 'object'
+      ) {
+        console.warn(`Invalid feature geometry for route ${routeId}`);
+        return;
+      }
+
+      if (feature.geometry.type === 'LineString') {
+        if (
+          !feature.geometry.coordinates ||
+          !Array.isArray(feature.geometry.coordinates)
+        ) {
+          console.warn(`Invalid coordinates for route ${routeId}`);
+          return;
+        }
+
+        // GeoJSON uses [lng, lat], need to convert to {lat, lng}
+        const path = feature.geometry.coordinates.map((coord: number[]) => ({
+          lat: coord[1],
+          lng: coord[0]
+        }));
+
+        const polyline = this.mapProvider!.addPolyline({
+          path,
+          color: color,
+          weight: 4,
+          opacity: 1.0
+        });
+
+        polylines.push(polyline);
+      }
+    });
+
+    // For GeoJSON format, store without direction (or use a default key)
+    if (polylines.length > 0) {
+      this.routePolylines.set(routeId, polylines);
+    }
   }
 
   /**

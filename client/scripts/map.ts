@@ -14,6 +14,7 @@ import './components/route-bell';
 import './components/live-notifications';
 import './components/bus-report-form';
 import type { BusReportFormElement } from './components/bus-report-form';
+import { showToast } from './utils/toast';
 import type { IRouteBellElement } from './components/route-bell';
 import { LocationIndicator } from './components/location-indicator';
 import './components/toggle-panel';
@@ -243,24 +244,7 @@ async function syncSubscriptionsFromServer(): Promise<void> {
 }
 
 function showSubscriptionToast(message: string): void {
-  const toast = document.createElement('div');
-  toast.className = 'toast-notification';
-  toast.textContent = message;
-  toast.style.cssText = `
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0, 0, 0, 0.8);
-    color: white;
-    padding: 12px 24px;
-    border-radius: 8px;
-    z-index: 10000;
-    font-size: 14px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  `;
-  document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 5000);
+  showToast(message);
 }
 
 // ─── Map provider ──────────────────────────────────────────────────────────────
@@ -681,6 +665,13 @@ const registerFilterApplicationEvents = (): void => {
   });
 };
 
+function updateBellState(routeId: string, subscribed: boolean): void {
+  const bell = document.querySelector(
+    'route-bell'
+  ) as IRouteBellElement | null;
+  bell?.showBell(routeId, subscribed);
+}
+
 const registerSubscriptionEvents = (): void => {
   document.addEventListener('bellSubscribe', async (e: Event) => {
     const { routeId } = (e as CustomEvent<{ routeId: string }>).detail;
@@ -707,10 +698,7 @@ const registerSubscriptionEvents = (): void => {
         showSubscriptionToast(
           'Subscription limit reached (10). Please remove a subscription first.'
         );
-        const bell = document.querySelector(
-          'route-bell'
-        ) as IRouteBellElement | null;
-        bell?.showBell(routeId, false);
+        updateBellState(routeId, false);
       } else if (
         res.status === 409 &&
         res.data.name === 'DuplicateSubscription'
@@ -721,17 +709,11 @@ const registerSubscriptionEvents = (): void => {
         );
       } else {
         showSubscriptionToast('Failed to subscribe. Please try again.');
-        const bell = document.querySelector(
-          'route-bell'
-        ) as IRouteBellElement | null;
-        bell?.showBell(routeId, false);
+        updateBellState(routeId, false);
       }
     } catch {
       showSubscriptionToast('Failed to subscribe. Please try again.');
-      const bell = document.querySelector(
-        'route-bell'
-      ) as IRouteBellElement | null;
-      bell?.showBell(routeId, false);
+      updateBellState(routeId, false);
     }
   });
 
@@ -754,17 +736,11 @@ const registerSubscriptionEvents = (): void => {
         showSubscriptionToast(`Unsubscribed from Route ${routeId}.`);
       } else {
         showSubscriptionToast('Failed to unsubscribe. Please try again.');
-        const bell = document.querySelector(
-          'route-bell'
-        ) as IRouteBellElement | null;
-        bell?.showBell(routeId, true);
+        updateBellState(routeId, true);
       }
     } catch {
       showSubscriptionToast('Failed to unsubscribe. Please try again.');
-      const bell = document.querySelector(
-        'route-bell'
-      ) as IRouteBellElement | null;
-      bell?.showBell(routeId, true);
+      updateBellState(routeId, true);
     }
   });
 };

@@ -529,6 +529,69 @@ export class FilterController {
   }
 
   /**
+   * Return directions that are both available for the route and enabled in the toggle.
+   */
+  private getEnabledDirections(
+    selectedDirections: { inbound: boolean; outbound: boolean },
+    routeDirections: string[]
+  ): string[] {
+    const directions: string[] = [];
+    if (selectedDirections.inbound && routeDirections.includes('INBOUND')) {
+      directions.push('INBOUND');
+    }
+    if (selectedDirections.outbound && routeDirections.includes('OUTBOUND')) {
+      directions.push('OUTBOUND');
+    }
+    return directions;
+  }
+
+  /**
+   * Show or hide polylines for each direction based on toggle state.
+   */
+  private updateDirectionVisibility(
+    routeId: string,
+    routeDirections: string[],
+    selectedDirections: { inbound: boolean; outbound: boolean }
+  ): void {
+    for (const dir of ['INBOUND', 'OUTBOUND'] as const) {
+      if (!routeDirections.includes(dir)) continue;
+      const enabled = dir === 'INBOUND'
+        ? selectedDirections.inbound
+        : selectedDirections.outbound;
+      if (enabled) {
+        this.routeRenderer.showDirectionPolylines(routeId, dir);
+      } else {
+        this.routeRenderer.hideDirectionPolylines(routeId, dir);
+      }
+    }
+  }
+
+  /**
+   * Clear stop markers for both directions then re-render markers for enabled directions.
+   */
+  private async refreshStopMarkers(
+    routeId: string,
+    directions: string[]
+  ): Promise<void> {
+    this.routeRenderer.clearStopMarkers(`${routeId}_INBOUND`);
+    this.routeRenderer.clearStopMarkers(`${routeId}_OUTBOUND`);
+
+    for (const direction of directions) {
+      const stops = await this.fetchStops(routeId, direction);
+      // Guard against deselection that may have occurred during the async fetch
+      if (this.stateManager.getState().selectedRouteId !== routeId) return;
+      if (stops.length > 0) {
+        this.routeRenderer.renderStopMarkers(
+          routeId,
+          stops,
+          direction,
+          (stop) => this.handleStopClick(stop)
+        );
+      }
+    }
+  }
+
+  /**
    * Apply direction filter
    */
   async applyDirectionFilter(): Promise<void> {
@@ -540,7 +603,6 @@ export class FilterController {
     }
 
     try {
-      // Get the selected route to check available directions
       const selectedRoute = state.availableRoutes.find(
         (r) => r.id === state.selectedRouteId
       );
@@ -549,72 +611,18 @@ export class FilterController {
         return;
       }
 
-      // Build list of directions to fetch based on:
-      // 1. What directions are available for this route
-      // 2. What directions are enabled in the toggle
-      const directions: string[] = [];
+      const directions = this.getEnabledDirections(
+        state.selectedDirections,
+        selectedRoute.directions
+      );
 
-      if (
-        state.selectedDirections.inbound &&
-        selectedRoute.directions.includes('INBOUND')
-      ) {
-        directions.push('INBOUND');
-      }
-      if (
-        state.selectedDirections.outbound &&
-        selectedRoute.directions.includes('OUTBOUND')
-      ) {
-        directions.push('OUTBOUND');
-      }
+      this.updateDirectionVisibility(
+        state.selectedRouteId,
+        selectedRoute.directions,
+        state.selectedDirections
+      );
 
-      // Control route geometry visibility based on direction toggles
-      // Only show/hide if the route actually has that direction
-      if (selectedRoute.directions.includes('INBOUND')) {
-        if (state.selectedDirections.inbound) {
-          this.routeRenderer.showDirectionPolylines(
-            state.selectedRouteId,
-            'INBOUND'
-          );
-        } else {
-          this.routeRenderer.hideDirectionPolylines(
-            state.selectedRouteId,
-            'INBOUND'
-          );
-        }
-      }
-
-      if (selectedRoute.directions.includes('OUTBOUND')) {
-        if (state.selectedDirections.outbound) {
-          this.routeRenderer.showDirectionPolylines(
-            state.selectedRouteId,
-            'OUTBOUND'
-          );
-        } else {
-          this.routeRenderer.hideDirectionPolylines(
-            state.selectedRouteId,
-            'OUTBOUND'
-          );
-        }
-      }
-
-      // Clear existing stop markers
-      this.routeRenderer.clearStopMarkers(`${state.selectedRouteId}_INBOUND`);
-      this.routeRenderer.clearStopMarkers(`${state.selectedRouteId}_OUTBOUND`);
-
-      // Fetch and render stops for each enabled direction
-      for (const direction of directions) {
-        const stops = await this.fetchStops(state.selectedRouteId, direction);
-        // Guard against deselection that may have occurred during the async fetch
-        if (this.stateManager.getState().selectedRouteId !== state.selectedRouteId) return;
-        if (stops.length > 0) {
-          this.routeRenderer.renderStopMarkers(
-            state.selectedRouteId,
-            stops,
-            direction,
-            (stop) => this.handleStopClick(stop)
-          );
-        }
-      }
+      await this.refreshStopMarkers(state.selectedRouteId, directions);
 
       this.urlSync.updateURL(state);
     } catch (error) {
