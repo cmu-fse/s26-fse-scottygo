@@ -35,7 +35,7 @@ const POLL_MS = POLL_SEC * 1000;
 
 import {
   TripshotLocation,
-  TripshotViaStop,
+  TripshotViaStop
 } from '../server/services/tripshot-api';
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -60,8 +60,22 @@ interface TsVehicleStatus {
 }
 
 type StopState =
-  | { Awaiting: { expectedArrivalTime: string; stopId: string; viaIdx: number; scheduledAt: string } }
-  | { Departed: { arrivalTime: string; departureTime: string; stopId: string; viaIdx: number } }
+  | {
+      Awaiting: {
+        expectedArrivalTime: string;
+        stopId: string;
+        viaIdx: number;
+        scheduledAt: string;
+      };
+    }
+  | {
+      Departed: {
+        arrivalTime: string;
+        departureTime: string;
+        stopId: string;
+        viaIdx: number;
+      };
+    }
   | { Skipped: { stopId: string; viaIdx: number } };
 
 // TripshotViaStop from tripshot-api covers the ViaStop shape;
@@ -107,11 +121,18 @@ function isActive(ride: TsRide): boolean {
   return 'Active' in ride.state;
 }
 
-function nextAwaitingStop(ride: TsRide): { stopId: string; viaIdx: number; eta: string; scheduled: string } | null {
+function nextAwaitingStop(
+  ride: TsRide
+): { stopId: string; viaIdx: number; eta: string; scheduled: string } | null {
   for (const ss of ride.stopStatus) {
     if ('Awaiting' in ss) {
       const a = ss.Awaiting;
-      return { stopId: a.stopId, viaIdx: a.viaIdx, eta: a.expectedArrivalTime, scheduled: a.scheduledAt };
+      return {
+        stopId: a.stopId,
+        viaIdx: a.viaIdx,
+        eta: a.expectedArrivalTime,
+        scheduled: a.scheduledAt
+      };
     }
   }
   return null;
@@ -142,7 +163,9 @@ function printSnapshot(data: TsLiveStatus, label = 'Snapshot'): void {
 
   console.log(`\n${'─'.repeat(72)}`);
   console.log(`  ${label}  |  API time: ${fmtTime(data.timestamp)}`);
-  console.log(`  Fleet: ${data.vehicles.length} vehicles | Rides today: ${data.rides.length} | Active now: ${active.length}`);
+  console.log(
+    `  Fleet: ${data.vehicles.length} vehicles | Rides today: ${data.rides.length} | Active now: ${active.length}`
+  );
   console.log(`${'─'.repeat(72)}`);
 
   if (active.length === 0) {
@@ -159,19 +182,28 @@ function printSnapshot(data: TsLiveStatus, label = 'Snapshot'): void {
     const locStr = vs
       ? `(${vs.location.lt.toFixed(5)}, ${vs.location.lg.toFixed(5)})`
       : '(no GPS)';
-    const bearingStr = vs?.bearing != null ? `${vs.bearing.toFixed(0)}°` : 'n/a';
+    const bearingStr =
+      vs?.bearing != null ? `${vs.bearing.toFixed(0)}°` : 'n/a';
     const speedStr = vs ? fmtSpeed(vs.speed) : 'n/a';
-    const gpsAge = vs ? `${Math.round((Date.now() - new Date(vs.when).getTime()) / 1000)}s ago` : 'n/a';
+    const gpsAge = vs
+      ? `${Math.round((Date.now() - new Date(vs.when).getTime()) / 1000)}s ago`
+      : 'n/a';
 
     console.log(`\n  Route: ${ride.routeName}`);
-    console.log(`    Vehicle : ${ride.vehicleName ?? '?'}  |  Riders: ${ride.riderCount}  |  Live: ${ride.liveDataAvailable}`);
-    console.log(`    Position: ${locStr}  bearing=${bearingStr}  speed=${speedStr}  (${gpsAge})`);
+    console.log(
+      `    Vehicle : ${ride.vehicleName ?? '?'}  |  Riders: ${ride.riderCount}  |  Live: ${ride.liveDataAvailable}`
+    );
+    console.log(
+      `    Position: ${locStr}  bearing=${bearingStr}  speed=${speedStr}  (${gpsAge})`
+    );
     console.log(`    Progress: ${departed}/${total} stops departed`);
 
     if (next) {
       const deltaSec = etaDeltaSec(next.eta);
       const sign = deltaSec >= 0 ? '+' : '';
-      console.log(`    Next stop viaIdx=${next.viaIdx}: ETA ${fmtTime(next.eta)} (${sign}${deltaSec.toFixed(0)}s from now)`);
+      console.log(
+        `    Next stop viaIdx=${next.viaIdx}: ETA ${fmtTime(next.eta)} (${sign}${deltaSec.toFixed(0)}s from now)`
+      );
     } else {
       console.log(`    Next stop: all stops departed`);
     }
@@ -183,25 +215,33 @@ function printSnapshot(data: TsLiveStatus, label = 'Snapshot'): void {
 
 function printStops(data: TsLiveStatus): void {
   const active = data.rides.filter(isActive);
-  console.log(`\nActive rides: ${active.length}  |  API time: ${fmtTime(data.timestamp)}\n`);
+  console.log(
+    `\nActive rides: ${active.length}  |  API time: ${fmtTime(data.timestamp)}\n`
+  );
 
   for (const ride of active) {
     console.log(`${'═'.repeat(72)}`);
-    console.log(`  ${ride.routeName}  (vehicle: ${ride.vehicleName ?? '?'}, riders: ${ride.riderCount})`);
+    console.log(
+      `  ${ride.routeName}  (vehicle: ${ride.vehicleName ?? '?'}, riders: ${ride.riderCount})`
+    );
     console.log(`${'═'.repeat(72)}`);
 
     // Build a map from stopId → stopStatus for quick lookup
     const statusByStopId = new Map<string, string>();
     for (const ss of ride.stopStatus) {
       if ('Departed' in ss) statusByStopId.set(ss.Departed.stopId, 'DEPARTED');
-      else if ('Awaiting' in ss) statusByStopId.set(ss.Awaiting.stopId, 'NEXT    ');
-      else if ('Skipped' in ss) statusByStopId.set(ss.Skipped.stopId, 'SKIPPED ');
+      else if ('Awaiting' in ss)
+        statusByStopId.set(ss.Awaiting.stopId, 'NEXT    ');
+      else if ('Skipped' in ss)
+        statusByStopId.set(ss.Skipped.stopId, 'SKIPPED ');
     }
 
     // Print each via (ordered by viaIdx = array index)
     ride.vias.forEach((via, idx) => {
       if (!isTsVia(via)) {
-        console.log(`  [${String(idx).padStart(3)}]           (non-stop via: ${JSON.stringify(Object.keys(via))})`);
+        console.log(
+          `  [${String(idx).padStart(3)}]           (non-stop via: ${JSON.stringify(Object.keys(via))})`
+        );
         return;
       }
       const s = via.ViaStop.stop;
@@ -210,7 +250,9 @@ function printStops(data: TsLiveStatus): void {
         s.terminal ? 'terminal' : '',
         s.onDemand ? 'on-demand' : '',
         s.gtfsId ? `gtfs:${s.gtfsId}` : ''
-      ].filter(Boolean).join(' ');
+      ]
+        .filter(Boolean)
+        .join(' ');
       console.log(
         `  [${String(idx).padStart(3)}] ${status}  ${s.name.padEnd(42)}  (${s.location.lt.toFixed(5)}, ${s.location.lg.toFixed(5)})  ${flags}`
       );
@@ -223,7 +265,10 @@ function printStops(data: TsLiveStatus): void {
 
 function printAllStops(data: TsLiveStatus): void {
   // Collect unique stops across all rides, tracking which routes serve each
-  const stopMap = new Map<string, { stop: TripshotViaStop['ViaStop']['stop']; routes: Set<string> }>();
+  const stopMap = new Map<
+    string,
+    { stop: TripshotViaStop['ViaStop']['stop']; routes: Set<string> }
+  >();
 
   for (const ride of data.rides) {
     for (const via of ride.vias) {
@@ -240,9 +285,13 @@ function printAllStops(data: TsLiveStatus): void {
     a.stop.name.localeCompare(b.stop.name)
   );
 
-  console.log(`\nAll stops across ${data.rides.length} rides  |  Unique stops: ${entries.length}  |  API time: ${fmtTime(data.timestamp)}\n`);
+  console.log(
+    `\nAll stops across ${data.rides.length} rides  |  Unique stops: ${entries.length}  |  API time: ${fmtTime(data.timestamp)}\n`
+  );
   console.log(`${'─'.repeat(72)}`);
-  console.log(`  ${'Name'.padEnd(44)} ${'Lat'.padEnd(11)} ${'Lng'.padEnd(12)} Routes`);
+  console.log(
+    `  ${'Name'.padEnd(44)} ${'Lat'.padEnd(11)} ${'Lng'.padEnd(12)} Routes`
+  );
   console.log(`${'─'.repeat(72)}`);
 
   for (const { stop: s, routes } of entries) {
@@ -250,7 +299,9 @@ function printAllStops(data: TsLiveStatus): void {
       s.terminal ? '[terminal]' : '',
       s.onDemand ? '[on-demand]' : '',
       s.gtfsId ?? ''
-    ].filter(Boolean).join(' ');
+    ]
+      .filter(Boolean)
+      .join(' ');
     console.log(
       `  ${s.name.padEnd(44)} ${s.location.lt.toFixed(5).padEnd(11)} ${s.location.lg.toFixed(5).padEnd(12)} ${[...routes].join(', ')}  ${flags}`
     );
@@ -274,7 +325,12 @@ interface VehicleTrack {
   totalDistanceM: number;
 }
 
-function haversineM(lat1: number, lng1: number, lat2: number, lng2: number): number {
+function haversineM(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number
+): number {
   const R = 6_371_000;
   const toRad = (d: number) => (d * Math.PI) / 180;
   const dLat = toRad(lat2 - lat1);
@@ -294,7 +350,13 @@ function updateTracks(
 
     let track = tracks.get(vs.vehicleId);
     if (!track) {
-      track = { vehicleId: vs.vehicleId, name: vs.name, samples: [], changeIntervals: [], totalDistanceM: 0 };
+      track = {
+        vehicleId: vs.vehicleId,
+        name: vs.name,
+        samples: [],
+        changeIntervals: [],
+        totalDistanceM: 0
+      };
       tracks.set(vs.vehicleId, track);
     }
 
@@ -315,13 +377,18 @@ function updateTracks(
 
 // ── Summary ────────────────────────────────────────────────────────────
 
-function printSummary(tracks: Map<string, VehicleTrack>, totalPolls: number): void {
+function printSummary(
+  tracks: Map<string, VehicleTrack>,
+  totalPolls: number
+): void {
   console.log(`\n${'═'.repeat(72)}`);
   console.log('  GPS UPDATE ANALYSIS');
   console.log(`  Total polls: ${totalPolls}`);
   console.log(`${'═'.repeat(72)}`);
 
-  const active = [...tracks.values()].filter((t) => t.changeIntervals.length > 0);
+  const active = [...tracks.values()].filter(
+    (t) => t.changeIntervals.length > 0
+  );
 
   if (active.length === 0) {
     console.log('  No position changes observed.');
@@ -334,16 +401,25 @@ function printSummary(tracks: Map<string, VehicleTrack>, totalPolls: number): vo
   const mean = allIntervals.reduce((s, v) => s + v, 0) / allIntervals.length;
   const median =
     allIntervals.length % 2 === 0
-      ? (allIntervals[allIntervals.length / 2 - 1] + allIntervals[allIntervals.length / 2]) / 2
+      ? (allIntervals[allIntervals.length / 2 - 1] +
+          allIntervals[allIntervals.length / 2]) /
+        2
       : allIntervals[Math.floor(allIntervals.length / 2)];
 
   console.log(`\n  Across ${active.length} vehicles with position updates:`);
-  console.log(`    Intervals (s): min=${allIntervals[0].toFixed(1)}  median=${median.toFixed(1)}  mean=${mean.toFixed(1)}  max=${allIntervals[allIntervals.length - 1].toFixed(1)}`);
-  console.log(`    Suggested poll interval: ${Math.max(5, Math.floor(median * 0.8)).toFixed(0)}s  (80% of median, floor 5s)`);
+  console.log(
+    `    Intervals (s): min=${allIntervals[0].toFixed(1)}  median=${median.toFixed(1)}  mean=${mean.toFixed(1)}  max=${allIntervals[allIntervals.length - 1].toFixed(1)}`
+  );
+  console.log(
+    `    Suggested poll interval: ${Math.max(5, Math.floor(median * 0.8)).toFixed(0)}s  (80% of median, floor 5s)`
+  );
 
   console.log(`\n  Per-vehicle breakdown:`);
-  for (const t of [...active].sort((a, b) => b.changeIntervals.length - a.changeIntervals.length)) {
-    const avg = t.changeIntervals.reduce((s, v) => s + v, 0) / t.changeIntervals.length;
+  for (const t of [...active].sort(
+    (a, b) => b.changeIntervals.length - a.changeIntervals.length
+  )) {
+    const avg =
+      t.changeIntervals.reduce((s, v) => s + v, 0) / t.changeIntervals.length;
     console.log(
       `    ${t.name.padEnd(6)} updates=${t.changeIntervals.length}  avg=${avg.toFixed(1)}s  dist=${(t.totalDistanceM / 1000).toFixed(2)}km`
     );
@@ -352,8 +428,12 @@ function printSummary(tracks: Map<string, VehicleTrack>, totalPolls: number): vo
   // ETA accuracy assessment note
   console.log(`\n  ETA accuracy:`);
   console.log(`    TripShot provides 'expectedArrivalTime' per awaiting stop.`);
-  console.log(`    To validate accuracy, compare vs actual 'arrivalTime' in Departed entries.`);
-  console.log(`    Run with a longer --duration to collect before/after pairs.`);
+  console.log(
+    `    To validate accuracy, compare vs actual 'arrivalTime' in Departed entries.`
+  );
+  console.log(
+    `    Run with a longer --duration to collect before/after pairs.`
+  );
   console.log();
 }
 
@@ -381,11 +461,21 @@ async function main(): Promise<void> {
     return;
   }
 
-  console.log('┌──────────────────────────────────────────────────────────────────┐');
-  console.log('│  TripShot liveStatus Analyzer                                    │');
-  console.log(`│  Duration: ${String(DURATION_MIN).padEnd(4)} min  |  Poll: every ${String(POLL_SEC).padEnd(3)} s                    │`);
-  console.log('│  Ctrl-C to stop early (prints summary on exit)                   │');
-  console.log('└──────────────────────────────────────────────────────────────────┘');
+  console.log(
+    '┌──────────────────────────────────────────────────────────────────┐'
+  );
+  console.log(
+    '│  TripShot liveStatus Analyzer                                    │'
+  );
+  console.log(
+    `│  Duration: ${String(DURATION_MIN).padEnd(4)} min  |  Poll: every ${String(POLL_SEC).padEnd(3)} s                    │`
+  );
+  console.log(
+    '│  Ctrl-C to stop early (prints summary on exit)                   │'
+  );
+  console.log(
+    '└──────────────────────────────────────────────────────────────────┘'
+  );
 
   const tracks = new Map<string, VehicleTrack>();
   let totalPolls = 0;
@@ -407,10 +497,15 @@ async function main(): Promise<void> {
       const data = await fetchLiveStatus();
       updateTracks(tracks, data);
       const elapsed = ((Date.now() - startTime) / 1000 / 60).toFixed(1);
-      printSnapshot(data, `Poll #${totalPolls} (${elapsed}/${DURATION_MIN} min, ${errors} errors)`);
+      printSnapshot(
+        data,
+        `Poll #${totalPolls} (${elapsed}/${DURATION_MIN} min, ${errors} errors)`
+      );
     } catch (e) {
       errors++;
-      console.error(`  [poll #${totalPolls}] fetch error: ${e instanceof Error ? e.message : e}`);
+      console.error(
+        `  [poll #${totalPolls}] fetch error: ${e instanceof Error ? e.message : e}`
+      );
     }
 
     const remaining = POLL_MS - (Date.now() - pollStart);
