@@ -13,7 +13,7 @@ import SubscriptionsController from './controllers/subscriptions.controller';
 
 const app = new App(
   [
-    new AuthController('/auth'),
+    AuthController.getInstance('/auth'),
     AccountController.getInstance('/account'),
     MapController.getInstance('/'),
     BusController.getInstance('/transit'),
