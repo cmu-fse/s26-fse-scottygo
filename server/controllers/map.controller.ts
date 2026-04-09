@@ -230,11 +230,21 @@ export default class MapController extends Controller {
 
   // Return Google Maps config to the client (API key, default center, zoom)
   public getMapConfig(req: Request, res: Response): void {
+    if (!GOOGLE_MAPS_KEY) {
+      const errorRes: responses.IAppError = {
+        type: 'ServerError',
+        name: 'GetRequestFailure',
+        message: 'Google Maps API key is not configured'
+      };
+      res.status(500).json(errorRes);
+      return;
+    }
+
     const successRes: responses.ISuccess = {
       name: 'ConfigFound',
       message: 'Google Maps configuration',
       payload: {
-        apiKey: GOOGLE_MAPS_KEY || '',
+        apiKey: GOOGLE_MAPS_KEY,
         lat: DEFAULT_MAP_CENTER.lat,
         lon: DEFAULT_MAP_CENTER.lon,
         defaultZoom: DEFAULT_MAP_ZOOM

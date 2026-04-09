@@ -68,8 +68,17 @@ function validateCredentials(
 }
 
 export default class AuthController extends Controller {
-  public constructor(path: string) {
+  private static instance: AuthController | null = null;
+
+  private constructor(path: string) {
     super(path);
+  }
+
+  public static getInstance(path: string): AuthController {
+    if (!AuthController.instance) {
+      AuthController.instance = new AuthController(path);
+    }
+    return AuthController.instance;
   }
 
   public initializeRoutes(): void {
