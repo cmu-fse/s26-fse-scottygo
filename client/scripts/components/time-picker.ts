@@ -178,7 +178,14 @@ export class TimePickerPanel extends HTMLElement implements ITimePickerElement {
   }
 
   private attachEvents(): void {
-    // Hour input
+    this.attachHourInputEvents();
+    this.attachMinuteInputEvents();
+    this.attachClockEvents();
+    this.attachPeriodEvents();
+    this.attachActionEvents();
+  }
+
+  private attachHourInputEvents(): void {
     const hourInput = this.querySelector('#hour-input') as HTMLInputElement;
     hourInput?.addEventListener('input', (e) => {
       e.stopPropagation();
@@ -193,8 +200,9 @@ export class TimePickerPanel extends HTMLElement implements ITimePickerElement {
     hourInput?.addEventListener('blur', (e) => {
       (e.target as HTMLInputElement).value = this.hour.toString();
     });
+  }
 
-    // Minute input
+  private attachMinuteInputEvents(): void {
     const minuteInput = this.querySelector('#minute-input') as HTMLInputElement;
     minuteInput?.addEventListener('input', (e) => {
       e.stopPropagation();
@@ -208,8 +216,9 @@ export class TimePickerPanel extends HTMLElement implements ITimePickerElement {
     minuteInput?.addEventListener('blur', (e) => {
       (e.target as HTMLInputElement).value = this.format(this.minute);
     });
+  }
 
-    // Hour selection from clock
+  private attachClockEvents(): void {
     this.querySelectorAll('.clock-number').forEach((el) => {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -219,8 +228,9 @@ export class TimePickerPanel extends HTMLElement implements ITimePickerElement {
         this.updateClock();
       });
     });
+  }
 
-    // AM/PM toggle
+  private attachPeriodEvents(): void {
     this.querySelectorAll('[data-period]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -230,14 +240,14 @@ export class TimePickerPanel extends HTMLElement implements ITimePickerElement {
         this.updatePeriod();
       });
     });
+  }
 
-    // Cancel button
+  private attachActionEvents(): void {
     this.querySelector('#time-cancel')?.addEventListener('click', (e) => {
       e.stopPropagation();
       this.hide();
     });
 
-    // OK button - dispatch timeSelected event
     this.querySelector('#time-ok')?.addEventListener('click', (e) => {
       e.stopPropagation();
       const timeSelection: ITimeSelection = {

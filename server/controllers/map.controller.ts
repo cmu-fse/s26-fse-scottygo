@@ -18,6 +18,10 @@ import type {
   ITransitSearchResult
 } from '../../common/transit.interface';
 
+// Default map center (CMU campus) and zoom level
+const DEFAULT_MAP_CENTER = { lat: 40.4433, lon: -79.9436 };
+const DEFAULT_MAP_ZOOM = 14;
+
 export default class MapController extends Controller {
   private static instance: MapController | null = null;
 
@@ -34,7 +38,7 @@ export default class MapController extends Controller {
 
   public initializeRoutes(): void {
     this.router.get('/', this.mapPage.bind(this));
-    this.router.get('/users/:username?', this.authorize, this.getUser);
+    this.router.get('/users/:username', this.authorize, this.getUser);
     this.router.get('/config', this.authorize, this.getMapConfig.bind(this));
 
     // Search endpoints (SearchInfo UC — R1 contextual search)
@@ -52,7 +56,7 @@ export default class MapController extends Controller {
   }
 
   // Check if the user is logged in by validating token
-  public async authorize(
+  private async authorize(
     req: Request,
     res: Response,
     next: NextFunction
@@ -68,7 +72,7 @@ export default class MapController extends Controller {
         message: 'Token is required'
       };
       res.status(401).json(errorRes);
-      return; // Stop execution
+      return;
     }
 
     // Verify and decode token with secretKey
@@ -91,25 +95,29 @@ export default class MapController extends Controller {
 
   // Get a User by username
   public async getUser(req: Request, res: Response) {
-    // ISuccess with
-    // payload: IUser
-    // name: ‘UserFound’
-    // IAppError with
-    // ClientErrorName = 'UserNotFound'
+    const username = req.params.username;
+    if (!username) {
+      const errorRes: responses.IAppError = {
+        type: 'ClientError',
+        name: 'MissingUsername',
+        message: 'Username is required'
+      };
+      return res.status(400).json(errorRes);
+    }
+
     try {
-      const user: IUser | null = await User.getUserForUsername(
-        req.params.username
-      );
-      // Obfuscate password before sending to client
-      const sanitizedUser = user
-        ? {
-            ...user,
-            credentials: {
-              username: user.credentials.username,
-              password: 'obfuscated'
-            }
-          }
-        : null;
+      const user: IUser | null = await User.getUserForUsername(username);
+
+      if (!user) {
+        const errorRes: responses.IAppError = {
+          type: 'ClientError',
+          name: 'UserNotFound',
+          message: `User '${username}' not found`
+        };
+        return res.status(404).json(errorRes);
+      }
+
+      const sanitizedUser = this.sanitizeUser(user);
       const successRes: responses.ISuccess = {
         name: 'UserFound',
         message: 'User retrieved successfully',
@@ -123,12 +131,10 @@ export default class MapController extends Controller {
         'type' in error &&
         'name' in error
       ) {
-        // Handle errors raised as IAppError by model/database
         const appError = error as responses.IAppError;
         const statusCode = appError.type === 'ClientError' ? 400 : 500;
         return res.status(statusCode).json(appError);
       }
-      // Handle error not raised as IAppError - create one to wrap unexpected error
       const unexpectedError: responses.IAppError = {
         type: 'ServerError',
         name: 'MongoDBError',
@@ -224,14 +230,24 @@ export default class MapController extends Controller {
 
   // Return Google Maps config to the client (API key, default center, zoom)
   public getMapConfig(req: Request, res: Response): void {
+    if (!GOOGLE_MAPS_KEY) {
+      const errorRes: responses.IAppError = {
+        type: 'ServerError',
+        name: 'GetRequestFailure',
+        message: 'Google Maps API key is not configured'
+      };
+      res.status(500).json(errorRes);
+      return;
+    }
+
     const successRes: responses.ISuccess = {
       name: 'ConfigFound',
       message: 'Google Maps configuration',
       payload: {
         apiKey: GOOGLE_MAPS_KEY,
-        lat: 40.4433, // CMU campus default
-        lon: -79.9436,
-        defaultZoom: 14
+        lat: DEFAULT_MAP_CENTER.lat,
+        lon: DEFAULT_MAP_CENTER.lon,
+        defaultZoom: DEFAULT_MAP_ZOOM
       }
     };
     res.status(200).json(successRes);

@@ -143,6 +143,7 @@ describe('LoginLogout Use Case unit tests', () => {
       message: 'Incorrect password'
     };
 
+    jest.spyOn(User, 'getUserAccount').mockResolvedValue(activeAccount);
     jest.spyOn(User, 'validateUser').mockRejectedValue(invalidCredsError);
 
     await authController.login(req, res as Response);

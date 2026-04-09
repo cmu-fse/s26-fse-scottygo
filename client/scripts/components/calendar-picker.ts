@@ -92,6 +92,21 @@ export class CalendarPickerPanel
       month: 'long'
     });
 
+    const daysHTML = this.buildDaysHTML(month, year);
+    this.innerHTML = this.buildPanelTemplate(monthName, year, daysHTML);
+
+    // Re-apply the visible class if panel is currently visible
+    if (this.isVisible) {
+      const panel = this.querySelector('.calendar-picker-panel') as HTMLElement;
+      if (panel) {
+        panel.classList.add('visible');
+      }
+    }
+
+    this.attachEvents();
+  }
+
+  private buildDaysHTML(month: number, year: number): string {
     const firstDay = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const daysInPrevMonth = new Date(year, month, 0).getDate();
@@ -118,11 +133,19 @@ export class CalendarPickerPanel
       `;
     }
 
+    return daysHTML;
+  }
+
+  private buildPanelTemplate(
+    monthName: string,
+    year: number,
+    daysHTML: string
+  ): string {
     // Preserve display and pointer-events styles if panel is currently visible
     const displayStyle = this.isVisible ? 'block' : 'none';
     const pointerEvents = this.isVisible ? 'auto' : 'none';
 
-    this.innerHTML = `
+    return `
       <div class="calendar-picker-panel panel" style="display: ${displayStyle}; pointer-events: ${pointerEvents};">
         <div class="cal-header">
           <button class="cal-nav-btn" id="cal-prev">
@@ -151,16 +174,6 @@ export class CalendarPickerPanel
         </div>
       </div>
     `;
-
-    // Re-apply the visible class if panel is currently visible
-    if (this.isVisible) {
-      const panel = this.querySelector('.calendar-picker-panel') as HTMLElement;
-      if (panel) {
-        panel.classList.add('visible');
-      }
-    }
-
-    this.attachEvents();
   }
 
   private attachEvents(): void {
