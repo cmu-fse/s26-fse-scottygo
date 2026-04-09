@@ -4,9 +4,5 @@
     "types": ["node"],
     "rootDir": "../"
   },
-  "include": [
-    "./**/*.ts",
-    "../server/**/*.ts",
-    "../common/**/*.ts"
-  ]
+  "include": ["./**/*.ts", "../server/**/*.ts", "../common/**/*.ts"]
 }
