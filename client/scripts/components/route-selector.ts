@@ -19,6 +19,7 @@ export interface IRouteSelectorElement extends HTMLElement {
   toggle(): void;
   isOpen(): boolean;
   setRoutes(routes: IRouteOption[]): void;
+  clearSelection(): void;
 }
 
 export class RouteSelectorPanel
@@ -121,6 +122,16 @@ export class RouteSelectorPanel
     this.filteredRoutes = [...routes];
     this.searchValue = '';
     this.render();
+  }
+
+  /**
+   * Clear the current route selection
+   */
+  clearSelection(): void {
+    this.selectedRoute = null;
+    this.querySelectorAll('.route-btn').forEach((b) => {
+      b.classList.remove('selected');
+    });
   }
 
   private render(): void {

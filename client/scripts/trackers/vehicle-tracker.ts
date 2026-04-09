@@ -37,6 +37,8 @@ export class VehicleTracker {
 
   private pollingInterval: number | null = null;
   private currentRouteId: string | null = null;
+  private multiRouteIds: string[] = [];
+  private multiRoutePollingInterval: number | null = null;
   private vehicleMarkers = new Map<string, IMapMarker>(); // vehicleId → marker
   private vehicleData = new Map<string, IVehicle>(); // vehicleId → vehicle data for icon rebuilds
   private hasShownStaticToast = false;
@@ -121,11 +123,78 @@ export class VehicleTracker {
       console.log('Stopped vehicle polling');
     }
 
+    this.stopMultiRoutePolling();
+
     // Clear all vehicle markers
     this.clearVehicles();
     this.currentRouteId = null;
     this.hasShownStaticToast = false;
     this.hasShownNoVehiclesToast = false;
+  }
+
+  /**
+   * Start polling vehicle positions for multiple routes simultaneously.
+   * Used during directions mode to show selected bus locations.
+   */
+  startMultiRoutePolling(routeIds: string[]): void {
+    if (!this.mapProvider || routeIds.length === 0) return;
+
+    this.stopMultiRoutePolling();
+    this.multiRouteIds = routeIds;
+
+    // Initial fetch
+    this.updateMultiRoutePositions();
+
+    // Poll every 30 seconds
+    this.multiRoutePollingInterval = window.setInterval(() => {
+      this.updateMultiRoutePositions();
+    }, 30000);
+
+    console.log(
+      `Started multi-route vehicle polling for routes: ${routeIds.join(', ')}`
+    );
+  }
+
+  /**
+   * Stop multi-route polling (called by stopPolling or independently).
+   */
+  private stopMultiRoutePolling(): void {
+    if (this.multiRoutePollingInterval !== null) {
+      clearInterval(this.multiRoutePollingInterval);
+      this.multiRoutePollingInterval = null;
+    }
+    this.multiRouteIds = [];
+  }
+
+  /**
+   * Fetch and render vehicle positions for all multi-route IDs.
+   */
+  private async updateMultiRoutePositions(): Promise<void> {
+    if (!this.mapProvider || this.multiRouteIds.length === 0) return;
+
+    const token = localStorage.getItem('token');
+
+    for (const routeId of this.multiRouteIds) {
+      try {
+        const response = await axios.get(`/transit/vehicles/${routeId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+          validateStatus: () => true
+        });
+
+        if (
+          response.status === 200 &&
+          response.data.name === 'VehiclesLocated'
+        ) {
+          const vehicles: IVehicle[] = response.data.payload || [];
+          this.renderVehicles(vehicles);
+        }
+      } catch (error) {
+        console.error(
+          `Error fetching vehicles for route ${routeId}:`,
+          error
+        );
+      }
+    }
   }
 
   /**

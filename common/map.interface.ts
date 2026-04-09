@@ -39,6 +39,7 @@ export interface IMapPolylineOptions {
   color?: string;
   weight?: number;
   opacity?: number;
+  zIndex?: number;
 }
 
 export interface IMapMarker {

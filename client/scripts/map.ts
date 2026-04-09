@@ -2,7 +2,7 @@ import axios, { AxiosResponse } from 'axios';
 import type { IUser, IUserAccount } from '../../common/user.interface';
 import type { IResponse } from '../../common/server.responses';
 import type { IMapProvider, IConfig } from '../../common/map.interface';
-import type { IStop } from '../../common/transit.interface';
+import type { IStop, IPrediction } from '../../common/transit.interface';
 import { GoogleMapProvider } from './maps/google-map.provider';
 
 // Import web components
@@ -318,12 +318,16 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
     directionsController.setToastCallback(showToast);
     directionsController.setInfoPanelCallback(updateDirectionsPanel);
     directionsController.setExitCallback(async () => {
-      // A4: Exit directions mode → return to TUC4 Step 2
+      // A4: Exit directions mode → restore previous map state
+      enableFilterControls();
       removeDirectionsPanel();
-      await filterController.initialize();
-      // Restore nearby-stops view (Step 2) instead of showing all routes
-      if (userLocation) {
-        await filterController.showNearbyStops(userLocation);
+
+      // If a route was selected before directions, re-apply that filter
+      const prevRoute = mapStateManager.getState().selectedRouteId;
+      if (prevRoute) {
+        await filterController.applyRouteFilter(prevRoute);
+      } else if (userLocation) {
+        await filterController.restoreDefaultState(userLocation);
       }
     });
 
@@ -512,6 +516,8 @@ const handlePanelToggle = (
   clickMessage: string,
   panelFoundMessage?: string
 ): void => {
+  // Block filter interactions while in directions mode
+  if (directionsController.isActive) return;
   console.log(clickMessage);
   const panels = getPanels();
   if (panelFoundMessage) {
@@ -578,6 +584,19 @@ const registerFilterPanelToggleEvents = (): void => {
       'Direction filter clicked',
       'Direction panel found:'
     );
+  });
+
+  document.addEventListener('clearFilters', async () => {
+    console.log('Clear all filters clicked');
+    closeAllPanels();
+    // Clear route selector visual state
+    const routeSelector = document.querySelector(
+      'route-selector-panel'
+    ) as IRouteSelectorElement;
+    if (routeSelector) routeSelector.clearSelection();
+    if (userLocation) {
+      await filterController.restoreDefaultState(userLocation);
+    }
   });
 };
 
@@ -795,9 +814,10 @@ const registerRouteSelectionEvents = (): void => {
     const route = customEvent.detail.route;
     if (!route) {
       console.log('Route deselected, returning to nearby stops view');
-      await filterController.clearRouteFilter();
       if (userLocation) {
-        await filterController.showNearbyStops(userLocation);
+        await filterController.restoreDefaultState(userLocation);
+      } else {
+        await filterController.clearRouteFilter();
       }
       return;
     }
@@ -954,19 +974,72 @@ function showToast(message: string): void {
 }
 
 // ── Directions Info Panel (TUC4 Step 6) ──────────────────────────────
+let directionsBusTickerInterval: number | null = null;
+
+function stopDirectionsBusTicker(): void {
+  if (directionsBusTickerInterval !== null) {
+    clearInterval(directionsBusTickerInterval);
+    directionsBusTickerInterval = null;
+  }
+}
+
+function startDirectionsBusTicker(): void {
+  stopDirectionsBusTicker();
+  directionsBusTickerInterval = window.setInterval(() => {
+    const panel = document.getElementById('directions-panel');
+    if (!panel) { stopDirectionsBusTicker(); return; }
+    panel.querySelectorAll<HTMLElement>('.directions-panel__bus').forEach((li) => {
+      const arrival = Number(li.dataset.arrival);
+      if (!arrival) return;
+      const secsLeft = Math.round((arrival - Date.now()) / 1000);
+      const timeEl = li.querySelector('.directions-panel__bus-time');
+      if (timeEl) timeEl.textContent = secsLeft <= 0 ? 'NOW' : secsLeft < 60 ? `${secsLeft}s` : `${Math.ceil(secsLeft / 60)} min`;
+    });
+  }, 1000);
+}
+
 function updateDirectionsPanel(
-  info: { durationMin: number; eta: string } | null
+  info: { durationMin: number; eta: string; predictions: IPrediction[] } | null
 ): void {
   // Remove existing panel
   removeDirectionsPanel();
 
-  if (!info) return;
+  if (!info) {
+    enableFilterControls();
+    return;
+  }
+
+  // Disable side filters while viewing walking directions
+  disableFilterControls();
 
   const panel = document.createElement('div');
   panel.id = 'directions-panel';
   panel.className = 'directions-panel';
 
   const stopName = directionsController.targetStop?.stopName ?? 'Selected Stop';
+
+  let predictionsHTML = '';
+  if (info.predictions.length > 0) {
+    const routes = mapStateManager.getState().availableRoutes;
+    const items = info.predictions
+      .map((p) => {
+        const secsLeft = Math.round((p.predictedArrivalTime - Date.now()) / 1000);
+        const minText = secsLeft <= 0 ? 'NOW' : secsLeft < 60 ? `${secsLeft}s` : `${Math.ceil(secsLeft / 60)} min`;
+        const color = routes.find((r) => r.id === p.routeId)?.color || '#c41230';
+        return `<li class="directions-panel__bus" data-arrival="${p.predictedArrivalTime}">
+          <span class="directions-panel__bus-badge" style="background:${color}">${p.routeId}</span>
+          <span class="directions-panel__bus-time">${minText}</span>
+          ${p.vid ? `<span class="directions-panel__bus-vid">Bus ${p.vid}</span>` : ''}
+        </li>`;
+      })
+      .join('');
+    predictionsHTML = `
+      <div class="directions-panel__buses">
+        <span class="directions-panel__buses-label">Selected buses arriving:</span>
+        <ul class="directions-panel__bus-list">${items}</ul>
+      </div>
+    `;
+  }
 
   panel.innerHTML = `
     <div class="directions-panel__header">
@@ -978,10 +1051,14 @@ function updateDirectionsPanel(
       <span class="directions-panel__duration">${info.durationMin} min walk</span>
       <span class="directions-panel__eta">ETA ${info.eta}</span>
     </div>
+    ${predictionsHTML}
   `;
 
   const container = document.querySelector('.map-container');
   if (container) container.appendChild(panel);
+
+  // Start countdown ticker for bus arrival times
+  if (info.predictions.length > 0) startDirectionsBusTicker();
 
   // Close button: exit directions mode (A4)
   const closeBtn = panel.querySelector('.directions-panel__close');
@@ -993,8 +1070,33 @@ function updateDirectionsPanel(
 }
 
 function removeDirectionsPanel(): void {
+  stopDirectionsBusTicker();
   const existing = document.getElementById('directions-panel');
   if (existing) existing.remove();
+}
+
+/** Disable all side filter controls while in directions mode. */
+function disableFilterControls(): void {
+  closeAllPanels();
+  const controls = document.querySelector('map-controls');
+  if (controls) controls.classList.add('directions-active');
+  // Also disable toggle/filter panels from opening
+  const panels = getPanels();
+  for (const key of panelOrder) {
+    const el = panels[key] as HTMLElement | null;
+    if (el) el.classList.add('directions-active');
+  }
+}
+
+/** Re-enable side filter controls after exiting directions mode. */
+function enableFilterControls(): void {
+  const controls = document.querySelector('map-controls');
+  if (controls) controls.classList.remove('directions-active');
+  const panels = getPanels();
+  for (const key of panelOrder) {
+    const el = panels[key] as HTMLElement | null;
+    if (el) el.classList.remove('directions-active');
+  }
 }
 
 // Check if coordinates are within Pittsburgh area (Rule R5)
