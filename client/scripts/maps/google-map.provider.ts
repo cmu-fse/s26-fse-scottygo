@@ -164,6 +164,7 @@ export class GoogleMapProvider implements IMapProvider {
       strokeColor: options.color ?? '#0000FF',
       strokeWeight: options.weight ?? 3,
       strokeOpacity: options.opacity ?? 1.0,
+      zIndex: options.zIndex,
       map: this.map
     });
     this.polylines.set(id, polyline);
@@ -171,6 +172,15 @@ export class GoogleMapProvider implements IMapProvider {
     return {
       id,
       setVisible: (visible: boolean) => polyline.setVisible(visible),
+      onClick: (callback: (position: ILatLng) => void) => {
+        google.maps.event.addListener(
+          polyline,
+          'click',
+          (e: google.maps.PolyMouseEvent) => {
+            if (e.latLng) callback({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+          }
+        );
+      },
       remove: () => {
         polyline.setMap(null);
         this.polylines.delete(id);

@@ -25,6 +25,9 @@ export class MapControls extends HTMLElement {
         <button class="circle-btn primary" id="direction-filter-btn" title="Direction Filter">
           <span class="material-icons-outlined">sync_alt</span>
         </button>
+        <button class="circle-btn" id="clear-filters-btn" title="Clear All Filters">
+          <span class="material-icons-outlined">clear_all</span>
+        </button>
       </div>
     `;
 
@@ -53,6 +56,11 @@ export class MapControls extends HTMLElement {
 
     directionBtn?.addEventListener('click', () => {
       this.dispatchEvent(new CustomEvent('filterDirection', { bubbles: true }));
+    });
+
+    const clearBtn = this.querySelector('#clear-filters-btn');
+    clearBtn?.addEventListener('click', () => {
+      this.dispatchEvent(new CustomEvent('clearFilters', { bubbles: true }));
     });
   }
 }
