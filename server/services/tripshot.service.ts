@@ -115,6 +115,10 @@ class TripshotService {
    * Failures are logged but never thrown — warming is best-effort.
    */
   async warmPatternCache(): Promise<void> {
+    if (process.env.NODE_ENV === 'test') {
+      return;
+    }
+
     const routeIds = Object.keys(CMU_ROUTE_METADATA).map((k) => `CMU-${k}`);
     console.log(
       `[Tripshot ${new Date().toISOString()}] Pre-warming pattern cache for ${routeIds.length} routes`
