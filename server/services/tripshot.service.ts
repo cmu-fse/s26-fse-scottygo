@@ -5,7 +5,8 @@ import {
   IRoute,
   IPattern,
   IStop,
-  IVehicle
+  IVehicle,
+  IPrediction
 } from '../../common/transit.interface';
 import { IAppError } from '../../common/server.responses';
 import {
@@ -17,10 +18,23 @@ import {
   TRIPSHOT_BASE_URL,
   TripshotRouteResponse,
   decodePolyline,
-  fetchWithTimeout
+  fetchWithTimeout,
+  isTsViaStop
 } from './tripshot-api';
+import tripshotLiveStatusService from './tripshot-livestatus.service';
+
+/** How long a cached pattern set is considered fresh (24 hours). */
+const PATTERN_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+interface CachedPatterns {
+  patterns: IPattern[];
+  cachedAt: number;
+}
 
 class TripshotService {
+  /** Server-side in-memory cache: routeId → patterns + timestamp. */
+  private patternCache = new Map<string, CachedPatterns>();
+
   /**
    * Get all CMU Shuttle routes
    */
@@ -43,19 +57,27 @@ class TripshotService {
   }
 
   /**
-   * Fetch route geometry (patterns) from Tripshot API
+   * Fetch route geometry (patterns) from Tripshot API.
+   * Results are cached in memory for 24 hours so repeated selections of the
+   * same route are served instantly without a TripShot network call.
    * @param routeId - Format: "CMU-{index}" (e.g., "CMU-1" for A Route)
    */
   async getPatterns(routeId: string): Promise<IPattern[]> {
     const { metadata } = extractRouteIndex(routeId);
     const tripshotRouteId = metadata.routeId;
 
+    // Return from cache if still fresh
+    const cached = this.patternCache.get(routeId);
+    if (cached && Date.now() - cached.cachedAt < PATTERN_CACHE_TTL_MS) {
+      console.log(
+        `[Tripshot ${new Date().toISOString()}] Patterns for ${routeId} served from cache`
+      );
+      return cached.patterns;
+    }
+
     try {
-      // Get current date for the API call (format: YYYY-MM-DD)
       const today = new Date();
       const dateStr = today.toISOString().split('T')[0];
-
-      // Fetch route data from Tripshot API
       const url = `${TRIPSHOT_BASE_URL}/routeSummary/${tripshotRouteId}?day=${dateStr}&withNavigation=true&embedStops=true`;
 
       const response = await fetchWithTimeout(url);
@@ -65,16 +87,17 @@ class TripshotService {
       }
 
       const data: TripshotRouteResponse = await response.json();
+      const patterns = this.processTripshotResponse(data);
 
-      // Process the response to extract route geometry
-      return this.processTripshotResponse(data);
+      // Store in cache (even empty results, to avoid hammering a failing route)
+      this.patternCache.set(routeId, { patterns, cachedAt: Date.now() });
+      return patterns;
     } catch (error) {
       console.error(
         `[Tripshot ${new Date().toISOString()}] Failed to fetch patterns for ${routeId}:`,
         error
       );
 
-      // Return empty array if API fails (client will show error)
       const appError: IAppError = {
         type: 'ServerError',
         name: 'UpstreamError',
@@ -82,6 +105,35 @@ class TripshotService {
       };
       throw appError;
     }
+  }
+
+  /**
+   * Pre-warm the pattern cache for all known CMU routes in the background.
+   * Called once after the liveStatus service completes its first poll so that
+   * patterns are ready before a user selects a CMU route.
+   * Failures are logged but never thrown — warming is best-effort.
+   */
+  async warmPatternCache(): Promise<void> {
+    const routeIds = Object.keys(CMU_ROUTE_METADATA).map((k) => `CMU-${k}`);
+    console.log(
+      `[Tripshot ${new Date().toISOString()}] Pre-warming pattern cache for ${routeIds.length} routes`
+    );
+    for (const routeId of routeIds) {
+      // Skip routes already cached
+      const cached = this.patternCache.get(routeId);
+      if (cached && Date.now() - cached.cachedAt < PATTERN_CACHE_TTL_MS) {
+        continue;
+      }
+      try {
+        await this.getPatterns(routeId);
+      } catch {
+        // Non-fatal — route may not be running today
+      }
+    }
+    console.log(
+      `[Tripshot ${new Date().toISOString()}] Pattern cache warm-up complete ` +
+        `(${this.patternCache.size} routes cached)`
+    );
   }
 
   /**
@@ -130,8 +182,22 @@ class TripshotService {
 
     const tripshotRouteId = metadata.routeId;
 
+    // Primary: liveStatus cache (in-memory, no network call).
+    // This covers routes that are currently active but may not have rides
+    // in today's routeSummary response (e.g. routes that started later).
+    const liveStops = tripshotLiveStatusService.getStopsByTsRouteId(
+      tripshotRouteId,
+      routeId
+    );
+    if (liveStops.length > 0) {
+      console.log(
+        `[Tripshot ${new Date().toISOString()}] Stops for ${routeId} served from liveStatus cache`
+      );
+      return liveStops;
+    }
+
+    // Fallback: routeSummary API (needed when the route isn't currently active)
     try {
-      // Get current date for the API call (format: YYYY-MM-DD)
       const today = new Date();
       const dateStr = today.toISOString().split('T')[0];
 
@@ -145,7 +211,6 @@ class TripshotService {
 
       const data: TripshotRouteResponse = await response.json();
 
-      // Extract stops from vias
       if (!data.rides || data.rides.length === 0) {
         return [];
       }
@@ -154,6 +219,8 @@ class TripshotService {
       const stops: IStop[] = [];
 
       for (const via of ride.vias) {
+        // Skip waypoints — only ViaStop entries carry stop coordinates
+        if (!isTsViaStop(via)) continue;
         const stop = via.ViaStop.stop;
         stops.push({
           stopId: stop.stopId,
@@ -183,16 +250,27 @@ class TripshotService {
   }
 
   /**
-   * Get real-time vehicle positions
-   * Note: Tripshot API may or may not support real-time vehicle tracking
-   * This is a placeholder that would need actual API endpoint configuration
+   * Get real-time vehicle positions for a CMU shuttle route.
+   * Data is sourced from the liveStatus poller (updated every 30 s).
+   * @param routeId - Format: "CMU-{index}" (e.g., "CMU-1")
    */
   async getVehicles(routeId: string): Promise<IVehicle[]> {
-    // TODO: Implement when Tripshot vehicle tracking API is available
-    console.warn(
-      `[Tripshot ${new Date().toISOString()}] Real-time vehicle tracking not yet implemented for ${routeId}`
+    const { metadata } = extractRouteIndex(routeId);
+    const vehicles = tripshotLiveStatusService.getVehiclesByTsRouteId(
+      metadata.routeId
     );
-    return [];
+    // Rewrite internal TripShot UUID to our CMU-n route ID so the client
+    // receives a consistent routeId regardless of data source.
+    return vehicles.map((v) => ({ ...v, routeId }));
+  }
+
+  /**
+   * Get ETA predictions for a TripShot stop UUID.
+   * Data is sourced from the liveStatus poller (updated every 30 s).
+   * @param stopId - TripShot stop UUID
+   */
+  getPredictions(stopId: string): IPrediction[] {
+    return tripshotLiveStatusService.getPredictions(stopId);
   }
 
   /**

@@ -5,6 +5,7 @@ import { Request, Response } from 'express';
 import Controller from './controller';
 import DAC, { IMemorySampleRecord } from '../db/dac';
 import tripshotService from '../services/tripshot.service';
+import tripshotLiveStatusService from '../services/tripshot-livestatus.service';
 import vehiclePositionsService from '../services/vehicle-positions.service';
 import tripUpdatesService from '../services/trip-updates.service';
 import memoryMonitorService from '../services/memory-monitor.service';
@@ -98,6 +99,7 @@ export default class BusController extends Controller {
   private getHealth(_req: Request, res: Response): void {
     const vehiclesHealthy = vehiclePositionsService.isHealthy();
     const tripsHealthy = tripUpdatesService.isHealthy();
+    const tripshotHealthy = tripshotLiveStatusService.isHealthy();
     const colorsAvailable = TransitModel.colorsAvailable;
 
     const status = {
@@ -117,6 +119,14 @@ export default class BusController extends Controller {
       },
       trueTimeColors: {
         available: colorsAvailable
+      },
+      tripshotLiveStatus: {
+        healthy: tripshotHealthy,
+        lastFetched:
+          tripshotLiveStatusService.getLastFetched()?.toISOString() ?? null,
+        consecutiveFailures:
+          tripshotLiveStatusService.getConsecutiveFailures(),
+        error: tripshotLiveStatusService.getLastError()
       },
       overall: vehiclesHealthy && tripsHealthy
     };
@@ -1223,7 +1233,14 @@ export default class BusController extends Controller {
   private getPredictions(req: Request, res: Response): void {
     const { stopId } = req.params;
     try {
-      const predictions = tripUpdatesService.getPredictions(stopId);
+      // TripShot stop IDs are UUIDs; PRT/GTFS stop IDs are numeric strings.
+      // Route UUID-shaped stop IDs to the TripShot liveStatus predictions cache.
+      const UUID_REGEX =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const predictions = UUID_REGEX.test(stopId)
+        ? tripshotService.getPredictions(stopId)
+        : tripUpdatesService.getPredictions(stopId);
+
       const successRes: responses.ISuccess = {
         name: 'PredictionsRetrieved',
         message: `Found ${predictions.length} predictions for stop ${stopId}`,

@@ -327,18 +327,25 @@ export class FilterController {
       await this.applyRouteFilter(updatedState.selectedRouteId);
     }
 
+    // Re-render nearby stops filtered to the newly enabled systems (TUC4).
+    // Use userLocation (not nearbyStopsActive) because showNearbyStops sets the flag
+    // to false when it returns empty (e.g. CMU-only mode before CMU stops load),
+    // which would prevent subsequent toggles from re-fetching.
+    if (this.userLocation && !updatedState.selectedRouteId) {
+      await this.showNearbyStops(this.userLocation);
+    }
+
     this.urlSync.updateURL(updatedState);
   }
 
   /**
    * Prefetch routes for newly enabled systems.
-   * Uses bulk endpoint to also cache patterns and stops for new routes.
+   * Always uses the /transit/routes endpoint so that CMU routes (which are
+   * absent from the bulk/GTFS payload) are included alongside PRT routes.
    */
   private async prefetchRoutes(): Promise<void> {
     try {
-      const routes = this.bulkLoaded
-        ? await this.fetchBulkData()
-        : await this.fetchAllRoutes();
+      const routes = await this.fetchAllRoutes();
       routes.forEach((r) => this.routeColorCache.set(r.id, r.color));
       this.stateManager.setAvailableRoutes(routes);
 
@@ -718,8 +725,10 @@ export class FilterController {
       return this.patternCache.get(routeId) as unknown as RouteData;
     }
 
-    // Bulk data was loaded but this route has no patterns — no geometry available
-    if (this.bulkLoaded) {
+    // PRT routes not found in the bulk payload genuinely have no geometry.
+    // CMU routes are never in the bulk payload (lazy-loaded), so always fall
+    // through to the per-route API call for them.
+    if (this.bulkLoaded && !routeId.startsWith('CMU-')) {
       console.debug(`Route ${routeId} has no geometry in bulk data — skipping`);
       return null;
     }
@@ -1276,10 +1285,26 @@ export class FilterController {
     const state = this.stateManager.getState();
     if (state.selectedRouteId) return;
 
+    // Clear stale markers before (re-)rendering so system-filter changes don't stack
+    if (this.nearbyStopsActive) {
+      for (const routeId of this.nearbyRouteIds) {
+        this.routeRenderer.clearStopMarkers(`${routeId}_NEARBY`);
+      }
+      this.routeRenderer.clearStopMarkers('NEARBY_NEARBY');
+      this.nearbyStopsActive = false;
+      this.nearbyRouteIds.clear();
+    }
+
+    // Derive system filter from the active toggles
+    const { prt, cmu } = state.selectedSystems;
+    const system: string | undefined =
+      prt && cmu ? undefined : prt ? 'PRT' : cmu ? 'CMU' : undefined;
+
     try {
       const nearbyData = await this.fetchNearbyStops(
         position.lat,
-        position.lng
+        position.lng,
+        system
       );
       if (!nearbyData || nearbyData.stops.length === 0) return;
 
@@ -1404,13 +1429,16 @@ export class FilterController {
    */
   private async fetchNearbyStops(
     lat: number,
-    lon: number
+    lon: number,
+    system?: string
   ): Promise<INearbyStopsPayload | null> {
     try {
+      const params: Record<string, string | number> = { lat, lon };
+      if (system) params.system = system;
       const response: AxiosResponse = await axios.get(
         '/transit/stops/nearbystops',
         {
-          params: { lat, lon },
+          params,
           headers: { Authorization: `Bearer ${this.token}` },
           validateStatus: () => true
         }
