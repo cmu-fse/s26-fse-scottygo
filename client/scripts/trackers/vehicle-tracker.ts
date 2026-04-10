@@ -37,6 +37,9 @@ export class VehicleTracker {
 
   private pollingInterval: number | null = null;
   private currentRouteId: string | null = null;
+  private currentRouteColor = '#4285F4';
+  private multiRouteIds: string[] = [];
+  private multiRoutePollingInterval: number | null = null;
   private vehicleMarkers = new Map<string, IMapMarker>(); // vehicleId → marker
   private vehicleData = new Map<string, IVehicle>(); // vehicleId → vehicle data for icon rebuilds
   private hasShownStaticToast = false;
@@ -85,9 +88,11 @@ export class VehicleTracker {
   }
 
   /**
-   * Start polling for vehicle positions on a specific route
+   * Start polling for vehicle positions on a specific route.
+   * @param routeColor Hex color of the route used to tint the bus icon.
    */
-  startPolling(routeId: string): void {
+  startPolling(routeId: string, routeColor = '#4285F4'): void {
+    this.currentRouteColor = routeColor;
     if (!this.mapProvider) {
       console.error('Map provider not initialized');
       return;
@@ -121,11 +126,78 @@ export class VehicleTracker {
       console.log('Stopped vehicle polling');
     }
 
+    this.stopMultiRoutePolling();
+
     // Clear all vehicle markers
     this.clearVehicles();
     this.currentRouteId = null;
     this.hasShownStaticToast = false;
     this.hasShownNoVehiclesToast = false;
+  }
+
+  /**
+   * Start polling vehicle positions for multiple routes simultaneously.
+   * Used during directions mode to show selected bus locations.
+   */
+  startMultiRoutePolling(routeIds: string[]): void {
+    if (!this.mapProvider || routeIds.length === 0) return;
+
+    this.stopMultiRoutePolling();
+    this.multiRouteIds = routeIds;
+
+    // Initial fetch
+    this.updateMultiRoutePositions();
+
+    // Poll every 30 seconds
+    this.multiRoutePollingInterval = window.setInterval(() => {
+      this.updateMultiRoutePositions();
+    }, 30000);
+
+    console.log(
+      `Started multi-route vehicle polling for routes: ${routeIds.join(', ')}`
+    );
+  }
+
+  /**
+   * Stop multi-route polling (called by stopPolling or independently).
+   */
+  private stopMultiRoutePolling(): void {
+    if (this.multiRoutePollingInterval !== null) {
+      clearInterval(this.multiRoutePollingInterval);
+      this.multiRoutePollingInterval = null;
+    }
+    this.multiRouteIds = [];
+  }
+
+  /**
+   * Fetch and render vehicle positions for all multi-route IDs.
+   */
+  private async updateMultiRoutePositions(): Promise<void> {
+    if (!this.mapProvider || this.multiRouteIds.length === 0) return;
+
+    const token = localStorage.getItem('token');
+
+    for (const routeId of this.multiRouteIds) {
+      try {
+        const response = await axios.get(`/transit/vehicles/${routeId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+          validateStatus: () => true
+        });
+
+        if (
+          response.status === 200 &&
+          response.data.name === 'VehiclesLocated'
+        ) {
+          const vehicles: IVehicle[] = response.data.payload || [];
+          this.renderVehicles(vehicles);
+        }
+      } catch (error) {
+        console.error(
+          `Error fetching vehicles for route ${routeId}:`,
+          error
+        );
+      }
+    }
   }
 
   /**
@@ -280,62 +352,86 @@ export class VehicleTracker {
   }
 
   /**
-   * Create bus icon with heading rotation and directional triangle.
-   * Returns icon data with proper anchor so bus center sits on the route.
+   * Create a bus icon tinted with the route color.
+   *
+   * Design notes:
+   * - The bus is drawn as a side-view facing RIGHT (+x = East) at origin.
+   * - For eastward headings (0–179°) the group is simply rotated.
+   * - For westward headings (180–359°) the bus is mirrored horizontally
+   *   (scale -1 on x) and then rotated by a corrected angle so the front
+   *   still faces the direction of travel without the icon appearing
+   *   upside-down (which a plain 180° rotation would cause).
+   * - The 40×40 viewBox gives enough clearance at every rotation angle so
+   *   no part of the icon is clipped by the bounding box.
    */
   private createBusIcon(vehicle: IVehicle): {
     url: string;
     anchor: { x: number; y: number };
     size: { width: number; height: number };
   } {
-    const color = vehicle.isDetoured ? '#FFA500' : '#FFB84D';
+    // Detoured buses keep an amber override so they stand out on the map.
+    const color = vehicle.isDetoured ? '#FFA500' : this.currentRouteColor;
     const scale = Math.max(
       0.5,
       Math.min(2.5, (this.currentZoom - 10) * 0.3 + 1)
     );
-    const heading = vehicle.heading || 0;
 
-    // ViewBox dimensions — bus centered with triangle attached below
-    const vbW = 40;
-    const vbH = 32;
-    const cx = vbW / 2; // center x
-    const cy = 12; // bus vertical center (where route coordinate should anchor)
+    // Normalise heading to [0, 360).
+    const heading = ((vehicle.heading ?? 0) % 360 + 360) % 360;
 
-    const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="${Math.round(vbW * scale)}" height="${Math.round(vbH * scale)}" viewBox="0 0 ${vbW} ${vbH}">
-        <g transform="rotate(${heading - 90}, ${cx}, ${cy})">
-          <!-- Bus body -->
-          <rect x="${cx - 13}" y="${cy - 6}" width="26" height="12" rx="2" fill="${color}" stroke="#333" stroke-width="1"/>
-          <!-- Windshield -->
-          <rect x="${cx - 11}" y="${cy - 4}" width="6" height="6" rx="1" fill="#B3D9FF" stroke="#333" stroke-width="0.5"/>
-          <!-- Windows -->
-          <rect x="${cx - 4}" y="${cy - 4}" width="4" height="6" rx="0.5" fill="#B3D9FF" stroke="#333" stroke-width="0.5"/>
-          <rect x="${cx + 1}" y="${cy - 4}" width="4" height="6" rx="0.5" fill="#B3D9FF" stroke="#333" stroke-width="0.5"/>
-          <rect x="${cx + 6}" y="${cy - 4}" width="4" height="6" rx="0.5" fill="#B3D9FF" stroke="#333" stroke-width="0.5"/>
-          <!-- Black stripe -->
-          <rect x="${cx - 11}" y="${cy + 3}" width="22" height="1.5" fill="#333"/>
-          <!-- Wheels -->
-          <circle cx="${cx - 7}" cy="${cy + 6}" r="2.5" fill="#333" stroke="#666" stroke-width="0.5"/>
-          <circle cx="${cx - 7}" cy="${cy + 6}" r="1.2" fill="#E85D4E"/>
-          <circle cx="${cx + 7}" cy="${cy + 6}" r="2.5" fill="#333" stroke="#666" stroke-width="0.5"/>
-          <circle cx="${cx + 7}" cy="${cy + 6}" r="1.2" fill="#E85D4E"/>
-          <!-- Headlight -->
-          <circle cx="${cx - 13}" cy="${cy - 1}" r="1" fill="#333"/>
-          <!-- Side mirror -->
-          <rect x="${cx - 15}" y="${cy - 3}" width="2" height="1.5" rx="0.5" fill="#333"/>
-          <!-- Blue directional triangle (front of bus) -->
-          <polygon points="${cx + 15},${cy} ${cx + 11},${cy - 4} ${cx + 11},${cy + 4}" fill="#4285F4" stroke="#3367D6" stroke-width="0.5"/>
-        </g>
-      </svg>
-    `;
+    // Westward headings (180–359°): mirror the bus so the front stays
+    // visually "correct" (windows above chassis, headlight at nose).
+    // Eastward headings (0–179°): standard rotation only.
+    const flip = heading >= 180;
 
-    const pixelW = Math.round(vbW * scale);
-    const pixelH = Math.round(vbH * scale);
+    // Rotation angle that makes the bus front point toward `heading`.
+    //
+    // Without flip: front is +x; rotate(heading-90) maps +x → compass heading.
+    // With flip:    after scale(-1,1) the effective front is -x;
+    //              rotate(-(heading+90)) then maps -x → compass heading.
+    const rotDeg = flip ? -(heading + 90) : heading - 90;
+
+    // 40×40 viewBox; bus max radius from centre ≈ 15 px → well inside 20 px margin.
+    const vbSize = 40;
+    const cx = vbSize / 2; // 20
+    const cy = vbSize / 2; // 20
+    const sz = Math.round(vbSize * scale);
+
+    // Build the SVG transform that centres the bus and applies mirror + rotation.
+    // Transform order (SVG applies left → right on the coordinate system):
+    //   translate  → move origin to the icon centre on screen
+    //   scale      → optional horizontal mirror for westward headings
+    //   rotate     → point the bus nose toward the heading
+    const groupTransform = flip
+      ? `translate(${cx},${cy}) scale(-1,1) rotate(${rotDeg})`
+      : `translate(${cx},${cy}) rotate(${rotDeg})`;
+
+    const svg =
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${sz}" height="${sz}" viewBox="0 0 ${vbSize} ${vbSize}">` +
+      `<g transform="${groupTransform}">` +
+        // Bus body — main fill is the route colour
+        `<rect x="-12" y="-5" width="24" height="10" rx="2" fill="${color}" stroke="rgba(0,0,0,0.35)" stroke-width="0.6"/>` +
+        // Front accent panel (covers the right side to mark the nose)
+        `<rect x="9" y="-5" width="3" height="10" fill="rgba(0,0,0,0.18)"/>` +
+        // Windshield (front pane, right side of body)
+        `<rect x="4.5" y="-3.5" width="5" height="7" rx="1" fill="rgba(210,235,255,0.9)" stroke="rgba(0,0,0,0.25)" stroke-width="0.4"/>` +
+        // Passenger side window 1
+        `<rect x="-1.5" y="-3.5" width="3.5" height="5" rx="0.5" fill="rgba(210,235,255,0.75)" stroke="rgba(0,0,0,0.2)" stroke-width="0.3"/>` +
+        // Passenger side window 2
+        `<rect x="-7" y="-3.5" width="3.5" height="5" rx="0.5" fill="rgba(210,235,255,0.75)" stroke="rgba(0,0,0,0.2)" stroke-width="0.3"/>` +
+        // Headlight at nose
+        `<circle cx="12" cy="0" r="1.3" fill="rgba(255,255,200,0.95)"/>` +
+        // Front wheel
+        `<rect x="5" y="4.5" width="4.5" height="2.5" rx="0.8" fill="rgba(30,30,30,0.85)"/>` +
+        // Rear wheel
+        `<rect x="-9.5" y="4.5" width="4.5" height="2.5" rx="0.8" fill="rgba(30,30,30,0.85)"/>` +
+      `</g>` +
+      `</svg>`;
 
     return {
-      url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg.trim()),
+      url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
       anchor: { x: Math.round(cx * scale), y: Math.round(cy * scale) },
-      size: { width: pixelW, height: pixelH }
+      size: { width: sz, height: sz }
     };
   }
 

@@ -17,7 +17,8 @@ import {
   ITransitCache,
   IBulkTransitData,
   INearbyStop,
-  INearbyStopsPayload
+  INearbyStopsPayload,
+  INearbyStopsFilters
 } from '../../common/transit.interface';
 
 /** How long a cache entry is considered fresh (24 hours in ms). */
@@ -445,14 +446,7 @@ export class TransitModel {
     lat: number,
     lon: number,
     radiusMeters: number = DEFAULT_NEARBY_RADIUS_M,
-    filters?: {
-      routeId?: string;
-      system?: string;
-      direction?: string;
-      date?: string;
-      time?: string;
-      includeRoutes?: boolean;
-    }
+    filters?: INearbyStopsFilters
   ): Promise<INearbyStopsPayload> {
     // 1. Collect candidate routes
     let routes = await TransitModel.getRoutes();
