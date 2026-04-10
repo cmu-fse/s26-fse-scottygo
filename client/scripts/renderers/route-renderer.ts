@@ -6,7 +6,8 @@
 import type {
   IMapProvider,
   IMapPolyline,
-  IMapMarker
+  IMapMarker,
+  ILatLng
 } from '../../../common/map.interface';
 import type { IRoute, IStop, IDetour } from '../../../common/transit.interface';
 
@@ -47,6 +48,14 @@ export class RouteRenderer {
   private detourPolylines = new Map<string, IMapPolyline[]>(); // routeId_direction → detour overlays
   private stopMarkers = new Map<string, IMapMarker[]>(); // routeId_direction → markers
   private routeColors = new Map<string, string>(); // routeId → color
+  /** Reverse lookup: polyline.id → routeId */
+  private polylineRouteMap = new Map<string, string>();
+  /** Path segments per route for overlap detection: routeId → array of polyline paths */
+  private routePaths = new Map<string, ILatLng[][]>();
+  /** Callback invoked when a polyline on the map is clicked */
+  private onRouteClickCallback:
+    | ((routeIds: string[], position: ILatLng) => void)
+    | null = null;
 
   private constructor() {}
 
@@ -55,6 +64,65 @@ export class RouteRenderer {
       RouteRenderer.instance = new RouteRenderer();
     }
     return RouteRenderer.instance;
+  }
+
+  /** Register a callback for polyline clicks. */
+  setRouteClickCallback(
+    cb: (routeIds: string[], position: ILatLng) => void
+  ): void {
+    this.onRouteClickCallback = cb;
+  }
+
+  /** Return route color or fallback. */
+  getRouteColor(routeId: string): string {
+    return this.routeColors.get(routeId) || '#c41230';
+  }
+
+  /**
+   * Find all rendered route IDs whose polyline paths pass near the given
+   * position. Checks actual stored path coordinates against a proximity
+   * threshold (~30 m at Pittsburgh latitude).
+   */
+  getRoutesAtPosition(position: ILatLng): string[] {
+    const THRESHOLD = 0.0003; // ~30 m
+    const hitRoutes: string[] = [];
+
+    for (const [routeId, paths] of this.routePaths) {
+      let found = false;
+      for (const path of paths) {
+        for (const pt of path) {
+          if (
+            Math.abs(pt.lat - position.lat) < THRESHOLD &&
+            Math.abs(pt.lng - position.lng) < THRESHOLD
+          ) {
+            found = true;
+            break;
+          }
+        }
+        if (found) break;
+      }
+      if (found) hitRoutes.push(routeId);
+    }
+
+    return hitRoutes;
+  }
+
+  /** Attach a click listener to a polyline and register it in the reverse map. */
+  private registerPolylineClick(
+    polyline: IMapPolyline,
+    routeId: string
+  ): void {
+    this.polylineRouteMap.set(polyline.id, routeId);
+    polyline.onClick((position: ILatLng) => {
+      if (!this.onRouteClickCallback) return;
+      // Find all routes overlapping at the clicked position
+      const overlapping = this.getRoutesAtPosition(position);
+      // Ensure the clicked route is always included
+      if (!overlapping.includes(routeId)) {
+        overlapping.unshift(routeId);
+      }
+      this.onRouteClickCallback(overlapping, position);
+    });
   }
 
   /**
@@ -199,6 +267,16 @@ export class RouteRenderer {
           opacity: 1.0
         });
 
+        this.registerPolylineClick(polyline, routeId);
+
+        // Store path for overlap detection
+        if (!this.routePaths.has(routeId)) {
+          this.routePaths.set(routeId, []);
+        }
+        this.routePaths.get(routeId)!.push(
+          segment.path.map((p) => ({ lat: p.lat, lng: p.lng }))
+        );
+
         // Store with direction-specific key
         const directionKey = `${routeId}_${segment.direction}`;
         if (!this.routePolylines.has(directionKey)) {
@@ -260,6 +338,14 @@ export class RouteRenderer {
           weight: 4,
           opacity: 1.0
         });
+
+        this.registerPolylineClick(polyline, routeId);
+
+        // Store path for overlap detection
+        if (!this.routePaths.has(routeId)) {
+          this.routePaths.set(routeId, []);
+        }
+        this.routePaths.get(routeId)!.push(path);
 
         polylines.push(polyline);
       }
@@ -417,28 +503,30 @@ export class RouteRenderer {
    * Clear route polylines (remove from map)
    */
   clearRoutePolylines(routeId: string): void {
+    const removePolylines = (polylines: IMapPolyline[] | undefined) => {
+      if (!polylines) return;
+      polylines.forEach((p) => {
+        this.polylineRouteMap.delete(p.id);
+        p.remove();
+      });
+    };
+
     // Clear direction-specific polylines
     const inboundKey = `${routeId}_INBOUND`;
     const outboundKey = `${routeId}_OUTBOUND`;
 
-    const inboundPolylines = this.routePolylines.get(inboundKey);
-    if (inboundPolylines) {
-      inboundPolylines.forEach((polyline) => polyline.remove());
-      this.routePolylines.delete(inboundKey);
-    }
+    removePolylines(this.routePolylines.get(inboundKey));
+    this.routePolylines.delete(inboundKey);
 
-    const outboundPolylines = this.routePolylines.get(outboundKey);
-    if (outboundPolylines) {
-      outboundPolylines.forEach((polyline) => polyline.remove());
-      this.routePolylines.delete(outboundKey);
-    }
+    removePolylines(this.routePolylines.get(outboundKey));
+    this.routePolylines.delete(outboundKey);
 
     // Clear regular polylines
-    const polylines = this.routePolylines.get(routeId);
-    if (polylines) {
-      polylines.forEach((polyline) => polyline.remove());
-      this.routePolylines.delete(routeId);
-    }
+    removePolylines(this.routePolylines.get(routeId));
+    this.routePolylines.delete(routeId);
+
+    // Clear stored paths for overlap detection
+    this.routePaths.delete(routeId);
 
     this.clearDetourPolylines(routeId);
   }
@@ -483,6 +571,8 @@ export class RouteRenderer {
       polylines.forEach((polyline) => polyline.remove());
     });
     this.routePolylines.clear();
+    this.polylineRouteMap.clear();
+    this.routePaths.clear();
 
     this.detourPolylines.forEach((polylines) => {
       polylines.forEach((polyline) => polyline.remove());

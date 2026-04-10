@@ -79,6 +79,12 @@ export class FilterController {
   private nearbyStopsActive = false;
   /** Route IDs that have nearby stops (used to restore hidden routes) */
   private nearbyRouteIds = new Set<string>();
+  /** Stop ID of the currently open prediction popup (for live refresh) */
+  private openPopupStopId: string | null = null;
+  /** Interval handle for prediction auto-refresh (30 s) */
+  private predictionPollInterval: number | null = null;
+  /** Interval handle for 1-second countdown ticker */
+  private predictionTickerInterval: number | null = null;
 
   /** Walk-time heuristic: 1 km ≈ 15 min (TUC4 R4) */
   private static readonly WALK_MINUTES_PER_KM = 15;
@@ -394,8 +400,16 @@ export class FilterController {
       // Fetch and display detours for this route
       await this.fetchAndShowDetours(routeId);
 
-      // Start vehicle polling for this route
-      this.vehicleTracker.startPolling(routeId);
+      // Start vehicle polling, passing the route colour so bus icons are tinted
+      // to match the route polyline already drawn on the map.
+      const pollingState = this.stateManager.getState();
+      const pollingRoute = pollingState.availableRoutes.find(
+        (r) => r.id === routeId
+      );
+      this.vehicleTracker.startPolling(
+        routeId,
+        this.routeColorCache.get(routeId) ?? pollingRoute?.color ?? '#4285F4'
+      );
 
       const state = this.stateManager.getState();
       this.urlSync.updateURL(state);
@@ -883,8 +897,13 @@ export class FilterController {
   private showStopPopup(stop: IStop, predictions: IPrediction[]): void {
     // Remove any existing map popup (stop or bus) first
     closeMapPopup();
+    this.stopPredictionPolling();
     // Clear minimised state since we're opening a new popup
     this.minimisedStop = null;
+
+    // Track which predictions the user selects (by index)
+    const selectedIndices = new Set<number>();
+    const displayPredictions = predictions.slice(0, 8);
 
     const popup = document.createElement('div');
     popup.id = MAP_POPUP_ID;
@@ -918,8 +937,16 @@ export class FilterController {
       popup.appendChild(walkRow);
     }
 
-    // Predictions list
-    if (predictions.length === 0) {
+    // Hint for selection
+    if (displayPredictions.length > 0) {
+      const hint = document.createElement('p');
+      hint.className = 'map-popup__select-hint';
+      hint.textContent = 'Tap buses to include in directions';
+      popup.appendChild(hint);
+    }
+
+    // Predictions list (selectable)
+    if (displayPredictions.length === 0) {
       const empty = document.createElement('p');
       empty.className = 'map-popup__empty';
       empty.textContent = 'No upcoming arrivals';
@@ -927,10 +954,12 @@ export class FilterController {
     } else {
       const list = document.createElement('ul');
       list.className = 'map-popup__list';
-      // Show up to 8 next arrivals
-      for (const p of predictions.slice(0, 8)) {
+      for (let i = 0; i < displayPredictions.length; i++) {
+        const p = displayPredictions[i];
         const li = document.createElement('li');
-        li.className = 'map-popup__arrival';
+        li.className = 'map-popup__arrival map-popup__arrival--selectable';
+        li.dataset.predIndex = String(i);
+        li.dataset.arrival = String(p.predictedArrivalTime);
 
         const routeBadge = document.createElement('span');
         routeBadge.className = 'map-popup__route-badge';
@@ -940,7 +969,7 @@ export class FilterController {
 
         const mins = document.createElement('span');
         mins.className = 'map-popup__minutes';
-        mins.textContent = p.minutes <= 0 ? 'NOW' : `${p.minutes} min`;
+        mins.textContent = this.formatCountdown(p.predictedArrivalTime);
 
         const meta = document.createElement('span');
         meta.className = 'map-popup__meta';
@@ -952,6 +981,20 @@ export class FilterController {
         li.appendChild(routeBadge);
         li.appendChild(mins);
         li.appendChild(meta);
+
+        // Toggle selection on click
+        li.addEventListener('click', () => {
+          if (selectedIndices.has(i)) {
+            selectedIndices.delete(i);
+            li.classList.remove('map-popup__arrival--selected');
+          } else {
+            selectedIndices.add(i);
+            li.classList.add('map-popup__arrival--selected');
+          }
+          // Update directions button label
+          this.updateDirectionsBtnLabel(directionsBtn, selectedIndices.size);
+        });
+
         list.appendChild(li);
       }
       popup.appendChild(list);
@@ -975,7 +1018,10 @@ export class FilterController {
     // Close button handler (A2: deselect stop)
     const closeBtn = popup.querySelector('.map-popup__close');
     if (closeBtn) {
-      closeBtn.addEventListener('click', () => closeMapPopup());
+      closeBtn.addEventListener('click', () => {
+        this.stopPredictionPolling();
+        closeMapPopup();
+      });
     }
 
     // Minimize button handler (A3)
@@ -984,14 +1030,217 @@ export class FilterController {
       minBtn.addEventListener('click', () => {
         this.minimisedStop = stop;
         this.minimisedPredictions = predictions;
+        this.stopPredictionPolling();
         closeMapPopup();
       });
     }
 
     // Directions button handler (TUC4 Step 5)
-    directionsBtn.addEventListener('click', () => {
-      this.directionsController.startDirections(stop);
+    directionsBtn.addEventListener('click', async () => {
+      const selectedPreds = displayPredictions.filter((_, idx) =>
+        selectedIndices.has(idx)
+      );
+      await this.directionsController.startDirections(stop, selectedPreds);
+      // Render routes/stops/vehicles for selected bus predictions
+      if (selectedPreds.length > 0) {
+        await this.renderSelectedBusRoutes(selectedPreds);
+      }
     });
+
+    // Start live prediction refresh (30 s)
+    this.startPredictionPolling(stop, selectedIndices, displayPredictions);
+  }
+
+  /** Update the directions button label to reflect selection count. */
+  private updateDirectionsBtnLabel(
+    btn: HTMLButtonElement,
+    count: number
+  ): void {
+    const label = count > 0
+      ? `Directions (${count} bus${count > 1 ? 'es' : ''})`
+      : 'Directions';
+    btn.innerHTML = `
+      <span class="material-icons-outlined">directions_walk</span>
+      ${label}
+    `;
+  }
+
+  // -------------------------------------------------------------------
+  // Prediction Auto-Refresh
+  // -------------------------------------------------------------------
+
+  /** Start polling predictions every 30 s for the open stop popup. */
+  private startPredictionPolling(
+    stop: IStop,
+    selectedIndices: Set<number>,
+    displayPredictions: IPrediction[]
+  ): void {
+    this.stopPredictionPolling();
+    this.openPopupStopId = stop.stopId;
+
+    // 1-second countdown ticker
+    this.predictionTickerInterval = window.setInterval(() => {
+      if (!document.getElementById(MAP_POPUP_ID)) {
+        this.stopPredictionPolling();
+        return;
+      }
+      this.tickPredictionCountdowns();
+    }, 1000);
+
+    // 30-second full refresh from server
+    this.predictionPollInterval = window.setInterval(async () => {
+      if (!document.getElementById(MAP_POPUP_ID)) {
+        this.stopPredictionPolling();
+        return;
+      }
+
+      const fresh = await this.fetchPredictions(stop.stopId);
+      this.refreshPredictionList(
+        fresh.slice(0, 8),
+        selectedIndices,
+        displayPredictions
+      );
+    }, 30_000);
+  }
+
+  /** Stop prediction polling. */
+  private stopPredictionPolling(): void {
+    if (this.predictionPollInterval !== null) {
+      clearInterval(this.predictionPollInterval);
+      this.predictionPollInterval = null;
+    }
+    if (this.predictionTickerInterval !== null) {
+      clearInterval(this.predictionTickerInterval);
+      this.predictionTickerInterval = null;
+    }
+    this.openPopupStopId = null;
+  }
+
+  /** Tick all visible prediction countdowns by recalculating from arrival time. */
+  private tickPredictionCountdowns(): void {
+    const popup = document.getElementById(MAP_POPUP_ID);
+    if (!popup) return;
+
+    const items = popup.querySelectorAll<HTMLElement>('.map-popup__arrival');
+    items.forEach((li) => {
+      const arrival = Number(li.dataset.arrival);
+      if (!arrival) return;
+      const minsEl = li.querySelector('.map-popup__minutes');
+      if (minsEl) minsEl.textContent = this.formatCountdown(arrival);
+    });
+  }
+
+  /** Format a predicted arrival timestamp as a live countdown string. */
+  private formatCountdown(arrivalTimestamp: number): string {
+    const secsLeft = Math.round((arrivalTimestamp - Date.now()) / 1000);
+    if (secsLeft <= 0) return 'NOW';
+    if (secsLeft < 60) return `${secsLeft}s`;
+    return `${Math.ceil(secsLeft / 60)} min`;
+  }
+
+  /**
+   * Update prediction minutes and metadata in the open popup DOM without
+   * rebuilding the list (so user selections are preserved).
+   */
+  private refreshPredictionList(
+    freshPreds: IPrediction[],
+    selectedIndices: Set<number>,
+    displayPredictions: IPrediction[]
+  ): void {
+    const popup = document.getElementById(MAP_POPUP_ID);
+    if (!popup) return;
+
+    const items = popup.querySelectorAll<HTMLElement>('.map-popup__arrival');
+
+    // Update existing items with fresh data (matched by index)
+    items.forEach((li) => {
+      const idx = Number(li.dataset.predIndex);
+      if (idx >= freshPreds.length) {
+        // This prediction is gone — remove from DOM
+        li.remove();
+        selectedIndices.delete(idx);
+        return;
+      }
+      const p = freshPreds[idx];
+      // Sync backing array so directions button picks up fresh data
+      displayPredictions[idx] = p;
+
+      // Update arrival timestamp for the countdown ticker
+      li.dataset.arrival = String(p.predictedArrivalTime);
+
+      const minsEl = li.querySelector('.map-popup__minutes');
+      if (minsEl) minsEl.textContent = this.formatCountdown(p.predictedArrivalTime);
+
+      const metaEl = li.querySelector('.map-popup__meta');
+      if (metaEl) {
+        const parts: string[] = [];
+        if (p.vid) parts.push(`Bus ${p.vid}`);
+        if (p.isDelayed) parts.push('Delayed');
+        metaEl.textContent = parts.join(' · ');
+      }
+
+      // Update route badge in case routeId changed
+      const badge = li.querySelector('.map-popup__route-badge') as HTMLElement;
+      if (badge) {
+        badge.textContent = p.routeId;
+        badge.style.backgroundColor =
+          this.routeColorCache.get(p.routeId) || '#c41230';
+      }
+    });
+
+    // Handle "No upcoming arrivals" ↔ predictions toggle
+    const emptyEl = popup.querySelector('.map-popup__empty');
+    if (freshPreds.length === 0 && !emptyEl) {
+      const list = popup.querySelector('.map-popup__list');
+      if (list) list.remove();
+      const hint = popup.querySelector('.map-popup__select-hint');
+      if (hint) hint.remove();
+      const empty = document.createElement('p');
+      empty.className = 'map-popup__empty';
+      empty.textContent = 'No upcoming arrivals';
+      const dirBtn = popup.querySelector('.map-popup__directions-btn');
+      if (dirBtn) popup.insertBefore(empty, dirBtn);
+    } else if (freshPreds.length > 0 && emptyEl) {
+      emptyEl.remove();
+    }
+  }
+
+  /**
+   * Render routes, stops, patterns, and start vehicle polling for routes
+   * associated with the user's selected bus predictions during directions mode.
+   */
+  private async renderSelectedBusRoutes(
+    predictions: IPrediction[]
+  ): Promise<void> {
+    // Deduplicate route IDs
+    const routeIds = [...new Set(predictions.map((p) => p.routeId))];
+    const state = this.stateManager.getState();
+
+    for (const routeId of routeIds) {
+      // Render route geometry
+      const geometry = await this.fetchRouteGeometry(routeId);
+      if (geometry) {
+        const route = state.availableRoutes.find((r) => r.id === routeId);
+        const color = route?.color || this.routeColorCache.get(routeId) || '#FF0000';
+        this.routeRenderer.renderRouteGeometry(routeId, geometry, color);
+      }
+
+      // Render stop markers for both directions
+      for (const direction of ['INBOUND', 'OUTBOUND']) {
+        const stops = await this.fetchStops(routeId, direction);
+        if (stops.length > 0) {
+          this.routeRenderer.renderStopMarkers(
+            routeId,
+            stops,
+            direction,
+            () => {} // No-op click handler while in directions mode
+          );
+        }
+      }
+    }
+
+    // Start vehicle polling for selected routes
+    this.vehicleTracker.startMultiRoutePolling(routeIds);
   }
 
   /**
@@ -1045,6 +1294,18 @@ export class FilterController {
         }
       }
 
+      // Render route geometry for nearby routes that aren't rendered yet
+      for (const routeId of this.nearbyRouteIds) {
+        if (!this.routeRenderer.hasRouteGeometry(routeId)) {
+          const geometry = await this.fetchRouteGeometry(routeId);
+          if (geometry) {
+            const route = state.availableRoutes.find((r) => r.id === routeId);
+            const color = route?.color || this.routeColorCache.get(routeId) || '#FF0000';
+            this.routeRenderer.renderRouteGeometry(routeId, geometry, color);
+          }
+        }
+      }
+
       // Render each nearby stop as a marker (grouped under per-route keys)
       const stopsByRoute = new Map<string, IStop[]>();
 
@@ -1075,6 +1336,34 @@ export class FilterController {
     } catch (error) {
       console.error('[FilterController] Error showing nearby stops:', error);
     }
+  }
+
+  /**
+   * Restore the default map state: user location, nearby stops, and their
+   * route/pattern geometry — without real-time bus locations.
+   * Called when exiting directions mode or any overlay that replaced the
+   * default view.
+   */
+  async restoreDefaultState(position: ILatLng): Promise<void> {
+    // Clear everything from the map
+    this.routeRenderer.clearAllRoutes();
+    this.vehicleTracker.stopPolling();
+    this.stopPredictionPolling();
+    closeMapPopup();
+
+    // Reset all filters to defaults
+    this.stateManager.updateFilter('selectedRouteId', null);
+    this.stateManager.updateFilter('selectedDate', null);
+    this.stateManager.updateFilter('selectedTime', null);
+    this.stateManager.updateFilter('selectedDirections', {
+      inbound: true,
+      outbound: true
+    });
+    this.nearbyStopsActive = false;
+    this.nearbyRouteIds.clear();
+
+    // Re-show nearby stops with their route geometry (no vehicles)
+    await this.showNearbyStops(position);
   }
 
   /**

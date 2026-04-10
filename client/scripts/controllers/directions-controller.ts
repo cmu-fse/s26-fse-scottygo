@@ -13,7 +13,7 @@ import type {
   IMapPolyline,
   ILatLng
 } from '../../../common/map.interface';
-import type { IStop } from '../../../common/transit.interface';
+import type { IStop, IPrediction } from '../../../common/transit.interface';
 import { RouteRenderer } from '../renderers/route-renderer';
 import { VehicleTracker } from '../trackers/vehicle-tracker';
 import { closeMapPopup } from '../utils/map-popup';
@@ -47,6 +47,7 @@ export class DirectionsController {
   // Directions mode state
   private _isActive = false;
   private selectedStop: IStop | null = null;
+  private _selectedPredictions: IPrediction[] = [];
   private walkingPolyline: IMapPolyline | null = null;
   private walkingPath: ILatLng[] = [];
   private userLocation: ILatLng | null = null;
@@ -63,7 +64,7 @@ export class DirectionsController {
   private toastCallback: ((message: string) => void) | null = null;
   // Callback to update the directions info panel
   private infoPanelCallback:
-    | ((info: { durationMin: number; eta: string } | null) => void)
+    | ((info: { durationMin: number; eta: string; predictions: IPrediction[] } | null) => void)
     | null = null;
   // Callback executed when exiting directions mode
   private exitCallback: (() => void) | null = null;
@@ -89,9 +90,9 @@ export class DirectionsController {
     this.toastCallback = cb;
   }
 
-  /** Register a callback for directions info updates (duration + ETA) */
+  /** Register a callback for directions info updates (duration + ETA + selected bus predictions) */
   setInfoPanelCallback(
-    cb: (info: { durationMin: number; eta: string } | null) => void
+    cb: (info: { durationMin: number; eta: string; predictions: IPrediction[] } | null) => void
   ): void {
     this.infoPanelCallback = cb;
   }
@@ -109,6 +110,11 @@ export class DirectionsController {
   /** The stop currently being navigated to, if any */
   get targetStop(): IStop | null {
     return this.selectedStop;
+  }
+
+  /** The bus predictions the user selected before starting directions */
+  get selectedPredictions(): IPrediction[] {
+    return this._selectedPredictions;
   }
 
   /**
@@ -144,7 +150,10 @@ export class DirectionsController {
    * Start directions mode to a selected stop (TUC4 Step 5).
    * Enforces tap debounce (R1).
    */
-  async startDirections(stop: IStop): Promise<void> {
+  async startDirections(
+    stop: IStop,
+    selectedPredictions: IPrediction[] = []
+  ): Promise<void> {
     // R1: Tap debounce
     const now = Date.now();
     if (now - this.lastDirectionsTap < TAP_DEBOUNCE_MS) return;
@@ -158,6 +167,7 @@ export class DirectionsController {
     // Enter directions mode
     this._isActive = true;
     this.selectedStop = stop;
+    this._selectedPredictions = selectedPredictions;
 
     // R5: Hide non-selected stops and route overlays
     this.routeRenderer.clearAllRoutes();
@@ -178,6 +188,7 @@ export class DirectionsController {
   exitDirections(): void {
     this._isActive = false;
     this.selectedStop = null;
+    this._selectedPredictions = [];
 
     // Cancel in-flight request (R2)
     this.cancelInflightRequest();
@@ -230,8 +241,9 @@ export class DirectionsController {
       this.walkingPolyline = this.mapProvider.addPolyline({
         path: result.polyline,
         color: '#4285F4',
-        weight: 5,
-        opacity: 0.85
+        weight: 7,
+        opacity: 0.9,
+        zIndex: 10
       });
 
       // Update info panel with duration + ETA
@@ -241,7 +253,11 @@ export class DirectionsController {
         hour: '2-digit',
         minute: '2-digit'
       });
-      this.infoPanelCallback?.({ durationMin, eta: etaStr });
+      this.infoPanelCallback?.({
+        durationMin,
+        eta: etaStr,
+        predictions: this._selectedPredictions
+      });
     } catch (err) {
       if ((err as Error).name === 'AbortError') return; // cancelled
       console.error('[DirectionsController] Failed to fetch directions:', err);
