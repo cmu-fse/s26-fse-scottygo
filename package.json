@@ -33,10 +33,11 @@
     "test:unit": "npm-run-all test:unit:loginlogout test:unit:manageacct test:unit:register",
     "test:integration:manageacct": "jest ./tests/server.tests/integration.tests/manageacct.integration.test.ts --runInBand --detectOpenHandles --coverageDirectory=.coverage/integration-manageacct",
     "test:integration:loginlogout": "jest ./tests/server.tests/integration.tests/loginlogout.integration.test.ts --runInBand --detectOpenHandles --coverageDirectory=.coverage/integration-loginlogout",
-    "test:integration": "npm-run-all test:integration:manageacct test:integration:loginlogout test:integration:register test:integration:visualize-routes test:integration:trackBus",
+    "test:integration": "npm-run-all test:integration:manageacct test:integration:loginlogout test:integration:register test:integration:visualize-routes test:integration:trackBus test:integration:livenotification",
     "test:integration:register": "jest ./tests/server.tests/integration.tests/register.integration.test.ts --runInBand --detectOpenHandles --coverageDirectory=.coverage/integration-register",
     "test:integration:visualize-routes": "jest ./tests/server.tests/integration.tests/visualize-routes.integration.test.ts --runInBand --detectOpenHandles --forceExit --coverageDirectory=.coverage/integration-visualize-routes",
     "test:integration:trackBus": "jest ./tests/server.tests/integration.tests/trackBus.integration.test.ts --runInBand --detectOpenHandles --forceExit --coverageDirectory=.coverage/integration-trackBus",
+    "test:integration:livenotification": "jest ./tests/server.tests/integration.tests/livenotification.integration.test.ts --runInBand --detectOpenHandles --forceExit --coverageDirectory=.coverage/integration-livenotification",
     "test:server": "npm-run-all --continue-on-error test:unit test:integration test:rest",
     "later": "echo \"Some future command...\" && exit 1"
   },
