@@ -176,7 +176,10 @@ class GTFSService {
     read: (name: string) => string
   ): Map<string, { lat: number; lng: number }[]> {
     console.log(`[GTFS ${new Date().toISOString()}] Parsing shapes.txt...`);
-    const seqs = new Map<string, { seq: number; lat: number; lng: number }[]>();
+    const seqs = new Map<
+      string,
+      { seq: number; lat: number; lng: number }[]
+    >();
     for (const p of parse(read('shapes.txt'), CSV_OPTS) as Record<
       string,
       string
@@ -448,7 +451,8 @@ class GTFSService {
    * Return routes that have at least one trip running on the given date,
    * based on GTFS calendar.txt and calendar_dates.txt.
    */
-  filterRoutesByDate(date: Date): IRoute[] {
+
+  private assertGtfsLoaded(): void {
     if (!this.loaded) {
       const err: IAppError = {
         type: 'ServerError',
@@ -457,6 +461,10 @@ class GTFSService {
       };
       throw err;
     }
+  }
+
+  filterRoutesByDate(date: Date): IRoute[] {
+    this.assertGtfsLoaded();
 
     const activeServices = this.getActiveServiceIds(date);
     const activeRouteIds = new Set<string>();
@@ -477,14 +485,7 @@ class GTFSService {
    * @param time "HH:MM" in 24-hour format
    */
   filterRoutesByDateTime(date: Date, time: string): IRoute[] {
-    if (!this.loaded) {
-      const err: IAppError = {
-        type: 'ServerError',
-        name: 'GetRequestFailure',
-        message: 'GTFS schedule data is not yet loaded'
-      };
-      throw err;
-    }
+    this.assertGtfsLoaded();
 
     const [h, m] = time.split(':').map(Number);
     const queryMinutes = h * 60 + m;

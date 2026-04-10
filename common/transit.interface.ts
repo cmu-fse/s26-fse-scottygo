@@ -93,6 +93,15 @@ export interface IBulkTransitData {
 
 // ── Discover Stops & Schedules (TUC4) ──────────────────────────────────
 
+export interface INearbyStopsFilters {
+  routeId?: string;
+  system?: string;
+  direction?: string;
+  date?: string;
+  time?: string;
+  includeRoutes?: boolean;
+}
+
 export interface INearbyStop {
   stop: IStop;
   distanceMeters: number;
@@ -174,3 +183,4 @@ export interface ITransitCache {
   lastUpdated: Date;
   expiresAt: Date;
 }
+

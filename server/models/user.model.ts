@@ -17,7 +17,10 @@ import {
   validateEmailFormat,
   validatePasswordStrength
 } from './user.validation';
-import { ensureNotLastAdmin, isLastAdministrator } from './user.admin-rules';
+import {
+  ensureNotLastAdmin,
+  isLastAdministrator
+} from './user.admin-rules';
 
 export class User implements IUser {
   credentials: ILogin;
@@ -173,6 +176,14 @@ export class User implements IUser {
 
   // ==================== Account Management Methods ====================
 
+  private static throwUserNotFound(): never {
+    throw {
+      type: 'ClientError',
+      name: 'UserNotFound',
+      message: 'User not found'
+    } as IAppError;
+  }
+
   /**
    * Get all usernames (for admin dropdown)
    */
@@ -193,12 +204,7 @@ export class User implements IUser {
   static async getUserAccountById(userId: string): Promise<IUserAccount> {
     const userAccount = await DAC.db.findUserAccountById(userId);
     if (!userAccount) {
-      const error: IAppError = {
-        type: 'ClientError',
-        name: 'UserNotFound',
-        message: 'User not found'
-      };
-      throw error;
+      User.throwUserNotFound();
     }
     return userAccount;
   }
@@ -211,12 +217,7 @@ export class User implements IUser {
       username.toLowerCase()
     );
     if (!userAccount) {
-      const error: IAppError = {
-        type: 'ClientError',
-        name: 'UserNotFound',
-        message: 'User not found'
-      };
-      throw error;
+      User.throwUserNotFound();
     }
     return userAccount;
   }

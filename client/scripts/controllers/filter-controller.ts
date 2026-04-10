@@ -400,8 +400,16 @@ export class FilterController {
       // Fetch and display detours for this route
       await this.fetchAndShowDetours(routeId);
 
-      // Start vehicle polling for this route
-      this.vehicleTracker.startPolling(routeId);
+      // Start vehicle polling, passing the route colour so bus icons are tinted
+      // to match the route polyline already drawn on the map.
+      const pollingState = this.stateManager.getState();
+      const pollingRoute = pollingState.availableRoutes.find(
+        (r) => r.id === routeId
+      );
+      this.vehicleTracker.startPolling(
+        routeId,
+        this.routeColorCache.get(routeId) ?? pollingRoute?.color ?? '#4285F4'
+      );
 
       const state = this.stateManager.getState();
       this.urlSync.updateURL(state);
