@@ -38,7 +38,7 @@ export default class MapController extends Controller {
 
   public initializeRoutes(): void {
     this.router.get('/', this.mapPage.bind(this));
-    this.router.get('/users/:username', this.authorize, this.getUser);
+    this.router.get('/users/:username', this.authorize, this.getUser.bind(this).bind(this));
     this.router.get('/config', this.authorize, this.getMapConfig.bind(this));
 
     // Search endpoints (SearchInfo UC — R1 contextual search)

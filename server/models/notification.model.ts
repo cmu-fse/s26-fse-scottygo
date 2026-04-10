@@ -16,7 +16,7 @@ import {
 import { IAppError } from '../../common/server.responses';
 import vehiclePositionsService from '../services/vehicle-positions.service';
 import moderationService from '../services/moderation.service';
-import { TransitModel } from './transit.model';
+import { TransitModel, haversineDistanceMeters } from './transit.model';
 
 /** Radius limit for proximity check in miles (R9). */
 const PROXIMITY_LIMIT_MILES = 0.5;
@@ -30,25 +30,6 @@ const VALID_CROWDEDNESS: ICrowdedness[] = [
 ];
 const VALID_PRIORITY_SEATING: IPrioritySeating[] = ['Available', 'Occupied'];
 const VALID_CONDITION: IBusCondition[] = ['Clean', 'Dirty', 'Average'];
-
-/**
- * Haversine distance between two lat/lon points, in miles (R9).
- */
-function haversineDistanceMiles(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number
-): number {
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-  const R = 3958.8; // Earth radius in miles
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
 
 export class NotificationModel {
   /**
@@ -249,12 +230,8 @@ export class NotificationModel {
       throw error;
     }
 
-    const distance = haversineDistanceMiles(
-      data.lat,
-      data.lon,
-      bus.lat,
-      bus.lon
-    );
+    const distance =
+      haversineDistanceMeters(data.lat, data.lon, bus.lat, bus.lon) / 1609.344;
     if (!data.bypassProximityCheck && distance > PROXIMITY_LIMIT_MILES) {
       const error: IAppError = {
         type: 'ClientError',

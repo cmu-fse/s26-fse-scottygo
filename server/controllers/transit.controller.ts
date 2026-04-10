@@ -11,7 +11,7 @@ import memoryMonitorService from '../services/memory-monitor.service';
 import { TransitModel } from '../models/transit.model';
 import gtfsService from '../services/gtfs.service';
 import * as responses from '../../common/server.responses';
-import { IRoute, IVehicle } from '../../common/transit.interface';
+import { IRoute, IVehicle, INearbyStopsFilters } from '../../common/transit.interface';
 
 /**
  * Parse and clamp a numeric query-string value.
@@ -53,10 +53,19 @@ export default class BusController extends Controller {
   }
 
   public initializeRoutes(): void {
+    this.registerMemoryRoutes();
+    this.registerTransitRoutes();
+    this.registerStopRoutes();
+  }
+
+  private registerMemoryRoutes(): void {
     this.router.get('/health', this.getHealth.bind(this));
     this.router.get('/memory/samples', this.getMemorySamples.bind(this));
     this.router.get('/memory/summary', this.getMemorySummary.bind(this));
     this.router.get('/memory/dashboard', this.getMemoryDashboard.bind(this));
+  }
+
+  private registerTransitRoutes(): void {
     this.router.get('/bulk', this.getBulkData.bind(this));
     this.router.get('/routes', this.getRoutes.bind(this));
     this.router.post(
@@ -65,6 +74,11 @@ export default class BusController extends Controller {
     );
     this.router.get('/routes/:id', this.getPatterns.bind(this));
     this.router.get('/vehicles/:routeId', this.getVehicles.bind(this));
+    this.router.get('/detours/:routeId/geometry', this.getDetourGeometry.bind(this));
+    this.router.get('/detours/:routeId', this.getDetours.bind(this));
+  }
+
+  private registerStopRoutes(): void {
     this.router.get(
       '/stops/nearbystops',
       this.getNearbyStops.bind(this)
@@ -74,11 +88,6 @@ export default class BusController extends Controller {
       '/stops/:stopId/predictions',
       this.getPredictions.bind(this)
     );
-    this.router.get(
-      '/detours/:routeId/geometry',
-      this.getDetourGeometry.bind(this)
-    );
-    this.router.get('/detours/:routeId', this.getDetours.bind(this));
   }
 
   // GET /transit/health — service health status for the frontend
@@ -922,6 +931,30 @@ export default class BusController extends Controller {
     return parseLimit(rawLimit, defaultLimit, maxLimit);
   }
 
+  private sendRoutesRetrieved(res: Response, routes: IRoute[]): void {
+    const successRes: responses.ISuccess = {
+      name: 'RoutesRetrieved',
+      message: `Found ${routes.length} routes`,
+      payload: routes
+    };
+    res.status(200).json(successRes);
+  }
+
+  private parseNearbyStopsFilters(req: Request): INearbyStopsFilters {
+    const includeRoutesParam = req.query.includeRoutes as string | undefined;
+    const filters: INearbyStopsFilters = {
+      includeRoutes:
+        includeRoutesParam === undefined || includeRoutesParam !== 'false'
+    };
+    if (req.query.routeId) filters.routeId = req.query.routeId as string;
+    if (req.query.system) filters.system = req.query.system as string;
+    if (req.query.direction)
+      filters.direction = (req.query.direction as string).toUpperCase();
+    if (req.query.date) filters.date = req.query.date as string;
+    if (req.query.time) filters.time = req.query.time as string;
+    return filters;
+  }
+
   // GET /transit/bulk — all routes, patterns, and stops in one response
   private async getBulkData(_req: Request, res: Response): Promise<void> {
     try {
@@ -962,12 +995,7 @@ export default class BusController extends Controller {
         }
       }
 
-      const successRes: responses.ISuccess = {
-        name: 'RoutesRetrieved',
-        message: `Found ${routes.length} routes`,
-        payload: routes
-      };
-      res.status(200).json(successRes);
+      this.sendRoutesRetrieved(res, routes);
     } catch (error: unknown) {
       this.handleError(error, res);
     }
@@ -996,12 +1024,7 @@ export default class BusController extends Controller {
         ? gtfsService.filterRoutesByDateTime(new Date(date), time)
         : gtfsService.filterRoutesByDate(new Date(date));
 
-      const successRes: responses.ISuccess = {
-        name: 'RoutesRetrieved',
-        message: `Found ${routes.length} routes`,
-        payload: routes
-      };
-      res.status(200).json(successRes);
+      this.sendRoutesRetrieved(res, routes);
     } catch (error: unknown) {
       this.handleError(error, res);
     }
@@ -1093,26 +1116,7 @@ export default class BusController extends Controller {
       ? parseInt(req.query.radiusMeters as string, 10)
       : undefined; // let the model apply its own default
 
-    // includeRoutes defaults to true per REST spec
-    const includeRoutesParam = req.query.includeRoutes as string | undefined;
-    const includeRoutes =
-      includeRoutesParam === undefined || includeRoutesParam !== 'false';
-
-    const filters: {
-      routeId?: string;
-      system?: string;
-      direction?: string;
-      date?: string;
-      time?: string;
-      includeRoutes?: boolean;
-    } = { includeRoutes };
-
-    if (req.query.routeId) filters.routeId = req.query.routeId as string;
-    if (req.query.system) filters.system = req.query.system as string;
-    if (req.query.direction)
-      filters.direction = (req.query.direction as string).toUpperCase();
-    if (req.query.date) filters.date = req.query.date as string;
-    if (req.query.time) filters.time = req.query.time as string;
+    const filters = this.parseNearbyStopsFilters(req);
 
     try {
       const payload = await TransitModel.getNearbyStops(

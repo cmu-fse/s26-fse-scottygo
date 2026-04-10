@@ -53,6 +53,21 @@ export interface TripshotRouteResponse {
  * Decode Google's encoded polyline algorithm to lat/lng coordinates
  * Ported from Python implementation provided by user
  */
+
+function decodeNextValue(str: string, index: number): { value: number; index: number } {
+  let shift = 0;
+  let result = 0;
+  while (true) {
+    const b = str.charCodeAt(index) - 63;
+    index += 1;
+    result |= (b & 0x1f) << shift;
+    shift += 5;
+    if (b < 0x20) break;
+  }
+  const value = result & 1 ? ~(result >> 1) : result >> 1;
+  return { value, index };
+}
+
 export function decodePolyline(
   polylineStr: string
 ): Array<{ lat: number; lng: number }> {
@@ -62,35 +77,13 @@ export function decodePolyline(
   const coordinates: Array<{ lat: number; lng: number }> = [];
 
   while (index < polylineStr.length) {
-    let shift = 0;
-    let result = 0;
+    const latDecode = decodeNextValue(polylineStr, index);
+    lat += latDecode.value;
+    index = latDecode.index;
 
-    // Decode latitude
-    while (true) {
-      const b = polylineStr.charCodeAt(index) - 63;
-      index += 1;
-      result |= (b & 0x1f) << shift;
-      shift += 5;
-      if (b < 0x20) break;
-    }
-
-    const deltaLat = result & 1 ? ~(result >> 1) : result >> 1;
-    lat += deltaLat;
-
-    shift = 0;
-    result = 0;
-
-    // Decode longitude
-    while (true) {
-      const b = polylineStr.charCodeAt(index) - 63;
-      index += 1;
-      result |= (b & 0x1f) << shift;
-      shift += 5;
-      if (b < 0x20) break;
-    }
-
-    const deltaLng = result & 1 ? ~(result >> 1) : result >> 1;
-    lng += deltaLng;
+    const lngDecode = decodeNextValue(polylineStr, index);
+    lng += lngDecode.value;
+    index = lngDecode.index;
 
     coordinates.push({
       lat: lat / 1e5,
