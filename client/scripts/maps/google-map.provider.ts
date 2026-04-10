@@ -172,6 +172,15 @@ export class GoogleMapProvider implements IMapProvider {
     return {
       id,
       setVisible: (visible: boolean) => polyline.setVisible(visible),
+      onClick: (callback: (position: ILatLng) => void) => {
+        google.maps.event.addListener(
+          polyline,
+          'click',
+          (e: google.maps.PolyMouseEvent) => {
+            if (e.latLng) callback({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+          }
+        );
+      },
       remove: () => {
         polyline.setMap(null);
         this.polylines.delete(id);

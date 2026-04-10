@@ -310,6 +310,30 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
 
     // Initialize all components
     routeRenderer.initialize(mapProvider);
+
+    // Track last pointer position for route-pick popup placement
+    const mapContainer = document.querySelector('.map-container') as HTMLElement;
+    let lastPointerX = 0;
+    let lastPointerY = 0;
+    if (mapContainer) {
+      mapContainer.addEventListener('mousemove', (e) => {
+        const rect = mapContainer.getBoundingClientRect();
+        lastPointerX = e.clientX - rect.left;
+        lastPointerY = e.clientY - rect.top;
+      });
+      mapContainer.addEventListener('touchstart', (e) => {
+        const rect = mapContainer.getBoundingClientRect();
+        lastPointerX = e.touches[0].clientX - rect.left;
+        lastPointerY = e.touches[0].clientY - rect.top;
+      }, { passive: true });
+    }
+
+    // Route polyline click handler — show route-pick popup
+    routeRenderer.setRouteClickCallback((routeIds, _position) => {
+      if (directionsController.isActive) return;
+      showRoutePickPopup(routeIds, lastPointerX, lastPointerY);
+    });
+
     vehicleTracker.initialize(mapProvider);
     vehicleTracker.setAdminProximityBypass(isAdminUser);
     directionsController.initialize(mapProvider);
@@ -1073,6 +1097,73 @@ function removeDirectionsPanel(): void {
   stopDirectionsBusTicker();
   const existing = document.getElementById('directions-panel');
   if (existing) existing.remove();
+}
+
+// ─── Route-Pick Popup ────────────────────────────────────────────────
+
+/** Dismiss any open route-pick popup. */
+function dismissRoutePickPopup(): void {
+  const el = document.getElementById('route-pick-popup');
+  if (el) el.remove();
+}
+
+/** Show a small popup listing route badges at the given pixel position. */
+function showRoutePickPopup(
+  routeIds: string[],
+  x: number,
+  y: number
+): void {
+  dismissRoutePickPopup();
+  if (routeIds.length === 0) return;
+
+  const mapContainer = document.querySelector('.map-container');
+  if (!mapContainer) return;
+
+  const popup = document.createElement('div');
+  popup.id = 'route-pick-popup';
+  popup.className = 'route-pick-popup';
+
+  routeIds.forEach((id) => {
+    const badge = document.createElement('button');
+    badge.className = 'route-pick-badge';
+    badge.textContent = id;
+    badge.style.backgroundColor = routeRenderer.getRouteColor(id);
+    badge.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dismissRoutePickPopup();
+      document.dispatchEvent(
+        new CustomEvent('routeSelected', { detail: { route: id } })
+      );
+    });
+    popup.appendChild(badge);
+  });
+
+  // Position relative to map container, clamped to stay in-bounds
+  const containerRect = mapContainer.getBoundingClientRect();
+  const popupWidth = 120;
+  const popupHeight = 40;
+  const clampedX = Math.min(
+    Math.max(x - popupWidth / 2, 8),
+    containerRect.width - popupWidth - 8
+  );
+  const clampedY = Math.min(
+    Math.max(y - popupHeight - 12, 8),
+    containerRect.height - popupHeight - 8
+  );
+  popup.style.left = `${clampedX}px`;
+  popup.style.top = `${clampedY}px`;
+
+  mapContainer.appendChild(popup);
+
+  // Dismiss when clicking elsewhere
+  const onOutsideClick = (e: Event) => {
+    if (!popup.contains(e.target as Node)) {
+      dismissRoutePickPopup();
+      document.removeEventListener('click', onOutsideClick, true);
+    }
+  };
+  // Delay so the current click event doesn't immediately dismiss
+  setTimeout(() => document.addEventListener('click', onOutsideClick, true), 0);
 }
 
 /** Disable all side filter controls while in directions mode. */

@@ -64,6 +64,7 @@ export interface IMapMarker {
 export interface IMapPolyline {
   id: string;
   setVisible(visible: boolean): void;
+  onClick(callback: (position: ILatLng) => void): void;
   remove(): void;
 }
 
