@@ -134,3 +134,21 @@ export function extractRouteIndex(routeId: string): {
 
   return { index, metadata };
 }
+
+/**
+ * Resolve a TripShot route UUID to our public CMU route ID format (CMU-{n}).
+ * Returns null when the UUID is unknown.
+ */
+export function findCmuRouteIdByTripshotRouteId(
+  tripshotRouteId: string
+): string | null {
+  const normalized = tripshotRouteId.trim().toLowerCase();
+
+  for (const [index, metadata] of Object.entries(CMU_ROUTE_METADATA)) {
+    if (metadata.routeId.toLowerCase() === normalized) {
+      return `CMU-${index}`;
+    }
+  }
+
+  return null;
+}

@@ -22,6 +22,12 @@ import type {
 } from '../../../common/socket.interface';
 import type { INotification } from '../../../common/transit.interface';
 
+interface IRouteDisplayMeta {
+  id: string;
+  name: string;
+  system?: 'PRT' | 'CMU';
+}
+
 const MUTED_ROUTES_KEY = 'scottygo_muted_routes';
 
 function normalizeRouteId(routeId: string): string {
@@ -62,6 +68,22 @@ export function isRouteMuted(routeId: string): boolean {
 // ── Socket management ─────────────────────────────────────────────────────────
 
 let socket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null;
+const routeDisplayById = new Map<string, IRouteDisplayMeta>();
+
+function getRouteDisplayTitle(routeId: string): string {
+  const route = routeDisplayById.get(normalizeRouteId(routeId));
+  if (route?.system === 'CMU') {
+    return route.name;
+  }
+  return `Route ${routeId}`;
+}
+
+function formatNotificationMessage(message: string): string {
+  return message.replace(/\bCMU-\d+\b/gi, (routeId: string) => {
+    const title = getRouteDisplayTitle(routeId.toUpperCase());
+    return title === `Route ${routeId.toUpperCase()}` ? routeId : title;
+  });
+}
 
 // Routes we want to be in — joined when socket connects (and on reconnect).
 const activeRoutes = new Set<string>();
@@ -146,6 +168,7 @@ function formatElapsed(isoTimestamp: string): string {
 
 function showPopup(notif: INotification): void {
   const container = getContainer();
+  const routeTitle = getRouteDisplayTitle(notif.routeId);
 
   const card = document.createElement('div');
   card.className = 'live-notif-card';
@@ -158,9 +181,9 @@ function showPopup(notif: INotification): void {
     </button>
     <div class="live-notif-header">
       <span class="live-notif-icon">${NOTIF_ICON}</span>
-      <span class="live-notif-title">Route ${notif.routeId} · Bus #${notif.vid}</span>
+      <span class="live-notif-title">${routeTitle} · Bus #${notif.vid}</span>
     </div>
-    <p class="live-notif-body">${notif.message}</p>
+    <p class="live-notif-body">${formatNotificationMessage(notif.message)}</p>
     <div class="live-notif-footer">
       <span class="live-notif-tag">Live Update</span>
       <span class="live-notif-time">${formatElapsed(notif.createdAt)}</span>
@@ -196,6 +219,18 @@ async function init(): Promise<void> {
 
   // Fetch active subscriptions and join their socket rooms (skipping muted ones)
   try {
+    const routesRes = await fetch('/transit/routes', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (routesRes.ok) {
+      const routesData = await routesRes.json();
+      const routes: IRouteDisplayMeta[] = routesData.payload ?? [];
+      routeDisplayById.clear();
+      routes.forEach((route) => {
+        routeDisplayById.set(normalizeRouteId(route.id), route);
+      });
+    }
+
     const res = await fetch('/notifications/subscriptions', {
       headers: { Authorization: `Bearer ${token}` }
     });

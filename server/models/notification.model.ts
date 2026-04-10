@@ -17,6 +17,8 @@ import { IAppError } from '../../common/server.responses';
 import vehiclePositionsService from '../services/vehicle-positions.service';
 import moderationService from '../services/moderation.service';
 import { TransitModel, haversineDistanceMeters } from './transit.model';
+import tripshotService from '../services/tripshot.service';
+import { IVehicle } from '../../common/transit.interface';
 
 /** Radius limit for proximity check in miles (R9). */
 const PROXIMITY_LIMIT_MILES = 0.5;
@@ -39,6 +41,34 @@ export class NotificationModel {
   private static lastKnownStatus = new Map<string, ILastKnownBusStatus>();
 
   private static initialized = false;
+
+  /** Return all valid route IDs for TUC3 subscriptions (PRT + CMU). */
+  private static async getAllSubscribableRouteIds(): Promise<Set<string>> {
+    const routeIds = new Set<string>();
+
+    const prtRoutes = await TransitModel.getRoutes();
+    for (const route of prtRoutes) routeIds.add(route.id);
+
+    if (tripshotService.isConfigured()) {
+      const cmuRoutes = await tripshotService.getRoutes().catch(() => []);
+      for (const route of cmuRoutes) routeIds.add(route.id);
+    }
+
+    return routeIds;
+  }
+
+  /** Find a live vehicle for the given route and bus ID (case-insensitive). */
+  private static async findLiveVehicle(
+    routeId: string,
+    vid: string
+  ): Promise<IVehicle | null> {
+    const vehicles = routeId.startsWith('CMU-')
+      ? await tripshotService.getVehicles(routeId).catch(() => [])
+      : vehiclePositionsService.getVehicles(routeId);
+
+    const wanted = vid.trim().toLowerCase();
+    return vehicles.find((v) => v.vid.trim().toLowerCase() === wanted) ?? null;
+  }
 
   // ── Initialization ─────────────────────────────────────────────────
 
@@ -77,8 +107,8 @@ export class NotificationModel {
     routeId: string
   ): Promise<ISubscription> {
     // Validate that the route exists
-    const routes = await TransitModel.getRoutes();
-    const routeExists = routes.some((r) => r.id === routeId);
+    const routeIds = await NotificationModel.getAllSubscribableRouteIds();
+    const routeExists = routeIds.has(routeId);
     if (!routeExists) {
       const error: IAppError = {
         type: 'ClientError',
@@ -219,8 +249,7 @@ export class NotificationModel {
     }
 
     // R9: Server-side proximity validation
-    const vehicles = vehiclePositionsService.getVehicles(data.routeId);
-    const bus = vehicles.find((v) => v.vid === data.vid);
+    const bus = await NotificationModel.findLiveVehicle(data.routeId, data.vid);
     if (!bus) {
       const error: IAppError = {
         type: 'ClientError',
@@ -386,5 +415,15 @@ export class NotificationModel {
     }
 
     return notifications;
+  }
+
+  /**
+   * Return notifications from the last 30 minutes, optionally filtered by fields
+   * like routeId and/or vid.
+   */
+  static async getRecentNotifications(
+    filter: Record<string, unknown> = {}
+  ): Promise<INotification[]> {
+    return DAC.db.getRecentNotifications(filter);
   }
 }

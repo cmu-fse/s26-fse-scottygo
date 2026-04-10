@@ -719,6 +719,18 @@ function updateBellState(routeId: string, subscribed: boolean): void {
   bell?.showBell(routeId, subscribed);
 }
 
+function getRouteToastLabel(routeId: string): string {
+  const route = mapStateManager
+    .getState()
+    .availableRoutes.find((r) => r.id.toLowerCase() === routeId.toLowerCase());
+
+  if (route?.system === 'CMU') {
+    return route.name;
+  }
+
+  return `Route ${routeId}`;
+}
+
 const registerSubscriptionEvents = (): void => {
   document.addEventListener('bellSubscribe', async (e: Event) => {
     const { routeId } = (e as CustomEvent<{ routeId: string }>).detail;
@@ -737,7 +749,7 @@ const registerSubscriptionEvents = (): void => {
         document.dispatchEvent(
           new CustomEvent('notifRouteJoin', { detail: { routeId } })
         );
-        showSubscriptionToast(`Subscribed to Route ${routeId}.`);
+        showSubscriptionToast(`Subscribed to ${getRouteToastLabel(routeId)}.`);
       } else if (
         res.status === 409 &&
         res.data.name === 'SubscriptionLimitReached'
@@ -780,7 +792,9 @@ const registerSubscriptionEvents = (): void => {
         document.dispatchEvent(
           new CustomEvent('notifRouteLeave', { detail: { routeId } })
         );
-        showSubscriptionToast(`Unsubscribed from Route ${routeId}.`);
+        showSubscriptionToast(
+          `Unsubscribed from ${getRouteToastLabel(routeId)}.`
+        );
       } else {
         showSubscriptionToast('Failed to unsubscribe. Please try again.');
         updateBellState(routeId, true);
@@ -794,10 +808,11 @@ const registerSubscriptionEvents = (): void => {
 
 const registerBusReportEvents = (): void => {
   document.addEventListener('busReport', (e: Event) => {
-    const { vid, routeId, lat, lon } = (
+    const { vid, routeId, routeLabel, lat, lon } = (
       e as CustomEvent<{
         vid: string;
         routeId: string;
+        routeLabel?: string;
         lat: number;
         lon: number;
       }>
@@ -806,7 +821,7 @@ const registerBusReportEvents = (): void => {
       'bus-report-form'
     ) as BusReportFormElement | null;
     if (form && typeof form.open === 'function') {
-      form.open(vid, routeId, lat, lon);
+      form.open(vid, routeId, lat, lon, routeLabel);
     }
   });
 
@@ -981,7 +996,7 @@ function addUserLocationMarker(lat: number, lng: number): void {
 }
 
 // ── Toast Notification (TUC4 Step 11) ────────────────────────────────
-function showToast(message: string): void {
+function showMapToast(message: string): void {
   // Remove existing toast if any
   const existing = document.getElementById('map-toast');
   if (existing) existing.remove();

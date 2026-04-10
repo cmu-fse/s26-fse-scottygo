@@ -23,6 +23,7 @@ import { NotificationModel } from '../models/notification.model';
 import gtfsService from '../services/gtfs.service';
 import alertsService from '../services/alerts.service';
 import vehiclePositionsService from '../services/vehicle-positions.service';
+import tripshotService from '../services/tripshot.service';
 import type {
   IRoute,
   INotification,
@@ -480,13 +481,24 @@ export class NotificationAutocompleteStrategy implements ISearchStrategy<
     if (filtered === null) return [];
     const lower = filtered.toLowerCase();
 
-    const [routes, notifications] = await Promise.all([
+    const cmuRoutesPromise = tripshotService.isConfigured()
+      ? tripshotService.getRoutes()
+      : Promise.resolve([]);
+
+    const [routes, notifications, cmuRoutes] = await Promise.all([
       TransitModel.getRoutes(),
-      NotificationModel.searchNotifications({})
+      NotificationModel.getRecentNotifications(),
+      cmuRoutesPromise
     ]);
 
+    const cmuVehicles = (
+      await Promise.all(cmuRoutes.map((r) => tripshotService.getVehicles(r.id)))
+    ).flat();
+
+    const allRoutes = routes.concat(cmuRoutes);
+
     // 1. Route IDs from GTFS that match the query (always available)
-    const routeSuggestions: ISearchSuggestion[] = routes
+    const routeSuggestions: ISearchSuggestion[] = allRoutes
       .filter(
         (r) =>
           r.id.toLowerCase().includes(lower) ||
@@ -496,8 +508,10 @@ export class NotificationAutocompleteStrategy implements ISearchStrategy<
       .map((r) => ({ label: r.id, type: 'route' as const }));
 
     // 2. All live vehicle IDs from the GTFS-RT feed that match the query
-    const vidSuggestions: ISearchSuggestion[] = vehiclePositionsService
-      .getAllVehicles()
+    const vidSuggestions: ISearchSuggestion[] = [
+      ...vehiclePositionsService.getAllVehicles(),
+      ...cmuVehicles
+    ]
       .filter((v) => v.vid.toLowerCase().includes(lower))
       .slice(0, 3)
       .map((v) => ({ label: v.vid, type: 'vehicle' as const, vid: v.vid }));

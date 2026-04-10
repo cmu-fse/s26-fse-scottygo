@@ -23,6 +23,27 @@ interface Subscription {
 interface Route {
   id: string;
   name: string;
+  system?: 'PRT' | 'CMU';
+}
+
+function getRouteDisplay(
+  route: Route | undefined,
+  routeId: string
+): {
+  title: string;
+  subtitle: string;
+} {
+  if (route?.system === 'CMU' || routeId.startsWith('CMU-')) {
+    return {
+      title: route?.name ?? routeId,
+      subtitle: 'CMU Shuttle Route'
+    };
+  }
+
+  return {
+    title: `Route ${routeId}`,
+    subtitle: 'Pittsburgh Regional Transit Route'
+  };
 }
 
 // ── Mute helpers (mirrors live-notifications.ts) ───────────────────────────────
@@ -105,10 +126,13 @@ async function fetchRoutes(): Promise<void> {
   if (!res.ok) return;
   const data = await res.json();
   // Payload is IRoute[] — extract id and name
-  allRoutes = (data.payload ?? []).map((r: { id: string; name: string }) => ({
-    id: r.id,
-    name: r.name ?? `Route ${r.id}`
-  }));
+  allRoutes = (data.payload ?? []).map(
+    (r: { id: string; name: string; system?: 'PRT' | 'CMU' }) => ({
+      id: r.id,
+      name: r.name ?? `Route ${r.id}`,
+      system: r.system
+    })
+  );
 }
 
 async function apiSubscribe(
@@ -193,6 +217,8 @@ function formatAgo(isoTimestamp: string): string {
 function createCard(sub: Subscription): HTMLLIElement {
   const normalizedRouteId = normalizeRouteId(sub.routeId);
   const muted = getMutedRoutes().has(normalizedRouteId);
+  const route = allRoutes.find((r) => routeIdsEqual(r.id, sub.routeId));
+  const display = getRouteDisplay(route, sub.routeId);
   const li = document.createElement('li');
   li.classList.add('subscription-card');
   li.dataset.routeId = sub.routeId;
@@ -208,8 +234,9 @@ function createCard(sub: Subscription): HTMLLIElement {
     <div class="card-icon-circle">${busIconSVG}</div>
     <div class="card-info">
       <a class="card-route-link" href="/notifications?route=${encodeURIComponent(sub.routeId)}">
-        Route ${sub.routeId} ${chevronSVG}
+        ${display.title} ${chevronSVG}
       </a>
+      <div class="card-last-updated">${display.subtitle}</div>
       ${updatedText ? `<div class="card-last-updated">${updatedText}</div>` : ''}
     </div>
     <div class="card-actions">
@@ -320,13 +347,14 @@ function renderSheetResults(query: string): void {
   results.innerHTML = '';
   filtered.forEach((route) => {
     const isSubscribed = subscriptions.some((s) => s.routeId === route.id);
+    const display = getRouteDisplay(route, route.id);
     const li = document.createElement('li');
     li.classList.add('sheet-result-item');
     li.innerHTML = `
       <div class="result-icon-circle">${busIconSVG}</div>
       <div class="result-info">
-        <div class="result-name">Route ${route.id}</div>
-        <div class="result-destination">${route.name}</div>
+        <div class="result-name">${display.title}</div>
+        <div class="result-destination">${display.subtitle}</div>
       </div>
       <button class="result-add-btn ${isSubscribed ? 'subscribed' : ''}" aria-label="${isSubscribed ? 'Remove' : 'Add'} Route ${route.id}">
         +

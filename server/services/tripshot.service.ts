@@ -12,7 +12,8 @@ import { IAppError } from '../../common/server.responses';
 import {
   CMU_ROUTE_METADATA,
   CMURouteMetadata,
-  extractRouteIndex
+  extractRouteIndex,
+  findCmuRouteIdByTripshotRouteId
 } from './tripshot-metadata';
 import {
   TRIPSHOT_BASE_URL,
@@ -270,7 +271,10 @@ class TripshotService {
    * @param stopId - TripShot stop UUID
    */
   getPredictions(stopId: string): IPrediction[] {
-    return tripshotLiveStatusService.getPredictions(stopId);
+    return tripshotLiveStatusService.getPredictions(stopId).map((p) => {
+      const cmuRouteId = findCmuRouteIdByTripshotRouteId(p.routeId);
+      return cmuRouteId ? { ...p, routeId: cmuRouteId } : p;
+    });
   }
 
   /**

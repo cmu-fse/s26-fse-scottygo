@@ -932,7 +932,13 @@ export class FilterController {
 
     const subheader = document.createElement('div');
     subheader.className = 'map-popup__subheader';
-    subheader.textContent = `Stop #${stop.stopId}`;
+    const isUuidStopId =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        stop.stopId
+      );
+    subheader.textContent = isUuidStopId
+      ? 'CMU Shuttle Stop'
+      : `Stop #${stop.stopId}`;
     popup.appendChild(subheader);
 
     // Walking time estimate (TUC4 Step 4, R4: 1km ≈ 15 min)

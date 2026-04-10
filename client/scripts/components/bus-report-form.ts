@@ -8,7 +8,13 @@
  */
 
 export interface BusReportFormElement extends HTMLElement {
-  open(vid: string, routeId: string, lat: number, lon: number): void;
+  open(
+    vid: string,
+    routeId: string,
+    lat: number,
+    lon: number,
+    routeLabel?: string
+  ): void;
   close(): void;
 }
 
@@ -71,6 +77,7 @@ class BusReportForm extends HTMLElement implements BusReportFormElement {
   private answers: Record<string, string> = {};
   private vid = '';
   private routeId = '';
+  private routeLabel = '';
   private lat = 0;
   private lon = 0;
   private rootListenersAttached = false;
@@ -81,9 +88,16 @@ class BusReportForm extends HTMLElement implements BusReportFormElement {
     this.setAttribute('inert', '');
   }
 
-  open(vid: string, routeId: string, lat: number, lon: number): void {
+  open(
+    vid: string,
+    routeId: string,
+    lat: number,
+    lon: number,
+    routeLabel?: string
+  ): void {
     this.vid = vid;
     this.routeId = routeId;
+    this.routeLabel = routeLabel || `Route ${routeId}`;
     this.lat = lat;
     this.lon = lon;
     this.currentStep = 1;
@@ -109,7 +123,7 @@ class BusReportForm extends HTMLElement implements BusReportFormElement {
         <div class="bus-report" role="dialog" aria-modal="true" aria-label="Bus Report">
           <div class="bus-report__header">
             <strong class="bus-report__title">Bus Report</strong>
-            <p class="bus-report__subtitle">Bus ${this.vid} &middot; Route ${this.routeId}</p>
+            <p class="bus-report__subtitle">Bus ${this.vid} &middot; ${this.routeLabel}</p>
           </div>
           <div class="bus-report__progress">
             ${Array.from(

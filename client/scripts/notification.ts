@@ -9,6 +9,12 @@ import type {
   IServiceAlert
 } from '../../common/transit.interface';
 
+interface IRouteDisplayMeta {
+  id: string;
+  name: string;
+  system?: 'PRT' | 'CMU';
+}
+
 // ── Auth ───────────────────────────────────────────────────────────────────────
 
 function getToken(): string {
@@ -32,6 +38,95 @@ const clearBtn = document.getElementById('notif-search-clear')!;
 
 /** true while showing live notification search results (not alerts) */
 let showingNotifications = false;
+const routeDisplayById = new Map<string, IRouteDisplayMeta>();
+
+function normalizeRouteId(routeId: string): string {
+  return routeId.trim().toLowerCase();
+}
+
+function getRouteDisplay(routeId: string): { title: string; subtitle: string } {
+  const route = routeDisplayById.get(normalizeRouteId(routeId));
+
+  if (route?.system === 'CMU' || routeId.startsWith('CMU-')) {
+    return {
+      title: route?.name ?? routeId,
+      subtitle: 'CMU Shuttle Route'
+    };
+  }
+
+  return {
+    title: `Route ${routeId}`,
+    subtitle: 'Pittsburgh Regional Transit Route'
+  };
+}
+
+function formatNotificationMessage(message: string): string {
+  return message.replace(/\bCMU-\d+\b/gi, (routeId: string) => {
+    const display = getRouteDisplay(routeId.toUpperCase());
+    return display.title === routeId.toUpperCase() ? routeId : display.title;
+  });
+}
+
+function getQueryTokens(query: string): string[] {
+  return query
+    .toLowerCase()
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter(Boolean);
+}
+
+function stripUrls(text: string): string {
+  return text.replace(/https?:\/\/\S+/gi, ' ');
+}
+
+function isShortBusLikeToken(token: string): boolean {
+  return /^[a-z]\d{1,3}$/i.test(token);
+}
+
+function matchesTokenizedQuery(query: string, fields: string[]): boolean {
+  const tokens = getQueryTokens(query);
+  if (tokens.length === 0) return true;
+
+  const normalizedFields = fields.map((field) => field.toLowerCase());
+  return tokens.every((token) =>
+    normalizedFields.some((field) => field.includes(token))
+  );
+}
+
+function matchesNotificationQuery(
+  notif: INotification,
+  query: string
+): boolean {
+  const display = getRouteDisplay(notif.routeId);
+  return matchesTokenizedQuery(query, [
+    notif.message,
+    notif.routeId,
+    notif.vid ?? '',
+    display.title,
+    display.subtitle,
+    formatNotificationMessage(notif.message)
+  ]);
+}
+
+function matchesAlertQuery(alert: IServiceAlert, query: string): boolean {
+  const tokens = getQueryTokens(query);
+  const routeFields = alert.routeIds.flatMap((routeId) => {
+    const display = getRouteDisplay(routeId);
+    return [routeId, display.title];
+  });
+
+  // For short bus-like queries (e.g., "E5"), only match route identifiers
+  // and route names. This avoids accidental matches in URLs inside alerts.
+  if (tokens.length === 1 && isShortBusLikeToken(tokens[0])) {
+    return matchesTokenizedQuery(query, routeFields);
+  }
+
+  return matchesTokenizedQuery(query, [
+    alert.headerText,
+    stripUrls(alert.descriptionText),
+    ...routeFields
+  ]);
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -65,6 +160,8 @@ const NOTIF_ICON = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" 
 function createNotifCard(notif: INotification): HTMLLIElement {
   const li = document.createElement('li');
   li.className = 'notif-card';
+  const display = getRouteDisplay(notif.routeId);
+  const secondaryText = notif.vid ? `Bus #${notif.vid}` : display.subtitle;
 
   li.innerHTML = `
     <button class="notif-dismiss" aria-label="Dismiss notification">
@@ -75,9 +172,12 @@ function createNotifCard(notif: INotification): HTMLLIElement {
     </button>
     <div class="notif-card-header">
       <span class="notif-icon">${NOTIF_ICON}</span>
-      <span class="notif-title">Route ${notif.routeId} · Bus #${notif.vid}</span>
+      <div class="notif-header-text">
+        <span class="notif-title">${display.title}</span>
+          <span class="notif-subtitle">${secondaryText}</span>
+      </div>
     </div>
-    <p class="notif-body">${notif.message}</p>
+    <p class="notif-body">${formatNotificationMessage(notif.message)}</p>
     <div class="notif-card-footer">
       <span class="notif-tag">Live Update</span>
       <span class="notif-time">${formatTime(notif.createdAt)}</span>
@@ -93,6 +193,21 @@ function createNotifCard(notif: INotification): HTMLLIElement {
   );
 
   return li;
+}
+
+async function fetchRoutesForDisplay(): Promise<void> {
+  try {
+    const res = await fetch('/transit/routes', { headers: authHeaders() });
+    if (!res.ok) return;
+    const data = await res.json();
+    const routes: IRouteDisplayMeta[] = data.payload ?? [];
+    routeDisplayById.clear();
+    for (const route of routes) {
+      routeDisplayById.set(normalizeRouteId(route.id), route);
+    }
+  } catch {
+    // Best effort only — notification rendering has safe fallbacks.
+  }
 }
 
 // ── Alert cards ────────────────────────────────────────────────────────────────
@@ -163,7 +278,6 @@ async function searchNotifications(params: {
   const qs = new URLSearchParams();
   if (params.route) qs.set('route', params.route);
   if (params.bus) qs.set('bus', params.bus);
-  if (params.q) qs.set('q', params.q);
 
   const query = [params.route, params.bus, params.q].filter(Boolean).join(' ');
 
@@ -176,7 +290,10 @@ async function searchNotifications(params: {
 
     if (notifRes.ok) {
       const notifData = await notifRes.json();
-      const notifs: INotification[] = notifData.payload ?? [];
+      let notifs: INotification[] = notifData.payload ?? [];
+      if (params.q) {
+        notifs = notifs.filter((n) => matchesNotificationQuery(n, params.q!));
+      }
       notifs.forEach((n) => list.appendChild(createNotifCard(n)));
     }
 
@@ -184,14 +301,8 @@ async function searchNotifications(params: {
     if (alertRes.ok) {
       const alertData = await alertRes.json();
       const alerts: IServiceAlert[] = alertData.payload ?? [];
-      const lower = (query || '').toLowerCase();
-      const matched = lower
-        ? alerts.filter(
-            (a) =>
-              a.headerText.toLowerCase().includes(lower) ||
-              a.descriptionText.toLowerCase().includes(lower) ||
-              a.routeIds.some((r) => r.toLowerCase().includes(lower))
-          )
+      const matched = query
+        ? alerts.filter((a) => matchesAlertQuery(a, query))
         : [];
       matched.forEach((a) => list.appendChild(createAlertCard(a)));
     }
@@ -266,6 +377,8 @@ async function init(): Promise<void> {
   }
 
   connectForAlerts();
+
+  await fetchRoutesForDisplay();
 
   const { route, bus } = getPreFill();
 

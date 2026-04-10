@@ -455,6 +455,21 @@ export class VehicleTracker {
     showToast(message);
   }
 
+  /** Build user-facing route text for popup subheader. */
+  private getRouteSubheaderText(routeId: string): string {
+    const route = this.stateManager
+      .getState()
+      .availableRoutes.find(
+        (r) => r.id.toLowerCase() === routeId.toLowerCase()
+      );
+
+    if (route?.system === 'CMU') {
+      return route.name;
+    }
+
+    return `Route ${routeId}`;
+  }
+
   /**
    * Show info popup for a clicked bus marker.
    * Reads the latest stored data for the vehicle.
@@ -484,7 +499,7 @@ export class VehicleTracker {
     // Subheader — route
     const subheader = document.createElement('div');
     subheader.className = 'map-popup__subheader';
-    subheader.textContent = `Route ${vehicle.routeId}`;
+    subheader.textContent = this.getRouteSubheaderText(vehicle.routeId);
     popup.appendChild(subheader);
 
     // Detail rows
@@ -600,6 +615,7 @@ export class VehicleTracker {
             detail: {
               vid: latestVehicle.vid,
               routeId: latestVehicle.routeId,
+              routeLabel: this.getRouteSubheaderText(latestVehicle.routeId),
               lat: userLat,
               lon: userLon
             }

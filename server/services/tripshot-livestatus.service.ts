@@ -36,6 +36,11 @@ function tag(): string {
   return `[TripShotLiveStatus ${new Date().toISOString()}]`;
 }
 
+/** Normalize TripShot UUIDs so map keys are case-insensitive. */
+function normalizeTsRouteId(routeId: string): string {
+  return routeId.trim().toLowerCase();
+}
+
 class TripShotLiveStatusService {
   /**
    * In-memory store: TripShot routeId UUID → IVehicle[]
@@ -86,7 +91,7 @@ class TripShotLiveStatusService {
    * has not been fetched yet.
    */
   getVehiclesByTsRouteId(tsRouteId: string): IVehicle[] {
-    return this.vehiclesByTsRouteId.get(tsRouteId) ?? [];
+    return this.vehiclesByTsRouteId.get(normalizeTsRouteId(tsRouteId)) ?? [];
   }
 
   /**
@@ -103,10 +108,12 @@ class TripShotLiveStatusService {
    * @param cmuRouteId - Our "CMU-n" route ID written into each IStop.routes[]
    */
   getStopsByTsRouteId(tsRouteId: string, cmuRouteId: string): IStop[] {
-    return (this.stopsByTsRouteId.get(tsRouteId) ?? []).map((s) => ({
-      ...s,
-      routes: [cmuRouteId]
-    }));
+    return (this.stopsByTsRouteId.get(normalizeTsRouteId(tsRouteId)) ?? []).map(
+      (s) => ({
+        ...s,
+        routes: [cmuRouteId]
+      })
+    );
   }
 
   /** When the feed was last successfully fetched. */
@@ -244,7 +251,9 @@ class TripShotLiveStatusService {
       // ── Stops — extracted from every ride, not just active ones ─────
       // Only record the first ride's stops per route to avoid duplicates
       // (all rides for a route share the same stop sequence).
-      if (!newStops.has(ride.routeId)) {
+      const normalizedRouteId = normalizeTsRouteId(ride.routeId);
+
+      if (!newStops.has(normalizedRouteId)) {
         const stops: IStop[] = [];
         for (const via of ride.vias) {
           if (!isTsViaStop(via)) continue;
@@ -260,7 +269,7 @@ class TripShotLiveStatusService {
           });
         }
         if (stops.length > 0) {
-          newStops.set(ride.routeId, stops);
+          newStops.set(normalizedRouteId, stops);
         }
       }
 
@@ -270,11 +279,13 @@ class TripShotLiveStatusService {
       if (!vs || !vs.liveDataAvailable) continue;
 
       // ── Vehicle record ───────────────────────────────────────────────
+      const displayVid = (vs.name || '').trim() || vs.vehicleId;
+
       const vehicle: IVehicle = {
-        vid: vs.vehicleId,
+        vid: displayVid,
         lat: vs.location.lt,
         lon: vs.location.lg,
-        routeId: ride.routeId, // TripShot UUID; callers rewrite to CMU-n
+        routeId: normalizedRouteId, // TripShot UUID; callers rewrite to CMU-n
         heading: vs.bearing ?? 0,
         speed: vs.speed,
         source: 'live',
@@ -282,14 +293,14 @@ class TripShotLiveStatusService {
         isDetoured: false
       };
 
-      const vehicleList = newVehicles.get(ride.routeId) ?? [];
+      const vehicleList = newVehicles.get(normalizedRouteId) ?? [];
       vehicleList.push(vehicle);
-      newVehicles.set(ride.routeId, vehicleList);
+      newVehicles.set(normalizedRouteId, vehicleList);
 
       // ── Stop predictions from Awaiting entries ───────────────────────
       for (const ss of ride.stopStatus) {
         if (!('Awaiting' in ss)) continue;
-        this.addPrediction(newPredictions, ss, ride, vs.vehicleId);
+        this.addPrediction(newPredictions, ss, ride, displayVid);
       }
     }
 
@@ -311,10 +322,7 @@ class TripShotLiveStatusService {
     const awaiting = (ss as Extract<TsStopState, { Awaiting: unknown }>)
       .Awaiting;
     const eta = new Date(awaiting.expectedArrivalTime).getTime();
-    const minutesFromNow = Math.max(
-      0,
-      Math.round((eta - Date.now()) / 60_000)
-    );
+    const minutesFromNow = Math.max(0, Math.round((eta - Date.now()) / 60_000));
 
     const prediction: IPrediction = {
       stopId: awaiting.stopId,
