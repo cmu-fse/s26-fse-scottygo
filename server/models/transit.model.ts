@@ -62,8 +62,10 @@ function expiresAt(ttl: number = CACHE_TTL_MS): Date {
  *   distance = 2 · R · atan2(√a, √(1−a))
  *
  * where R is the mean Earth radius (6 371 000 m).
+ *
+ * Exported for unit testing (TUC4).
  */
-function haversineDistanceMeters(
+export function haversineDistanceMeters(
   lat1: number,
   lon1: number,
   lat2: number,
@@ -76,6 +78,16 @@ function haversineDistanceMeters(
     Math.sin(dLat / 2) ** 2 +
     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
   return EARTH_RADIUS_M * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/**
+ * Walk-time heuristic (TUC4 R4):
+ *   walkMinutesEstimate = ⌈(distanceMeters / 1000) × 15⌉
+ *
+ * Exported for unit testing.
+ */
+export function computeWalkMinutes(distanceMeters: number): number {
+  return Math.ceil((distanceMeters / METERS_PER_KM) * WALK_MINUTES_PER_KM);
 }
 
 /** Try to read a non-expired cache entry from MongoDB. */
@@ -528,10 +540,8 @@ export class TransitModel {
         );
         if (distanceMeters <= radius) {
           // Walk-time heuristic (TUC4 R4): 1 km ≈ 15 min of slow walking
-          // walkMinutesEstimate = ⌈(distanceMeters / 1000) × 15⌉
-          const walkMinutesEstimate = Math.ceil(
-            (distanceMeters / METERS_PER_KM) * WALK_MINUTES_PER_KM
-          );
+          // walkMinutesEstimate = ⌈(distanceMeters / 1000) × 15⌉  (TUC4 R4)
+          const walkMinutesEstimate = computeWalkMinutes(distanceMeters);
 
           result.push({
             stop,
