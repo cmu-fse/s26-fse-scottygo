@@ -26,6 +26,7 @@ import type { IMapProvider, IMapMarker } from '../../../common/map.interface';
 import type { IVehicle } from '../../../common/transit.interface';
 import { MapStateManager } from '../state/map-state';
 import { MAP_POPUP_ID, closeMapPopup } from '../utils/map-popup';
+import { getRouteTitle } from '../utils/route-display';
 import { showToast } from '../utils/toast';
 
 export class VehicleTracker {
@@ -457,17 +458,7 @@ export class VehicleTracker {
 
   /** Build user-facing route text for popup subheader. */
   private getRouteSubheaderText(routeId: string): string {
-    const route = this.stateManager
-      .getState()
-      .availableRoutes.find(
-        (r) => r.id.toLowerCase() === routeId.toLowerCase()
-      );
-
-    if (route?.system === 'CMU') {
-      return route.name;
-    }
-
-    return `Route ${routeId}`;
+    return getRouteTitle(routeId, this.stateManager.getState().availableRoutes);
   }
 
   /**

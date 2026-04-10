@@ -14,11 +14,10 @@ import {
   IBusCondition
 } from '../../common/transit.interface';
 import { IAppError } from '../../common/server.responses';
-import vehiclePositionsService from '../services/vehicle-positions.service';
 import moderationService from '../services/moderation.service';
-import { TransitModel, haversineDistanceMeters } from './transit.model';
-import tripshotService from '../services/tripshot.service';
+import { haversineDistanceMeters } from './transit.model';
 import { IVehicle } from '../../common/transit.interface';
+import notificationSourcesService from '../services/notification-sources.service';
 
 /** Radius limit for proximity check in miles (R9). */
 const PROXIMITY_LIMIT_MILES = 0.5;
@@ -44,17 +43,7 @@ export class NotificationModel {
 
   /** Return all valid route IDs for TUC3 subscriptions (PRT + CMU). */
   private static async getAllSubscribableRouteIds(): Promise<Set<string>> {
-    const routeIds = new Set<string>();
-
-    const prtRoutes = await TransitModel.getRoutes();
-    for (const route of prtRoutes) routeIds.add(route.id);
-
-    if (tripshotService.isConfigured()) {
-      const cmuRoutes = await tripshotService.getRoutes().catch(() => []);
-      for (const route of cmuRoutes) routeIds.add(route.id);
-    }
-
-    return routeIds;
+    return notificationSourcesService.getSubscribableRouteIds();
   }
 
   /** Find a live vehicle for the given route and bus ID (case-insensitive). */
@@ -62,9 +51,8 @@ export class NotificationModel {
     routeId: string,
     vid: string
   ): Promise<IVehicle | null> {
-    const vehicles = routeId.startsWith('CMU-')
-      ? await tripshotService.getVehicles(routeId).catch(() => [])
-      : vehiclePositionsService.getVehicles(routeId);
+    const vehicles =
+      await notificationSourcesService.getVehiclesForRoute(routeId);
 
     const wanted = vid.trim().toLowerCase();
     return vehicles.find((v) => v.vid.trim().toLowerCase() === wanted) ?? null;

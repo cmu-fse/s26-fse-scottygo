@@ -2,13 +2,15 @@ export {};
 
 import './components/app-header';
 import './components/live-notifications';
+import {
+  buildRouteDisplayMap,
+  getRouteDisplay,
+  normalizeRouteId,
+  type IRouteDisplayMeta
+} from './utils/route-display';
 
 const MAX_SUBSCRIPTIONS = 10;
 const MUTED_ROUTES_KEY = 'scottygo_muted_routes';
-
-function normalizeRouteId(routeId: string): string {
-  return routeId.trim().toLowerCase();
-}
 
 function routeIdsEqual(a: string, b: string): boolean {
   return normalizeRouteId(a) === normalizeRouteId(b);
@@ -18,32 +20,6 @@ interface Subscription {
   _id?: string;
   routeId: string;
   createdAt: string;
-}
-
-interface Route {
-  id: string;
-  name: string;
-  system?: 'PRT' | 'CMU';
-}
-
-function getRouteDisplay(
-  route: Route | undefined,
-  routeId: string
-): {
-  title: string;
-  subtitle: string;
-} {
-  if (route?.system === 'CMU' || routeId.startsWith('CMU-')) {
-    return {
-      title: route?.name ?? routeId,
-      subtitle: 'CMU Shuttle Route'
-    };
-  }
-
-  return {
-    title: `Route ${routeId}`,
-    subtitle: 'Pittsburgh Regional Transit Route'
-  };
 }
 
 // ── Mute helpers (mirrors live-notifications.ts) ───────────────────────────────
@@ -90,7 +66,8 @@ function showToast(message: string): void {
 // ── State ──────────────────────────────────────────────────────────────────────
 
 let subscriptions: Subscription[] = [];
-let allRoutes: Route[] = [];
+let allRoutes: IRouteDisplayMeta[] = [];
+let routeDisplayById = new Map<string, IRouteDisplayMeta>();
 /** Most recent notification createdAt per routeId (from last 30 min). */
 const latestNotifTime = new Map<string, string>();
 
@@ -133,6 +110,7 @@ async function fetchRoutes(): Promise<void> {
       system: r.system
     })
   );
+  routeDisplayById = buildRouteDisplayMap(allRoutes);
 }
 
 async function apiSubscribe(
@@ -217,8 +195,7 @@ function formatAgo(isoTimestamp: string): string {
 function createCard(sub: Subscription): HTMLLIElement {
   const normalizedRouteId = normalizeRouteId(sub.routeId);
   const muted = getMutedRoutes().has(normalizedRouteId);
-  const route = allRoutes.find((r) => routeIdsEqual(r.id, sub.routeId));
-  const display = getRouteDisplay(route, sub.routeId);
+  const display = getRouteDisplay(sub.routeId, routeDisplayById);
   const li = document.createElement('li');
   li.classList.add('subscription-card');
   li.dataset.routeId = sub.routeId;
@@ -333,21 +310,60 @@ function renderList(): void {
   renderEmptyState();
 }
 
+function getFilteredRoutes(query: string): IRouteDisplayMeta[] {
+  const lowerQ = query.toLowerCase();
+  if (!query) return allRoutes;
+
+  return allRoutes.filter(
+    (route) =>
+      route.id.toLowerCase().includes(lowerQ) ||
+      route.name.toLowerCase().includes(lowerQ)
+  );
+}
+
+async function toggleSubscriptionFromSheet(routeId: string): Promise<void> {
+  const alreadySubscribed = subscriptions.some((s) => s.routeId === routeId);
+  if (alreadySubscribed) {
+    const { ok } = await apiUnsubscribe(routeId);
+    if (ok) {
+      subscriptions = subscriptions.filter((s) => s.routeId !== routeId);
+      document.dispatchEvent(
+        new CustomEvent('notifRouteLeave', {
+          detail: { routeId }
+        })
+      );
+    }
+    return;
+  }
+
+  if (subscriptions.length >= MAX_SUBSCRIPTIONS) return;
+
+  const { ok, error } = await apiSubscribe(routeId);
+  if (ok) {
+    await fetchSubscriptions();
+    document.dispatchEvent(
+      new CustomEvent('notifRouteJoin', { detail: { routeId } })
+    );
+    return;
+  }
+
+  if (error?.includes('already subscribed')) {
+    showToast(`You are already subscribed to Route ${routeId}.`);
+    await fetchSubscriptions();
+    return;
+  }
+
+  showToast(error ?? 'Failed to subscribe.');
+}
+
 function renderSheetResults(query: string): void {
   const results = document.getElementById('sheet-results')!;
-  const lowerQ = query.toLowerCase();
-  const filtered = query
-    ? allRoutes.filter(
-        (r) =>
-          r.id.toLowerCase().includes(lowerQ) ||
-          r.name.toLowerCase().includes(lowerQ)
-      )
-    : allRoutes;
+  const filteredRoutes = getFilteredRoutes(query);
 
   results.innerHTML = '';
-  filtered.forEach((route) => {
+  filteredRoutes.forEach((route) => {
     const isSubscribed = subscriptions.some((s) => s.routeId === route.id);
-    const display = getRouteDisplay(route, route.id);
+    const display = getRouteDisplay(route.id, routeDisplayById);
     const li = document.createElement('li');
     li.classList.add('sheet-result-item');
     li.innerHTML = `
@@ -363,37 +379,7 @@ function renderSheetResults(query: string): void {
 
     const addBtn = li.querySelector<HTMLButtonElement>('.result-add-btn')!;
     addBtn.addEventListener('click', async () => {
-      const alreadySubscribed = subscriptions.some(
-        (s) => s.routeId === route.id
-      );
-      if (alreadySubscribed) {
-        // Treat as unsubscribe from search sheet
-        const { ok } = await apiUnsubscribe(route.id);
-        if (ok) {
-          subscriptions = subscriptions.filter((s) => s.routeId !== route.id);
-          document.dispatchEvent(
-            new CustomEvent('notifRouteLeave', {
-              detail: { routeId: route.id }
-            })
-          );
-        }
-      } else {
-        if (subscriptions.length >= MAX_SUBSCRIPTIONS) return; // button hidden at limit
-        const { ok, error } = await apiSubscribe(route.id);
-        if (ok) {
-          // Refresh subscription list from server to get the _id
-          await fetchSubscriptions();
-          document.dispatchEvent(
-            new CustomEvent('notifRouteJoin', { detail: { routeId: route.id } })
-          );
-        } else if (error?.includes('already subscribed')) {
-          // A9: duplicate
-          showToast(`You are already subscribed to Route ${route.id}.`);
-          await fetchSubscriptions();
-        } else {
-          showToast(error ?? 'Failed to subscribe.');
-        }
-      }
+      await toggleSubscriptionFromSheet(route.id);
       renderList();
       renderSheetResults(query);
     });

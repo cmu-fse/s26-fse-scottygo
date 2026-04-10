@@ -22,8 +22,7 @@ import { User } from '../models/user.model';
 import { NotificationModel } from '../models/notification.model';
 import gtfsService from '../services/gtfs.service';
 import alertsService from '../services/alerts.service';
-import vehiclePositionsService from '../services/vehicle-positions.service';
-import tripshotService from '../services/tripshot.service';
+import notificationSourcesService from '../services/notification-sources.service';
 import type {
   IRoute,
   INotification,
@@ -481,24 +480,14 @@ export class NotificationAutocompleteStrategy implements ISearchStrategy<
     if (filtered === null) return [];
     const lower = filtered.toLowerCase();
 
-    const cmuRoutesPromise = tripshotService.isConfigured()
-      ? tripshotService.getRoutes()
-      : Promise.resolve([]);
-
-    const [routes, notifications, cmuRoutes] = await Promise.all([
-      TransitModel.getRoutes(),
+    const [routes, notifications, allLiveVehicles] = await Promise.all([
+      notificationSourcesService.getAllSubscribableRoutes(),
       NotificationModel.getRecentNotifications(),
-      cmuRoutesPromise
+      notificationSourcesService.getAllLiveVehiclesForNotifications()
     ]);
 
-    const cmuVehicles = (
-      await Promise.all(cmuRoutes.map((r) => tripshotService.getVehicles(r.id)))
-    ).flat();
-
-    const allRoutes = routes.concat(cmuRoutes);
-
     // 1. Route IDs from GTFS that match the query (always available)
-    const routeSuggestions: ISearchSuggestion[] = allRoutes
+    const routeSuggestions: ISearchSuggestion[] = routes
       .filter(
         (r) =>
           r.id.toLowerCase().includes(lower) ||
@@ -508,10 +497,7 @@ export class NotificationAutocompleteStrategy implements ISearchStrategy<
       .map((r) => ({ label: r.id, type: 'route' as const }));
 
     // 2. All live vehicle IDs from the GTFS-RT feed that match the query
-    const vidSuggestions: ISearchSuggestion[] = [
-      ...vehiclePositionsService.getAllVehicles(),
-      ...cmuVehicles
-    ]
+    const vidSuggestions: ISearchSuggestion[] = allLiveVehicles
       .filter((v) => v.vid.toLowerCase().includes(lower))
       .slice(0, 3)
       .map((v) => ({ label: v.vid, type: 'vehicle' as const, vid: v.vid }));
