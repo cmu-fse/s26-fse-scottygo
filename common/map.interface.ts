@@ -39,6 +39,7 @@ export interface IMapPolylineOptions {
   color?: string;
   weight?: number;
   opacity?: number;
+  zIndex?: number;
 }
 
 export interface IMapMarker {
@@ -63,6 +64,7 @@ export interface IMapMarker {
 export interface IMapPolyline {
   id: string;
   setVisible(visible: boolean): void;
+  onClick(callback: (position: ILatLng) => void): void;
   remove(): void;
 }
 
