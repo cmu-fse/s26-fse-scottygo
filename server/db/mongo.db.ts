@@ -247,7 +247,9 @@ export class MongoDB implements IDatabase {
   }
 
   async getAllUserAccounts(): Promise<IUserAccount[]> {
-    const users: IUserAccount[] = await MUser.find().lean();
+    const users: IUserAccount[] = await MUser.find()
+      .select('-credentials.password')
+      .lean();
     return users;
   }
 
