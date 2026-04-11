@@ -80,9 +80,7 @@ jest.mock('../../../server/models/transit.model', () => {
       const dLon = toRad(lon2 - lon1);
       const a =
         Math.sin(dLat / 2) ** 2 +
-        Math.cos(toRad(lat1)) *
-          Math.cos(toRad(lat2)) *
-          Math.sin(dLon / 2) ** 2;
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
       return EARTH_RADIUS_M * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
   };
@@ -181,7 +179,9 @@ const mockVehicles = vehiclePositionsService as jest.Mocked<
   typeof vehiclePositionsService
 >;
 const mockAlerts = alertsService as jest.Mocked<typeof alertsService>;
-const mockModeration = moderationService as jest.Mocked<typeof moderationService>;
+const mockModeration = moderationService as jest.Mocked<
+  typeof moderationService
+>;
 
 // ---------------------------------------------------------------------------
 // Sample data
@@ -206,8 +206,8 @@ const nearBus: IVehicle = {
 /** Bus placed ~5 miles away — reporter will fail the proximity check. */
 const farBus: IVehicle = {
   vid: 'bus-far',
-  lat: 40.5000,
-  lon: -80.0500,
+  lat: 40.5,
+  lon: -80.05,
   routeId: '61C',
   heading: 0,
   source: 'live',
@@ -699,7 +699,9 @@ describe('TUC3: Service Alerts', () => {
         headerText: 'Route 61C delay',
         descriptionText: 'Delays due to construction.',
         routeIds: ['61C'],
-        activePeriods: [{ start: '2026-04-03T08:00:00Z', end: '2026-04-03T18:00:00Z' }]
+        activePeriods: [
+          { start: '2026-04-03T08:00:00Z', end: '2026-04-03T18:00:00Z' }
+        ]
       }
     ]);
 
@@ -716,7 +718,11 @@ describe('TUC3: Service Alerts', () => {
 
     const alerts = success.payload as responses.IPayload;
     expect(Array.isArray(alerts)).toBe(true);
-    const alertList = alerts as Array<{ id: string; headerText: string; routeIds: string[] }>;
+    const alertList = alerts as Array<{
+      id: string;
+      headerText: string;
+      routeIds: string[];
+    }>;
     expect(alertList.length).toBe(1);
     expect(alertList[0].id).toBe('alert-1');
     expect(alertList[0].headerText).toBe('Route 61C delay');

@@ -54,7 +54,10 @@ export interface TripshotRouteResponse {
  * Ported from Python implementation provided by user
  */
 
-function decodeNextValue(str: string, index: number): { value: number; index: number } {
+function decodeNextValue(
+  str: string,
+  index: number
+): { value: number; index: number } {
   let shift = 0;
   let result = 0;
   while (true) {

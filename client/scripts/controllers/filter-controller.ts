@@ -569,9 +569,10 @@ export class FilterController {
   ): void {
     for (const dir of ['INBOUND', 'OUTBOUND'] as const) {
       if (!routeDirections.includes(dir)) continue;
-      const enabled = dir === 'INBOUND'
-        ? selectedDirections.inbound
-        : selectedDirections.outbound;
+      const enabled =
+        dir === 'INBOUND'
+          ? selectedDirections.inbound
+          : selectedDirections.outbound;
       if (enabled) {
         this.routeRenderer.showDirectionPolylines(routeId, dir);
       } else {
@@ -1056,9 +1057,10 @@ export class FilterController {
     btn: HTMLButtonElement,
     count: number
   ): void {
-    const label = count > 0
-      ? `Directions (${count} bus${count > 1 ? 'es' : ''})`
-      : 'Directions';
+    const label =
+      count > 0
+        ? `Directions (${count} bus${count > 1 ? 'es' : ''})`
+        : 'Directions';
     btn.innerHTML = `
       <span class="material-icons-outlined">directions_walk</span>
       ${label}
@@ -1169,7 +1171,8 @@ export class FilterController {
       li.dataset.arrival = String(p.predictedArrivalTime);
 
       const minsEl = li.querySelector('.map-popup__minutes');
-      if (minsEl) minsEl.textContent = this.formatCountdown(p.predictedArrivalTime);
+      if (minsEl)
+        minsEl.textContent = this.formatCountdown(p.predictedArrivalTime);
 
       const metaEl = li.querySelector('.map-popup__meta');
       if (metaEl) {
@@ -1221,7 +1224,8 @@ export class FilterController {
       const geometry = await this.fetchRouteGeometry(routeId);
       if (geometry) {
         const route = state.availableRoutes.find((r) => r.id === routeId);
-        const color = route?.color || this.routeColorCache.get(routeId) || '#FF0000';
+        const color =
+          route?.color || this.routeColorCache.get(routeId) || '#FF0000';
         this.routeRenderer.renderRouteGeometry(routeId, geometry, color);
       }
 
@@ -1300,7 +1304,8 @@ export class FilterController {
           const geometry = await this.fetchRouteGeometry(routeId);
           if (geometry) {
             const route = state.availableRoutes.find((r) => r.id === routeId);
-            const color = route?.color || this.routeColorCache.get(routeId) || '#FF0000';
+            const color =
+              route?.color || this.routeColorCache.get(routeId) || '#FF0000';
             this.routeRenderer.renderRouteGeometry(routeId, geometry, color);
           }
         }

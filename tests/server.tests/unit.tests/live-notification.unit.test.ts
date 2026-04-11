@@ -84,10 +84,10 @@ const sampleVehicle: IVehicle = {
 };
 
 /** User coordinates close to the sample vehicle (within 0.5 miles). */
-const nearbyCoords = { lat: 40.4410, lon: -79.9960 };
+const nearbyCoords = { lat: 40.441, lon: -79.996 };
 
 /** User coordinates far from the sample vehicle (> 0.5 miles). */
-const farCoords = { lat: 40.5000, lon: -80.1000 };
+const farCoords = { lat: 40.5, lon: -80.1 };
 
 // ============================================================================
 // Reset internal state between tests
@@ -442,8 +442,12 @@ describe('Status change detection and notification (R6, R12)', () => {
     expect(result.notification).not.toBeNull();
     expect(result.notification!.changedFields).toContain('crowdedness');
     expect(result.notification!.changedFields).toContain('condition');
-    expect(result.notification!.message).toContain('Crowdedness changed to Packed');
-    expect(result.notification!.message).toContain('Condition changed to Dirty');
+    expect(result.notification!.message).toContain(
+      'Crowdedness changed to Packed'
+    );
+    expect(result.notification!.message).toContain(
+      'Condition changed to Dirty'
+    );
   });
 
   test('report with same status as last known does not produce a notification', async () => {
@@ -545,7 +549,9 @@ describe('Status change detection and notification (R6, R12)', () => {
 
     expect(result.notification).not.toBeNull();
     expect(result.notification!.changedFields).toEqual(['condition']);
-    expect(result.notification!.message).toContain('Condition changed to Dirty');
+    expect(result.notification!.message).toContain(
+      'Condition changed to Dirty'
+    );
     expect(result.notification!.message).not.toContain('Crowdedness');
   });
 });

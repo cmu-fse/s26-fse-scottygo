@@ -312,7 +312,9 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
     routeRenderer.initialize(mapProvider);
 
     // Track last pointer position for route-pick popup placement
-    const mapContainer = document.querySelector('.map-container') as HTMLElement;
+    const mapContainer = document.querySelector(
+      '.map-container'
+    ) as HTMLElement;
     let lastPointerX = 0;
     let lastPointerY = 0;
     if (mapContainer) {
@@ -321,11 +323,15 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
         lastPointerX = e.clientX - rect.left;
         lastPointerY = e.clientY - rect.top;
       });
-      mapContainer.addEventListener('touchstart', (e) => {
-        const rect = mapContainer.getBoundingClientRect();
-        lastPointerX = e.touches[0].clientX - rect.left;
-        lastPointerY = e.touches[0].clientY - rect.top;
-      }, { passive: true });
+      mapContainer.addEventListener(
+        'touchstart',
+        (e) => {
+          const rect = mapContainer.getBoundingClientRect();
+          lastPointerX = e.touches[0].clientX - rect.left;
+          lastPointerY = e.touches[0].clientY - rect.top;
+        },
+        { passive: true }
+      );
     }
 
     // Route polyline click handler — show route-pick popup
@@ -709,9 +715,7 @@ const registerFilterApplicationEvents = (): void => {
 };
 
 function updateBellState(routeId: string, subscribed: boolean): void {
-  const bell = document.querySelector(
-    'route-bell'
-  ) as IRouteBellElement | null;
+  const bell = document.querySelector('route-bell') as IRouteBellElement | null;
   bell?.showBell(routeId, subscribed);
 }
 
@@ -1011,14 +1015,25 @@ function startDirectionsBusTicker(): void {
   stopDirectionsBusTicker();
   directionsBusTickerInterval = window.setInterval(() => {
     const panel = document.getElementById('directions-panel');
-    if (!panel) { stopDirectionsBusTicker(); return; }
-    panel.querySelectorAll<HTMLElement>('.directions-panel__bus').forEach((li) => {
-      const arrival = Number(li.dataset.arrival);
-      if (!arrival) return;
-      const secsLeft = Math.round((arrival - Date.now()) / 1000);
-      const timeEl = li.querySelector('.directions-panel__bus-time');
-      if (timeEl) timeEl.textContent = secsLeft <= 0 ? 'NOW' : secsLeft < 60 ? `${secsLeft}s` : `${Math.ceil(secsLeft / 60)} min`;
-    });
+    if (!panel) {
+      stopDirectionsBusTicker();
+      return;
+    }
+    panel
+      .querySelectorAll<HTMLElement>('.directions-panel__bus')
+      .forEach((li) => {
+        const arrival = Number(li.dataset.arrival);
+        if (!arrival) return;
+        const secsLeft = Math.round((arrival - Date.now()) / 1000);
+        const timeEl = li.querySelector('.directions-panel__bus-time');
+        if (timeEl)
+          timeEl.textContent =
+            secsLeft <= 0
+              ? 'NOW'
+              : secsLeft < 60
+                ? `${secsLeft}s`
+                : `${Math.ceil(secsLeft / 60)} min`;
+      });
   }, 1000);
 }
 
@@ -1047,9 +1062,17 @@ function updateDirectionsPanel(
     const routes = mapStateManager.getState().availableRoutes;
     const items = info.predictions
       .map((p) => {
-        const secsLeft = Math.round((p.predictedArrivalTime - Date.now()) / 1000);
-        const minText = secsLeft <= 0 ? 'NOW' : secsLeft < 60 ? `${secsLeft}s` : `${Math.ceil(secsLeft / 60)} min`;
-        const color = routes.find((r) => r.id === p.routeId)?.color || '#c41230';
+        const secsLeft = Math.round(
+          (p.predictedArrivalTime - Date.now()) / 1000
+        );
+        const minText =
+          secsLeft <= 0
+            ? 'NOW'
+            : secsLeft < 60
+              ? `${secsLeft}s`
+              : `${Math.ceil(secsLeft / 60)} min`;
+        const color =
+          routes.find((r) => r.id === p.routeId)?.color || '#c41230';
         return `<li class="directions-panel__bus" data-arrival="${p.predictedArrivalTime}">
           <span class="directions-panel__bus-badge" style="background:${color}">${p.routeId}</span>
           <span class="directions-panel__bus-time">${minText}</span>
@@ -1108,11 +1131,7 @@ function dismissRoutePickPopup(): void {
 }
 
 /** Show a small popup listing route badges at the given pixel position. */
-function showRoutePickPopup(
-  routeIds: string[],
-  x: number,
-  y: number
-): void {
+function showRoutePickPopup(routeIds: string[], x: number, y: number): void {
   dismissRoutePickPopup();
   if (routeIds.length === 0) return;
 

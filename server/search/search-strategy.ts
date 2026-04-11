@@ -361,9 +361,7 @@ export class NotificationSearchStrategy implements ISearchStrategy<
     const filtered = filterStopWords(query);
     if (filtered === null) return [];
 
-    const notifications = await NotificationModel.getRecentNotifications();
-    const lower = filtered.toLowerCase();
-    return notifications.filter((n) => matchesNotificationText(n, lower));
+    return NotificationModel.searchNotifications({ q: filtered });
   }
 }
 
@@ -377,7 +375,7 @@ export class RecentNotificationsStrategy implements ISearchStrategy<
   INotification[]
 > {
   async search(_query: string): Promise<INotification[]> {
-    return NotificationModel.getRecentNotifications();
+    return NotificationModel.searchNotifications({});
   }
 }
 
@@ -387,7 +385,7 @@ export class NotificationRouteSearchStrategy implements ISearchStrategy<
   constructor(private readonly routeId: string) {}
 
   async search(_query: string): Promise<INotification[]> {
-    return NotificationModel.getRecentNotifications({ routeId: this.routeId });
+    return NotificationModel.searchNotifications({ route: this.routeId });
   }
 }
 
@@ -397,7 +395,7 @@ export class NotificationBusSearchStrategy implements ISearchStrategy<
   constructor(private readonly vid: string) {}
 
   async search(_query: string): Promise<INotification[]> {
-    return NotificationModel.getRecentNotifications({ vid: this.vid });
+    return NotificationModel.searchNotifications({ bus: this.vid });
   }
 }
 
@@ -412,22 +410,20 @@ export class NotificationCompositeSearchStrategy implements ISearchStrategy<
   ) {}
 
   async search(query: string): Promise<INotification[]> {
-    const filter: { routeId?: string; vid?: string } = {};
-    if (this.criteria.route) filter.routeId = this.criteria.route;
-    if (this.criteria.bus) filter.vid = this.criteria.bus;
-
-    let notifications = await NotificationModel.getRecentNotifications(filter);
-
-    if (!query.trim()) return notifications;
+    if (!query.trim()) {
+      return NotificationModel.searchNotifications({
+        route: this.criteria.route,
+        bus: this.criteria.bus
+      });
+    }
 
     const filtered = filterStopWords(query);
-    if (filtered === null) return notifications;
-
-    const lower = filtered.toLowerCase();
-    notifications = notifications.filter((n) =>
-      matchesNotificationText(n, lower)
-    );
-    return notifications;
+    return NotificationModel.searchNotifications({
+      route: this.criteria.route,
+      bus: this.criteria.bus,
+      // Preserve existing behavior: stopword-only query behaves like no q filter.
+      q: filtered ?? undefined
+    });
   }
 }
 
@@ -486,7 +482,7 @@ export class NotificationAutocompleteStrategy implements ISearchStrategy<
 
     const [routes, notifications] = await Promise.all([
       TransitModel.getRoutes(),
-      NotificationModel.getRecentNotifications()
+      NotificationModel.searchNotifications({})
     ]);
 
     // 1. Route IDs from GTFS that match the query (always available)

@@ -108,10 +108,7 @@ export class RouteRenderer {
   }
 
   /** Attach a click listener to a polyline and register it in the reverse map. */
-  private registerPolylineClick(
-    polyline: IMapPolyline,
-    routeId: string
-  ): void {
+  private registerPolylineClick(polyline: IMapPolyline, routeId: string): void {
     this.polylineRouteMap.set(polyline.id, routeId);
     polyline.onClick((position: ILatLng) => {
       if (!this.onRouteClickCallback) return;
@@ -273,9 +270,9 @@ export class RouteRenderer {
         if (!this.routePaths.has(routeId)) {
           this.routePaths.set(routeId, []);
         }
-        this.routePaths.get(routeId)!.push(
-          segment.path.map((p) => ({ lat: p.lat, lng: p.lng }))
-        );
+        this.routePaths
+          .get(routeId)!
+          .push(segment.path.map((p) => ({ lat: p.lat, lng: p.lng })));
 
         // Store with direction-specific key
         const directionKey = `${routeId}_${segment.direction}`;

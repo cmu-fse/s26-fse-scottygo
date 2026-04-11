@@ -177,7 +177,8 @@ export class GoogleMapProvider implements IMapProvider {
           polyline,
           'click',
           (e: google.maps.PolyMouseEvent) => {
-            if (e.latLng) callback({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+            if (e.latLng)
+              callback({ lat: e.latLng.lat(), lng: e.latLng.lng() });
           }
         );
       },

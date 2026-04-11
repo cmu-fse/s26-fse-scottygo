@@ -192,10 +192,7 @@ export class VehicleTracker {
           this.renderVehicles(vehicles);
         }
       } catch (error) {
-        console.error(
-          `Error fetching vehicles for route ${routeId}:`,
-          error
-        );
+        console.error(`Error fetching vehicles for route ${routeId}:`, error);
       }
     }
   }
@@ -377,7 +374,7 @@ export class VehicleTracker {
     );
 
     // Normalise heading to [0, 360).
-    const heading = ((vehicle.heading ?? 0) % 360 + 360) % 360;
+    const heading = (((vehicle.heading ?? 0) % 360) + 360) % 360;
 
     // Westward headings (180–359°): mirror the bus so the front stays
     // visually "correct" (windows above chassis, headlight at nose).
@@ -409,22 +406,22 @@ export class VehicleTracker {
     const svg =
       `<svg xmlns="http://www.w3.org/2000/svg" width="${sz}" height="${sz}" viewBox="0 0 ${vbSize} ${vbSize}">` +
       `<g transform="${groupTransform}">` +
-        // Bus body — main fill is the route colour
-        `<rect x="-12" y="-5" width="24" height="10" rx="2" fill="${color}" stroke="rgba(0,0,0,0.35)" stroke-width="0.6"/>` +
-        // Front accent panel (covers the right side to mark the nose)
-        `<rect x="9" y="-5" width="3" height="10" fill="rgba(0,0,0,0.18)"/>` +
-        // Windshield (front pane, right side of body)
-        `<rect x="4.5" y="-3.5" width="5" height="7" rx="1" fill="rgba(210,235,255,0.9)" stroke="rgba(0,0,0,0.25)" stroke-width="0.4"/>` +
-        // Passenger side window 1
-        `<rect x="-1.5" y="-3.5" width="3.5" height="5" rx="0.5" fill="rgba(210,235,255,0.75)" stroke="rgba(0,0,0,0.2)" stroke-width="0.3"/>` +
-        // Passenger side window 2
-        `<rect x="-7" y="-3.5" width="3.5" height="5" rx="0.5" fill="rgba(210,235,255,0.75)" stroke="rgba(0,0,0,0.2)" stroke-width="0.3"/>` +
-        // Headlight at nose
-        `<circle cx="12" cy="0" r="1.3" fill="rgba(255,255,200,0.95)"/>` +
-        // Front wheel
-        `<rect x="5" y="4.5" width="4.5" height="2.5" rx="0.8" fill="rgba(30,30,30,0.85)"/>` +
-        // Rear wheel
-        `<rect x="-9.5" y="4.5" width="4.5" height="2.5" rx="0.8" fill="rgba(30,30,30,0.85)"/>` +
+      // Bus body — main fill is the route colour
+      `<rect x="-12" y="-5" width="24" height="10" rx="2" fill="${color}" stroke="rgba(0,0,0,0.35)" stroke-width="0.6"/>` +
+      // Front accent panel (covers the right side to mark the nose)
+      `<rect x="9" y="-5" width="3" height="10" fill="rgba(0,0,0,0.18)"/>` +
+      // Windshield (front pane, right side of body)
+      `<rect x="4.5" y="-3.5" width="5" height="7" rx="1" fill="rgba(210,235,255,0.9)" stroke="rgba(0,0,0,0.25)" stroke-width="0.4"/>` +
+      // Passenger side window 1
+      `<rect x="-1.5" y="-3.5" width="3.5" height="5" rx="0.5" fill="rgba(210,235,255,0.75)" stroke="rgba(0,0,0,0.2)" stroke-width="0.3"/>` +
+      // Passenger side window 2
+      `<rect x="-7" y="-3.5" width="3.5" height="5" rx="0.5" fill="rgba(210,235,255,0.75)" stroke="rgba(0,0,0,0.2)" stroke-width="0.3"/>` +
+      // Headlight at nose
+      `<circle cx="12" cy="0" r="1.3" fill="rgba(255,255,200,0.95)"/>` +
+      // Front wheel
+      `<rect x="5" y="4.5" width="4.5" height="2.5" rx="0.8" fill="rgba(30,30,30,0.85)"/>` +
+      // Rear wheel
+      `<rect x="-9.5" y="4.5" width="4.5" height="2.5" rx="0.8" fill="rgba(30,30,30,0.85)"/>` +
       `</g>` +
       `</svg>`;
 

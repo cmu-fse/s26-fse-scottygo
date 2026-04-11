@@ -11,7 +11,11 @@ import memoryMonitorService from '../services/memory-monitor.service';
 import { TransitModel } from '../models/transit.model';
 import gtfsService from '../services/gtfs.service';
 import * as responses from '../../common/server.responses';
-import { IRoute, IVehicle, INearbyStopsFilters } from '../../common/transit.interface';
+import {
+  IRoute,
+  IVehicle,
+  INearbyStopsFilters
+} from '../../common/transit.interface';
 
 /**
  * Parse and clamp a numeric query-string value.
@@ -74,15 +78,15 @@ export default class BusController extends Controller {
     );
     this.router.get('/routes/:id', this.getPatterns.bind(this));
     this.router.get('/vehicles/:routeId', this.getVehicles.bind(this));
-    this.router.get('/detours/:routeId/geometry', this.getDetourGeometry.bind(this));
+    this.router.get(
+      '/detours/:routeId/geometry',
+      this.getDetourGeometry.bind(this)
+    );
     this.router.get('/detours/:routeId', this.getDetours.bind(this));
   }
 
   private registerStopRoutes(): void {
-    this.router.get(
-      '/stops/nearbystops',
-      this.getNearbyStops.bind(this)
-    );
+    this.router.get('/stops/nearbystops', this.getNearbyStops.bind(this));
     this.router.get('/stops/:routeId', this.getStops.bind(this));
     this.router.get(
       '/stops/:stopId/predictions',
