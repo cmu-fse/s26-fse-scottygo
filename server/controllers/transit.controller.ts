@@ -127,7 +127,7 @@ export default class BusController extends Controller {
         consecutiveFailures: tripshotLiveStatusService.getConsecutiveFailures(),
         error: tripshotLiveStatusService.getLastError()
       },
-      overall: vehiclesHealthy && tripsHealthy
+      overall: vehiclesHealthy && tripsHealthy && tripshotHealthy
     };
 
     res.status(200).json(status);
