@@ -81,8 +81,6 @@ export interface IDatabase {
 
   getAllUsernames(): Promise<string[]>;
 
-  getAllUserAccounts(): Promise<IUserAccount[]>;
-
   seedDefaultAdmin(): Promise<void>;
 
   // Transit cache methods

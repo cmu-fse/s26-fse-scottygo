@@ -42,32 +42,36 @@ jest.mock('../../../server/services/gtfs.service', () => ({
   }
 }));
 
-jest.mock('../../../server/models/transit.model', () => ({
-  __esModule: true,
-  TransitModel: {
-    refreshAllCaches: jest.fn().mockResolvedValue(undefined),
-    getRoutes: jest.fn().mockResolvedValue([
-      {
-        id: '61C',
-        name: 'McKeesport - Homestead',
-        system: 'PRT',
-        color: '#FF6600',
-        directions: ['INBOUND', 'OUTBOUND'],
-        activeStatus: true,
-        operatingDays: [0, 1, 2, 3, 4, 5, 6]
-      },
-      {
-        id: 'P1',
-        name: 'East Busway All-Stops',
-        system: 'PRT',
-        color: '#00518B',
-        directions: ['INBOUND', 'OUTBOUND'],
-        activeStatus: true,
-        operatingDays: [1, 2, 3, 4, 5]
-      }
-    ])
-  }
-}));
+jest.mock('../../../server/models/transit.model', () => {
+  const actual = jest.requireActual('../../../server/models/transit.model');
+  return {
+    __esModule: true,
+    haversineDistanceMeters: actual.haversineDistanceMeters,
+    TransitModel: {
+      refreshAllCaches: jest.fn().mockResolvedValue(undefined),
+      getRoutes: jest.fn().mockResolvedValue([
+        {
+          id: '61C',
+          name: 'McKeesport - Homestead',
+          system: 'PRT',
+          color: '#FF6600',
+          directions: ['INBOUND', 'OUTBOUND'],
+          activeStatus: true,
+          operatingDays: [0, 1, 2, 3, 4, 5, 6]
+        },
+        {
+          id: 'P1',
+          name: 'East Busway All-Stops',
+          system: 'PRT',
+          color: '#00518B',
+          directions: ['INBOUND', 'OUTBOUND'],
+          activeStatus: true,
+          operatingDays: [1, 2, 3, 4, 5]
+        }
+      ])
+    }
+  };
+});
 
 jest.mock('../../../server/services/vehicle-positions.service', () => ({
   __esModule: true,
@@ -162,7 +166,9 @@ const mockVehicles = vehiclePositionsService as jest.Mocked<
   typeof vehiclePositionsService
 >;
 const mockAlerts = alertsService as jest.Mocked<typeof alertsService>;
-const mockModeration = moderationService as jest.Mocked<typeof moderationService>;
+const mockModeration = moderationService as jest.Mocked<
+  typeof moderationService
+>;
 
 // ---------------------------------------------------------------------------
 // Sample data
@@ -187,8 +193,8 @@ const nearBus: IVehicle = {
 /** Bus placed ~5 miles away — reporter will fail the proximity check. */
 const farBus: IVehicle = {
   vid: 'bus-far',
-  lat: 40.5000,
-  lon: -80.0500,
+  lat: 40.5,
+  lon: -80.05,
   routeId: '61C',
   heading: 0,
   source: 'live',
@@ -680,7 +686,9 @@ describe('TUC3: Service Alerts', () => {
         headerText: 'Route 61C delay',
         descriptionText: 'Delays due to construction.',
         routeIds: ['61C'],
-        activePeriods: [{ start: '2026-04-03T08:00:00Z', end: '2026-04-03T18:00:00Z' }]
+        activePeriods: [
+          { start: '2026-04-03T08:00:00Z', end: '2026-04-03T18:00:00Z' }
+        ]
       }
     ]);
 
@@ -697,7 +705,11 @@ describe('TUC3: Service Alerts', () => {
 
     const alerts = success.payload as responses.IPayload;
     expect(Array.isArray(alerts)).toBe(true);
-    const alertList = alerts as Array<{ id: string; headerText: string; routeIds: string[] }>;
+    const alertList = alerts as Array<{
+      id: string;
+      headerText: string;
+      routeIds: string[];
+    }>;
     expect(alertList.length).toBe(1);
     expect(alertList[0].id).toBe('alert-1');
     expect(alertList[0].headerText).toBe('Route 61C delay');

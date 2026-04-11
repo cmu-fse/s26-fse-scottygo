@@ -102,11 +102,18 @@ export default class AuthController extends Controller {
     if (credentialError) {
       return res.status(400).json(credentialError);
     } else if (!reqEmail) {
-      return res.status(400).json(clientError('MissingEmail', 'Email address is required'));
+      return res
+        .status(400)
+        .json(clientError('MissingEmail', 'Email address is required'));
     } else if (reqAgreed === undefined || reqAgreed === null) {
       return res
         .status(400)
-        .json(clientError('UnauthorizedRequest', 'Agreement to Terms of Service is required'));
+        .json(
+          clientError(
+            'UnauthorizedRequest',
+            'Agreement to Terms of Service is required'
+          )
+        );
     }
 
     try {
@@ -125,12 +132,19 @@ export default class AuthController extends Controller {
         payload: sanitizedUser
       });
     } catch (error: unknown) {
-      return handleCatchError(res, error, 'An unexpected error occurred during registration');
+      return handleCatchError(
+        res,
+        error,
+        'An unexpected error occurred during registration'
+      );
     }
   }
 
   public async login(req: Request, res: Response) {
-    const credentialError = validateCredentials(req.params.username, req.body.password);
+    const credentialError = validateCredentials(
+      req.params.username,
+      req.body.password
+    );
     if (credentialError) {
       return res.status(400).json(credentialError);
     }
@@ -144,24 +158,28 @@ export default class AuthController extends Controller {
       // R5: Check account status before validating password
       const userAccount = await User.getUserAccount(credentials.username);
       if (userAccount.status === 'Inactive') {
-        return res.status(403).json(
-          clientError(
-            'InactiveAccount',
-            'Your account is inactive. Please contact an administrator to reactivate your account.'
-          )
-        );
+        return res
+          .status(403)
+          .json(
+            clientError(
+              'InactiveAccount',
+              'Your account is inactive. Please contact an administrator to reactivate your account.'
+            )
+          );
       }
 
       const user: IUser = await User.validateUser(credentials);
 
       // Check whether user has agreed to Terms of Service
       if (user.agreed === false) {
-        return res.status(401).json(
-          clientError(
-            'UnauthorizedRequest',
-            'User not authorized to log in and access app until agrees to Terms of Service'
-          )
-        );
+        return res
+          .status(401)
+          .json(
+            clientError(
+              'UnauthorizedRequest',
+              'User not authorized to log in and access app until agrees to Terms of Service'
+            )
+          );
       }
 
       // Create token payload with userId (immutable) and username (for convenience)
@@ -193,12 +211,19 @@ export default class AuthController extends Controller {
       };
       return res.status(200).json(successRes);
     } catch (error: unknown) {
-      return handleCatchError(res, error, 'An unexpected error occurred during login');
+      return handleCatchError(
+        res,
+        error,
+        'An unexpected error occurred during login'
+      );
     }
   }
 
   public async agreed(req: Request, res: Response) {
-    const credentialError = validateCredentials(req.params.username, req.body.password);
+    const credentialError = validateCredentials(
+      req.params.username,
+      req.body.password
+    );
     if (credentialError) {
       return res.status(400).json(credentialError);
     }
@@ -220,7 +245,11 @@ export default class AuthController extends Controller {
       };
       return res.status(200).json(successRes);
     } catch (error: unknown) {
-      return handleCatchError(res, error, 'An unexpected error occurred in the database');
+      return handleCatchError(
+        res,
+        error,
+        'An unexpected error occurred in the database'
+      );
     }
   }
 }

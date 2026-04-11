@@ -39,9 +39,7 @@ export async function ensureNotLastAdmin(
 /**
  * Check if a user is the last active administrator.
  */
-export async function isLastAdministrator(
-  username: string
-): Promise<boolean> {
+export async function isLastAdministrator(username: string): Promise<boolean> {
   const userAccount = await DAC.db.findUserAccountByUsername(
     username.toLowerCase()
   );

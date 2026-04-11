@@ -64,7 +64,13 @@ export class DirectionsController {
   private toastCallback: ((message: string) => void) | null = null;
   // Callback to update the directions info panel
   private infoPanelCallback:
-    | ((info: { durationMin: number; eta: string; predictions: IPrediction[] } | null) => void)
+    | ((
+        info: {
+          durationMin: number;
+          eta: string;
+          predictions: IPrediction[];
+        } | null
+      ) => void)
     | null = null;
   // Callback executed when exiting directions mode
   private exitCallback: (() => void) | null = null;
@@ -92,7 +98,13 @@ export class DirectionsController {
 
   /** Register a callback for directions info updates (duration + ETA + selected bus predictions) */
   setInfoPanelCallback(
-    cb: (info: { durationMin: number; eta: string; predictions: IPrediction[] } | null) => void
+    cb: (
+      info: {
+        durationMin: number;
+        eta: string;
+        predictions: IPrediction[];
+      } | null
+    ) => void
   ): void {
     this.infoPanelCallback = cb;
   }

@@ -57,7 +57,7 @@ jest.mock('../../../server/services/truetime.service', () => ({
 // Shared test fixtures
 // ---------------------------------------------------------------------------
 
-/** 
+/**
  * Reference point: CMU Tepper School area (Pittsburgh, PA).
  * All test stops below are positioned relative to this origin.
  */
@@ -112,7 +112,7 @@ const STOP_1500M: IStop = {
 const STOP_3000M: IStop = {
   stopId: 's4',
   stopName: '~3000m Stop',
-  lat: CENTER.lat + 0.0270,
+  lat: CENTER.lat + 0.027,
   lon: CENTER.lon,
   dtradd: [],
   dtrrem: []
@@ -234,9 +234,7 @@ describe('TUC4 – Discover Stops & Schedules unit tests', () => {
 
   describe('getNearbyStops', () => {
     function spyRoutes(routes: IRoute[]) {
-      return jest
-        .spyOn(TransitModel, 'getRoutes')
-        .mockResolvedValue(routes);
+      return jest.spyOn(TransitModel, 'getRoutes').mockResolvedValue(routes);
     }
 
     function spyStops(stopsByKey: Record<string, IStop[]>) {
@@ -257,10 +255,7 @@ describe('TUC4 – Discover Stops & Schedules unit tests', () => {
         '61C:OUTBOUND': []
       });
 
-      const result = await TransitModel.getNearbyStops(
-        CENTER.lat,
-        CENTER.lon
-      );
+      const result = await TransitModel.getNearbyStops(CENTER.lat, CENTER.lon);
 
       expect(result.stops).toHaveLength(2);
       // Closest stop (at center, 0 m) must come first
@@ -328,10 +323,7 @@ describe('TUC4 – Discover Stops & Schedules unit tests', () => {
         '61C:OUTBOUND': []
       });
 
-      const result = await TransitModel.getNearbyStops(
-        CENTER.lat,
-        CENTER.lon
-      );
+      const result = await TransitModel.getNearbyStops(CENTER.lat, CENTER.lon);
 
       expect(result.expandedRadiusApplied).toBe(false);
       expect(result.radiusMeters).toBe(1000);
@@ -350,10 +342,7 @@ describe('TUC4 – Discover Stops & Schedules unit tests', () => {
         '61C:OUTBOUND': []
       });
 
-      const result = await TransitModel.getNearbyStops(
-        CENTER.lat,
-        CENTER.lon
-      );
+      const result = await TransitModel.getNearbyStops(CENTER.lat, CENTER.lon);
 
       // Stop at center: distance ≈ 0 m → 0 min
       const centerResult = result.stops.find((s) => s.stop.stopId === 's0')!;
@@ -482,10 +471,7 @@ describe('TUC4 – Discover Stops & Schedules unit tests', () => {
         'P1:OUTBOUND': []
       });
 
-      const result = await TransitModel.getNearbyStops(
-        CENTER.lat,
-        CENTER.lon
-      );
+      const result = await TransitModel.getNearbyStops(CENTER.lat, CENTER.lon);
 
       // Shared stop must appear exactly once (deduplication)
       const matches = result.stops.filter(
@@ -526,11 +512,7 @@ describe('TUC4 – Discover Stops & Schedules unit tests', () => {
       spyRoutes([ROUTE_PRT]);
       spyStops({ '61C:INBOUND': [], '61C:OUTBOUND': [] });
 
-      const result = await TransitModel.getNearbyStops(
-        40.4433,
-        -79.9436,
-        500
-      );
+      const result = await TransitModel.getNearbyStops(40.4433, -79.9436, 500);
 
       expect(result.center).toEqual({ lat: 40.4433, lon: -79.9436 });
       expect(result.radiusMeters).toBe(500);
@@ -570,10 +552,7 @@ describe('TUC4 – Discover Stops & Schedules unit tests', () => {
         '61C:OUTBOUND': []
       });
 
-      const result = await TransitModel.getNearbyStops(
-        CENTER.lat,
-        CENTER.lon
-      );
+      const result = await TransitModel.getNearbyStops(CENTER.lat, CENTER.lon);
 
       for (const stop of result.stops) {
         expect(Number.isInteger(stop.distanceMeters)).toBe(true);

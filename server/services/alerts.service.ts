@@ -34,6 +34,10 @@ class AlertsService {
 
   private healthy = false;
 
+  private isStopping = false;
+
+  private fetchAbortController: AbortController | null = null;
+
   // ── Public API ───────────────────────────────────────────────────────
 
   getAlerts(): IServiceAlert[] {
@@ -55,6 +59,7 @@ class AlertsService {
 
   start(): void {
     if (this.intervalId) return;
+    this.isStopping = false;
     console.log(
       `${tag()} Starting alert feed polling (every ${POLL_INTERVAL_MS / 1000}s)`
     );
@@ -72,11 +77,14 @@ class AlertsService {
   }
 
   stop(): void {
+    this.isStopping = true;
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
       console.log(`${tag()} Stopped alert feed polling`);
     }
+    this.fetchAbortController?.abort();
+    this.fetchAbortController = null;
   }
 
   /**
@@ -87,9 +95,18 @@ class AlertsService {
   // ── Private ──────────────────────────────────────────────────────────
 
   private async fetchAlerts(): Promise<void> {
+    if (this.isStopping) {
+      return;
+    }
+
+    const abortController = new AbortController();
+    this.fetchAbortController = abortController;
     this.fetchInProgress = true;
+
     try {
-      const response = await fetch(GTFSRT_ALERTS_URL);
+      const response = await fetch(GTFSRT_ALERTS_URL, {
+        signal: abortController.signal
+      });
       if (!response.ok) {
         throw new Error(`HTTP ${response.status} ${response.statusText}`);
       }
@@ -151,13 +168,24 @@ class AlertsService {
         this.onAlertsChanged(newAlerts);
       }
 
-      console.log(`${tag()} Fetched ${newAlerts.length} service alerts`);
+      if (!this.isStopping) {
+        console.log(`${tag()} Fetched ${newAlerts.length} service alerts`);
+      }
     } catch (err) {
+      const isAbortError = err instanceof Error && err.name === 'AbortError';
+
+      if (this.isStopping || isAbortError) {
+        return;
+      }
+
       this.healthy = false;
       this.lastError =
         err instanceof Error ? err.message : 'Unknown error fetching alerts';
       console.error(`${tag()} Failed to fetch alerts:`, this.lastError);
     } finally {
+      if (this.fetchAbortController === abortController) {
+        this.fetchAbortController = null;
+      }
       this.fetchInProgress = false;
     }
   }

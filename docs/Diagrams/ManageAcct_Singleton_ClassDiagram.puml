@@ -3,9 +3,7 @@ skinparam classAttributeIconSize 0
 
 title ManageAcct - Singleton Design Pattern
 
-class Serve <<Client>> {
-  +bootstrap() : void
-}
+class Serve <<Client>>
 
 class AccountController <<Singleton>> {
   -{static} instance : AccountController

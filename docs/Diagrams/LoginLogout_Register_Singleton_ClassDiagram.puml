@@ -3,9 +3,7 @@ skinparam classAttributeIconSize 0
 
 title LoginLogout/Register - Singleton Design Pattern
 
-class Serve <<Client>> {
-  +bootstrap() : void
-}
+class Serve <<Client>>
 
 class AuthController <<Singleton>> {
   -{static} instance : AuthController
