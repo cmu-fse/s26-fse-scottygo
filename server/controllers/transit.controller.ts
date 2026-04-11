@@ -124,8 +124,7 @@ export default class BusController extends Controller {
         healthy: tripshotHealthy,
         lastFetched:
           tripshotLiveStatusService.getLastFetched()?.toISOString() ?? null,
-        consecutiveFailures:
-          tripshotLiveStatusService.getConsecutiveFailures(),
+        consecutiveFailures: tripshotLiveStatusService.getConsecutiveFailures(),
         error: tripshotLiveStatusService.getLastError()
       },
       overall: vehiclesHealthy && tripsHealthy
@@ -1232,14 +1231,20 @@ export default class BusController extends Controller {
   // GET /transit/stops/:stopId/predictions
   private getPredictions(req: Request, res: Response): void {
     const { stopId } = req.params;
+    const routeIdFilter = req.query.routeId as string | undefined;
     try {
       // TripShot stop IDs are UUIDs; PRT/GTFS stop IDs are numeric strings.
       // Route UUID-shaped stop IDs to the TripShot liveStatus predictions cache.
       const UUID_REGEX =
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      const predictions = UUID_REGEX.test(stopId)
-        ? tripshotService.getPredictions(stopId)
+      let predictions = UUID_REGEX.test(stopId)
+        ? tripshotService.getPredictions(stopId, routeIdFilter)
         : tripUpdatesService.getPredictions(stopId);
+
+      // Optional route filter for GTFS-RT stop predictions.
+      if (routeIdFilter && !UUID_REGEX.test(stopId)) {
+        predictions = predictions.filter((p) => p.routeId === routeIdFilter);
+      }
 
       const successRes: responses.ISuccess = {
         name: 'PredictionsRetrieved',

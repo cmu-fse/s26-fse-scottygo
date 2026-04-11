@@ -17,6 +17,7 @@
     "watch": "nodemon --watch client --watch server --watch .env -e js,ts,html,pug,css,json --exec npm-run-all build start",
     "lint": "eslint ./",
     "pug": "ts-node ./tools/pug-compile",
+    "export:cmu-static": "ts-node ./tools/export-cmu-static-from-tripshot",
     "serve": "ts-node server/serve",
     "test": "jest",
     "test:rest": "npm-run-all --continue-on-error test:rest:manageacct test:rest:memory-monitoring test:rest:transit test:rest:loginlogout",

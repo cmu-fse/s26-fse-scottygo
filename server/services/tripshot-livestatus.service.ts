@@ -31,6 +31,8 @@ const POLL_INTERVAL_MS = 30_000; // 30 seconds
 
 /** AbortSignal timeout for each fetch. */
 const FETCH_TIMEOUT_MS = 10_000;
+/** Ignore arrivals that are already stale beyond this grace period. */
+const STALE_PREDICTION_GRACE_MS = 60_000;
 
 function tag(): string {
   return `[TripShotLiveStatus ${new Date().toISOString()}]`;
@@ -99,7 +101,11 @@ class TripShotLiveStatusService {
    * Returns an empty array when no awaiting vehicles are found.
    */
   getPredictions(stopId: string): IPrediction[] {
-    return this.predictionsByStopId.get(stopId) ?? [];
+    const now = Date.now();
+    const predictions = this.predictionsByStopId.get(stopId) ?? [];
+    return predictions
+      .filter((p) => p.predictedArrivalTime >= now - STALE_PREDICTION_GRACE_MS)
+      .sort((a, b) => a.predictedArrivalTime - b.predictedArrivalTime);
   }
 
   /**
@@ -322,7 +328,16 @@ class TripShotLiveStatusService {
     const awaiting = (ss as Extract<TsStopState, { Awaiting: unknown }>)
       .Awaiting;
     const eta = new Date(awaiting.expectedArrivalTime).getTime();
-    const minutesFromNow = Math.max(0, Math.round((eta - Date.now()) / 60_000));
+    if (!Number.isFinite(eta)) {
+      return;
+    }
+
+    const now = Date.now();
+    if (eta < now - STALE_PREDICTION_GRACE_MS) {
+      return;
+    }
+
+    const minutesFromNow = Math.max(0, Math.round((eta - now) / 60_000));
 
     const prediction: IPrediction = {
       stopId: awaiting.stopId,

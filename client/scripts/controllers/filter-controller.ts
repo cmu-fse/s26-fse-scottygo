@@ -81,6 +81,8 @@ export class FilterController {
   private nearbyRouteIds = new Set<string>();
   /** Stop ID of the currently open prediction popup (for live refresh) */
   private openPopupStopId: string | null = null;
+  /** Route filter bound to the currently open stop popup, if any */
+  private openPopupRouteId: string | null = null;
   /** Interval handle for prediction auto-refresh (30 s) */
   private predictionPollInterval: number | null = null;
   /** Interval handle for 1-second countdown ticker */
@@ -120,21 +122,57 @@ export class FilterController {
     this.userLocation = position;
   }
 
+  /** Fallback route color when metadata is temporarily unavailable. */
+  private getFallbackRouteColor(routeId: string): string {
+    return routeId.startsWith('CMU-') ? '#C41230' : '#4285F4';
+  }
+
+  /** Update route selector options from current system-filtered state. */
+  private updateRouteSelectorFromState(routes: IRoute[]): void {
+    if (!this.routeSelectorUpdateCallback) return;
+
+    const state = this.stateManager.getState();
+    const filteredRoutes = routes.filter((r) => {
+      if (r.system === 'PRT') return state.selectedSystems.prt;
+      if (r.system === 'CMU') return state.selectedSystems.cmu;
+      return false;
+    });
+
+    const routeOptions = buildRouteOptions(filteredRoutes);
+    this.routeSelectorUpdateCallback(routeOptions);
+  }
+
   /**
    * Initialize - load all transit data from the bulk endpoint in one call
    */
   async initialize(): Promise<void> {
     try {
       console.log('Fetching bulk transit data from backend...');
-      const routes = await this.fetchBulkData();
+      let routes = await this.fetchBulkData();
+
+      // If URL-restored state references CMU, hydrate full route list now so
+      // route restoration after navigation has metadata (color/directions/stops).
+      const restoredState = this.stateManager.getState();
+      const needsCMURoutes =
+        restoredState.selectedSystems.cmu ||
+        (!!restoredState.selectedRouteId &&
+          restoredState.selectedRouteId.startsWith('CMU-'));
+
+      if (needsCMURoutes && !routes.some((r) => r.system === 'CMU')) {
+        const allRoutes = await this.fetchAllRoutes();
+        if (allRoutes.length > 0) {
+          routes = allRoutes;
+          console.log(
+            'Restored CMU route context detected - initialized with full route list'
+          );
+        }
+      }
+
       routes.forEach((r) => this.routeColorCache.set(r.id, r.color));
       this.stateManager.setAvailableRoutes(routes);
 
       // Update route selector with available routes
-      if (this.routeSelectorUpdateCallback) {
-        const routeOptions = buildRouteOptions(routes);
-        this.routeSelectorUpdateCallback(routeOptions);
-      }
+      this.updateRouteSelectorFromState(routes);
 
       // Render initial routes based on default filters (Rule R2: PRT ON, CMU OFF)
       await this.renderFilteredRoutes();
@@ -307,35 +345,26 @@ export class FilterController {
     // Re-apply all filters
     this.stateManager.reapplyFilters();
 
-    // Update route selector with filtered routes based on enabled systems
-    if (this.routeSelectorUpdateCallback) {
-      const updatedState = this.stateManager.getState();
-      const filteredRoutes = updatedState.availableRoutes.filter((r) => {
-        if (r.system === 'PRT') return updatedState.selectedSystems.prt;
-        if (r.system === 'CMU') return updatedState.selectedSystems.cmu;
-        return false;
-      });
-      const routeOptions = buildRouteOptions(filteredRoutes);
-      this.routeSelectorUpdateCallback(routeOptions);
-    }
+    const updatedState = this.stateManager.getState();
+    this.updateRouteSelectorFromState(updatedState.availableRoutes);
 
     await this.renderFilteredRoutes();
 
     // If a route is still selected after system filter, re-render it fully (geometry + stops)
-    const updatedState = this.stateManager.getState();
-    if (updatedState.selectedRouteId) {
-      await this.applyRouteFilter(updatedState.selectedRouteId);
+    const postRenderState = this.stateManager.getState();
+    if (postRenderState.selectedRouteId) {
+      await this.applyRouteFilter(postRenderState.selectedRouteId);
     }
 
     // Re-render nearby stops filtered to the newly enabled systems (TUC4).
     // Use userLocation (not nearbyStopsActive) because showNearbyStops sets the flag
     // to false when it returns empty (e.g. CMU-only mode before CMU stops load),
     // which would prevent subsequent toggles from re-fetching.
-    if (this.userLocation && !updatedState.selectedRouteId) {
+    if (this.userLocation && !postRenderState.selectedRouteId) {
       await this.showNearbyStops(this.userLocation);
     }
 
-    this.urlSync.updateURL(updatedState);
+    this.urlSync.updateURL(postRenderState);
   }
 
   /**
@@ -350,17 +379,7 @@ export class FilterController {
       this.stateManager.setAvailableRoutes(routes);
 
       // Update route selector with new routes
-      if (this.routeSelectorUpdateCallback) {
-        const state = this.stateManager.getState();
-        // Filter route IDs based on enabled systems
-        const filteredRoutes = routes.filter((r) => {
-          if (r.system === 'PRT') return state.selectedSystems.prt;
-          if (r.system === 'CMU') return state.selectedSystems.cmu;
-          return false;
-        });
-        const routeOptions = buildRouteOptions(filteredRoutes);
-        this.routeSelectorUpdateCallback(routeOptions);
-      }
+      this.updateRouteSelectorFromState(routes);
 
       console.log(
         'Routes prefetched successfully:',
@@ -373,11 +392,36 @@ export class FilterController {
   }
 
   /**
+   * Ensure route metadata exists in state (useful after back-navigation when
+   * URL state restores a CMU route before CMU routes have been prefetched).
+   */
+  private async ensureRouteAvailable(routeId: string): Promise<IRoute | null> {
+    let state = this.stateManager.getState();
+    let route = state.availableRoutes.find((r) => r.id === routeId);
+    if (route) return route;
+
+    const routes = await this.fetchAllRoutes();
+    if (routes.length === 0) {
+      return null;
+    }
+
+    routes.forEach((r) => this.routeColorCache.set(r.id, r.color));
+    this.stateManager.setAvailableRoutes(routes);
+    this.updateRouteSelectorFromState(routes);
+
+    state = this.stateManager.getState();
+    route = state.availableRoutes.find((r) => r.id === routeId);
+    return route ?? null;
+  }
+
+  /**
    * Apply route filter (single route selection - Rule R1)
    */
   async applyRouteFilter(routeId: string): Promise<void> {
     try {
       console.log('Applying route filter:', routeId);
+
+      const selectedRoute = await this.ensureRouteAvailable(routeId);
 
       // TUC4: Clear nearby stop markers when a specific route is selected
       this.clearNearbyStops();
@@ -392,17 +436,29 @@ export class FilterController {
         console.error('Failed to fetch geometry for route', routeId);
         // Continue anyway to show stops and vehicles
       } else {
-        // Find route info for color
-        const state = this.stateManager.getState();
-        const route = state.availableRoutes.find((r) => r.id === routeId);
-        const color = route?.color || '#FF0000';
+        const color =
+          selectedRoute?.color ||
+          this.routeColorCache.get(routeId) ||
+          this.getFallbackRouteColor(routeId);
 
         // Render route geometry
         this.routeRenderer.renderRouteGeometry(routeId, geometry, color);
       }
 
       // Fetch and render stops for both directions (if both enabled)
-      await this.applyDirectionFilter();
+      if (selectedRoute) {
+        await this.applyDirectionFilter();
+      } else {
+        const state = this.stateManager.getState();
+        const fallbackDirections = routeId.startsWith('CMU-')
+          ? ['OUTBOUND']
+          : ['INBOUND', 'OUTBOUND'];
+        const enabledDirections = this.getEnabledDirections(
+          state.selectedDirections,
+          fallbackDirections
+        );
+        await this.refreshStopMarkers(routeId, enabledDirections);
+      }
 
       // Fetch and display detours for this route
       await this.fetchAndShowDetours(routeId);
@@ -866,7 +922,9 @@ export class FilterController {
     if (this.restoreMinimisedPopup(stop)) return;
 
     try {
-      const predictions = await this.fetchPredictions(stop.stopId);
+      const routeFilter =
+        this.stateManager.getState().selectedRouteId ?? undefined;
+      const predictions = await this.fetchPredictions(stop.stopId, routeFilter);
       this.showStopPopup(stop, predictions);
     } catch (error) {
       console.error('Error handling stop click:', error);
@@ -877,11 +935,16 @@ export class FilterController {
    * Fetch arrival predictions for a stop from the backend (served from the
    * in-memory GTFS-RT trip-updates cache).
    */
-  private async fetchPredictions(stopId: string): Promise<IPrediction[]> {
+  private async fetchPredictions(
+    stopId: string,
+    routeId?: string
+  ): Promise<IPrediction[]> {
     try {
+      const params = routeId ? { routeId } : undefined;
       const response: AxiosResponse = await axios.get(
         `/transit/stops/${stopId}/predictions`,
         {
+          params,
           headers: { Authorization: `Bearer ${this.token}` },
           validateStatus: () => true
         }
@@ -1094,6 +1157,7 @@ export class FilterController {
   ): void {
     this.stopPredictionPolling();
     this.openPopupStopId = stop.stopId;
+    this.openPopupRouteId = this.stateManager.getState().selectedRouteId;
 
     // 1-second countdown ticker
     this.predictionTickerInterval = window.setInterval(() => {
@@ -1111,7 +1175,10 @@ export class FilterController {
         return;
       }
 
-      const fresh = await this.fetchPredictions(stop.stopId);
+      const fresh = await this.fetchPredictions(
+        stop.stopId,
+        this.openPopupRouteId ?? undefined
+      );
       this.refreshPredictionList(
         fresh.slice(0, 8),
         selectedIndices,
@@ -1131,6 +1198,7 @@ export class FilterController {
       this.predictionTickerInterval = null;
     }
     this.openPopupStopId = null;
+    this.openPopupRouteId = null;
   }
 
   /** Tick all visible prediction countdowns by recalculating from arrival time. */
@@ -1240,7 +1308,9 @@ export class FilterController {
       if (geometry) {
         const route = state.availableRoutes.find((r) => r.id === routeId);
         const color =
-          route?.color || this.routeColorCache.get(routeId) || '#FF0000';
+          route?.color ||
+          this.routeColorCache.get(routeId) ||
+          this.getFallbackRouteColor(routeId);
         this.routeRenderer.renderRouteGeometry(routeId, geometry, color);
       }
 
@@ -1331,13 +1401,35 @@ export class FilterController {
 
       // Render route geometry for nearby routes that aren't rendered yet
       for (const routeId of this.nearbyRouteIds) {
-        if (!this.routeRenderer.hasRouteGeometry(routeId)) {
+        if (this.routeRenderer.hasRouteGeometry(routeId)) {
+          continue;
+        }
+
+        try {
           const geometry = await this.fetchRouteGeometry(routeId);
-          if (geometry) {
-            const route = state.availableRoutes.find((r) => r.id === routeId);
-            const color =
-              route?.color || this.routeColorCache.get(routeId) || '#FF0000';
-            this.routeRenderer.renderRouteGeometry(routeId, geometry, color);
+          if (!geometry) {
+            continue;
+          }
+
+          const route = state.availableRoutes.find((r) => r.id === routeId);
+          const color =
+            route?.color ||
+            this.routeColorCache.get(routeId) ||
+            this.getFallbackRouteColor(routeId);
+          this.routeRenderer.renderRouteGeometry(routeId, geometry, color);
+        } catch (error: unknown) {
+          // Nearby stops should still render even if one route has no geometry.
+          const err = error as Record<string, unknown>;
+          const response = err?.response as Record<string, unknown> | undefined;
+          if (response?.status === 404 || err?.type === 'ClientError') {
+            console.debug(
+              `[FilterController] Nearby route geometry unavailable for ${routeId}; continuing with stops`
+            );
+          } else {
+            console.error(
+              `[FilterController] Failed to render nearby route geometry for ${routeId}:`,
+              error
+            );
           }
         }
       }
