@@ -11,7 +11,6 @@ import type {
   IRoute,
   IStop
 } from '../../../common/transit.interface';
-import type { IUserAccount } from '../../../common/user.interface';
 
 jest.mock('../../../server/models/transit.model', () => ({
   __esModule: true,
@@ -23,7 +22,7 @@ jest.mock('../../../server/models/transit.model', () => ({
 jest.mock('../../../server/models/user.model', () => ({
   __esModule: true,
   User: {
-    getAllUserAccounts: jest.fn()
+    getAllUsernames: jest.fn()
   }
 }));
 
@@ -119,36 +118,7 @@ const sampleStops: IStop[] = [
   }
 ];
 
-const sampleUsers: IUserAccount[] = [
-  {
-    credentials: { username: 'zeta', password: 'x' },
-    email: 'zeta@cmu.edu',
-    agreed: true,
-    status: 'Inactive',
-    privilegeLevel: 'Member'
-  },
-  {
-    credentials: { username: 'alpha', password: 'x' },
-    email: 'alpha@cmu.edu',
-    agreed: true,
-    status: 'Active',
-    privilegeLevel: 'Member'
-  },
-  {
-    credentials: { username: 'beta', password: 'x' },
-    email: 'beta@cmu.edu',
-    agreed: true,
-    status: 'Active',
-    privilegeLevel: 'Coordinator'
-  },
-  {
-    credentials: { username: 'adminUser', password: 'x' },
-    email: 'admin.search@cmu.edu',
-    agreed: true,
-    status: 'Active',
-    privilegeLevel: 'Administrator'
-  }
-];
+const sampleUsers: string[] = ['zeta', 'alpha', 'beta', 'adminUser'];
 
 const sampleNotifications: INotification[] = [
   {
@@ -176,7 +146,7 @@ describe('SearchInfo unit tests (R1 + R2)', () => {
     jest.clearAllMocks();
     mockTransitModel.getRoutes.mockResolvedValue(sampleRoutes);
     mockGtfs.getAllStops.mockReturnValue(sampleStops);
-    mockUser.getAllUserAccounts.mockResolvedValue(sampleUsers);
+    mockUser.getAllUsernames.mockResolvedValue(sampleUsers);
     mockNotificationModel.searchNotifications.mockImplementation(
       async (params: { route?: string; bus?: string; q?: string } = {}) => {
         let notifications = [...sampleNotifications];
@@ -227,22 +197,15 @@ describe('SearchInfo unit tests (R1 + R2)', () => {
   // ---------------------------------------------------------------------------
 
   describe('R1 contextual search rules', () => {
-    test('UserSearchStrategy (username field) supports partial case-insensitive matching', async () => {
-      const strategy = new UserSearchStrategy('username');
+    test('UserSearchStrategy supports partial case-insensitive matching', async () => {
+      const strategy = new UserSearchStrategy();
       const result = await strategy.search('ADMIN');
 
       expect(result).toEqual(['adminUser']);
     });
 
-    test('UserSearchStrategy (email field) matches by email content', async () => {
-      const strategy = new UserSearchStrategy('email');
-      const result = await strategy.search('alpha@cmu');
-
-      expect(result).toEqual(['alpha']);
-    });
-
-    test('UserSearchStrategy sorts active users first, then inactive; alphabetical within groups', async () => {
-      const strategy = new UserSearchStrategy('username');
+    test('UserSearchStrategy returns all usernames sorted alphabetically when query is empty', async () => {
+      const strategy = new UserSearchStrategy();
       const result = await strategy.search('');
 
       expect(result).toEqual(['adminUser', 'alpha', 'beta', 'zeta']);
