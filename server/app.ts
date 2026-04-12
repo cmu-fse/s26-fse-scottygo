@@ -5,6 +5,8 @@ import Controller from './controllers/controller';
 import gtfsService from './services/gtfs.service';
 import vehiclePositionsService from './services/vehicle-positions.service';
 import tripUpdatesService from './services/trip-updates.service';
+import tripshotLiveStatusService from './services/tripshot-livestatus.service';
+import tripshotService from './services/tripshot.service';
 import alertsService from './services/alerts.service';
 import memoryMonitorService from './services/memory-monitor.service';
 import { TransitModel } from './models/transit.model';
@@ -144,11 +146,34 @@ class App {
 
       // Start polling GTFS-RT feeds every 30 s (in-memory)
       // Delayed until after cache refresh so V8 can GC startup temporaries first.
+      const isTestEnv = process.env.NODE_ENV === 'test';
       vehiclePositionsService.start();
       tripUpdatesService.start();
+      if (!isTestEnv) {
+        // Wire up pattern cache warm-up before starting the poller so the
+        // callback is set before the first successful fetch can fire.
+        tripshotLiveStatusService.onFirstSuccess = () => {
+          if (typeof tripshotService.warmPatternCache !== 'function') {
+            return;
+          }
+
+          tripshotService
+            .warmPatternCache()
+            .catch((err) =>
+              console.error(
+                `[Server ${new Date().toISOString()}] Pattern warm-up failed:`,
+                err
+              )
+            );
+        };
+        tripshotLiveStatusService.start();
+      }
       if (this.isShuttingDown) {
         vehiclePositionsService.stop();
         tripUpdatesService.stop();
+        if (!isTestEnv) {
+          tripshotLiveStatusService.stop();
+        }
         return;
       }
       memoryMonitorService.capture('realtime-pollers.started');
@@ -326,6 +351,7 @@ class App {
         memoryMonitorService.stop();
         vehiclePositionsService.stop();
         tripUpdatesService.stop();
+        tripshotLiveStatusService.stop();
         alertsService.stop();
         if (this.dailyRefreshIntervalId) {
           clearInterval(this.dailyRefreshIntervalId);

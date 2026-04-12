@@ -22,7 +22,7 @@ import { User } from '../models/user.model';
 import { NotificationModel } from '../models/notification.model';
 import gtfsService from '../services/gtfs.service';
 import alertsService from '../services/alerts.service';
-import vehiclePositionsService from '../services/vehicle-positions.service';
+import notificationSourcesService from '../services/notification-sources.service';
 import type {
   IRoute,
   INotification,
@@ -199,8 +199,6 @@ export class SearchContext<T> {
   }
 }
 
-export type UserSearchField = 'username' | 'email';
-
 // ── Concrete Strategy 1: User Search ─────────────────────────────────────────
 
 /**
@@ -209,37 +207,18 @@ export type UserSearchField = 'username' | 'email';
  *
  * Context : Manage Account page (Admin combobox, GET /account/users/search).
  * Criteria: One or more words matching an existing username (or part of one).
- * Results : Matching usernames ordered by Active users first, then Inactive,
- *           and alphabetical by username/email within each group.
+ * Results : Matching usernames in alphabetical order.
  */
 export class UserSearchStrategy implements ISearchStrategy<string[]> {
-  constructor(private readonly field: UserSearchField = 'username') {}
-
   async search(query: string): Promise<string[]> {
     const lower = query.trim().toLowerCase();
-    const users = await User.getAllUserAccounts();
+    const usernames = await User.getAllUsernames();
 
     const filtered = lower
-      ? users.filter((u) => {
-          const target =
-            this.field === 'email' ? u.email : u.credentials.username;
-          return target.toLowerCase().includes(lower);
-        })
-      : users;
+      ? usernames.filter((u) => u.toLowerCase().includes(lower))
+      : usernames;
 
-    filtered.sort((a, b) => {
-      const aGroup = a.status === 'Active' ? 0 : 1;
-      const bGroup = b.status === 'Active' ? 0 : 1;
-      if (aGroup !== bGroup) return aGroup - bGroup;
-
-      const byUsername = a.credentials.username.localeCompare(
-        b.credentials.username
-      );
-      if (byUsername !== 0) return byUsername;
-      return a.email.localeCompare(b.email);
-    });
-
-    return filtered.map((u) => u.credentials.username);
+    return filtered.sort((a, b) => a.localeCompare(b));
   }
 }
 
@@ -480,9 +459,10 @@ export class NotificationAutocompleteStrategy implements ISearchStrategy<
     if (filtered === null) return [];
     const lower = filtered.toLowerCase();
 
-    const [routes, notifications] = await Promise.all([
-      TransitModel.getRoutes(),
-      NotificationModel.searchNotifications({})
+    const [routes, notifications, allLiveVehicles] = await Promise.all([
+      notificationSourcesService.getAllSubscribableRoutes(),
+      NotificationModel.getRecentNotifications(),
+      notificationSourcesService.getAllLiveVehiclesForNotifications()
     ]);
 
     // 1. Route IDs from GTFS that match the query (always available)
@@ -496,8 +476,7 @@ export class NotificationAutocompleteStrategy implements ISearchStrategy<
       .map((r) => ({ label: r.id, type: 'route' as const }));
 
     // 2. All live vehicle IDs from the GTFS-RT feed that match the query
-    const vidSuggestions: ISearchSuggestion[] = vehiclePositionsService
-      .getAllVehicles()
+    const vidSuggestions: ISearchSuggestion[] = allLiveVehicles
       .filter((v) => v.vid.toLowerCase().includes(lower))
       .slice(0, 3)
       .map((v) => ({ label: v.vid, type: 'vehicle' as const, vid: v.vid }));

@@ -42,49 +42,48 @@ jest.mock('../../../server/services/gtfs.service', () => ({
   }
 }));
 
-jest.mock('../../../server/models/transit.model', () => {
-  const EARTH_RADIUS_M = 6_371_000;
-  return {
-    __esModule: true,
-    TransitModel: {
-      refreshAllCaches: jest.fn().mockResolvedValue(undefined),
-      getRoutes: jest.fn().mockResolvedValue([
-        {
-          id: '61C',
-          name: 'McKeesport - Homestead',
-          system: 'PRT',
-          color: '#FF6600',
-          directions: ['INBOUND', 'OUTBOUND'],
-          activeStatus: true,
-          operatingDays: [0, 1, 2, 3, 4, 5, 6]
-        },
-        {
-          id: 'P1',
-          name: 'East Busway All-Stops',
-          system: 'PRT',
-          color: '#00518B',
-          directions: ['INBOUND', 'OUTBOUND'],
-          activeStatus: true,
-          operatingDays: [1, 2, 3, 4, 5]
-        }
-      ])
-    },
-    haversineDistanceMeters(
-      lat1: number,
-      lon1: number,
-      lat2: number,
-      lon2: number
-    ): number {
+jest.mock('../../../server/models/transit.model', () => ({
+  __esModule: true,
+  haversineDistanceMeters: jest.fn(
+    (lat1: number, lon1: number, lat2: number, lon2: number) => {
       const toRad = (deg: number) => (deg * Math.PI) / 180;
+      const R = 6371000;
       const dLat = toRad(lat2 - lat1);
       const dLon = toRad(lon2 - lon1);
       const a =
-        Math.sin(dLat / 2) ** 2 +
-        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-      return EARTH_RADIUS_M * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRad(lat1)) *
+          Math.cos(toRad(lat2)) *
+          Math.sin(dLon / 2) *
+          Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
     }
-  };
-});
+  ),
+  TransitModel: {
+    refreshAllCaches: jest.fn().mockResolvedValue(undefined),
+    getRoutes: jest.fn().mockResolvedValue([
+      {
+        id: '61C',
+        name: 'McKeesport - Homestead',
+        system: 'PRT',
+        color: '#FF6600',
+        directions: ['INBOUND', 'OUTBOUND'],
+        activeStatus: true,
+        operatingDays: [0, 1, 2, 3, 4, 5, 6]
+      },
+      {
+        id: 'P1',
+        name: 'East Busway All-Stops',
+        system: 'PRT',
+        color: '#00518B',
+        directions: ['INBOUND', 'OUTBOUND'],
+        activeStatus: true,
+        operatingDays: [1, 2, 3, 4, 5]
+      }
+    ])
+  }
+}));
 
 jest.mock('../../../server/services/vehicle-positions.service', () => ({
   __esModule: true,
@@ -116,6 +115,7 @@ jest.mock('../../../server/services/tripshot.service', () => ({
   __esModule: true,
   default: {
     isConfigured: jest.fn().mockReturnValue(false),
+    warmPatternCache: jest.fn().mockResolvedValue(undefined),
     getRoutes: jest.fn().mockResolvedValue([]),
     getPatterns: jest.fn().mockResolvedValue([]),
     getStops: jest.fn().mockResolvedValue([]),

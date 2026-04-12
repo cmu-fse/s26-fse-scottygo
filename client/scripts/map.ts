@@ -45,6 +45,7 @@ import { FilterController } from './controllers/filter-controller';
 import { DirectionsController } from './controllers/directions-controller';
 import { RouteRenderer } from './renderers/route-renderer';
 import { VehicleTracker } from './trackers/vehicle-tracker';
+import { getRouteTitle } from './utils/route-display';
 
 // Export empty object to treat as module
 export {};
@@ -719,6 +720,10 @@ function updateBellState(routeId: string, subscribed: boolean): void {
   bell?.showBell(routeId, subscribed);
 }
 
+function getRouteToastLabel(routeId: string): string {
+  return getRouteTitle(routeId, mapStateManager.getState().availableRoutes);
+}
+
 const registerSubscriptionEvents = (): void => {
   document.addEventListener('bellSubscribe', async (e: Event) => {
     const { routeId } = (e as CustomEvent<{ routeId: string }>).detail;
@@ -737,7 +742,7 @@ const registerSubscriptionEvents = (): void => {
         document.dispatchEvent(
           new CustomEvent('notifRouteJoin', { detail: { routeId } })
         );
-        showSubscriptionToast(`Subscribed to Route ${routeId}.`);
+        showSubscriptionToast(`Subscribed to ${getRouteToastLabel(routeId)}.`);
       } else if (
         res.status === 409 &&
         res.data.name === 'SubscriptionLimitReached'
@@ -780,7 +785,9 @@ const registerSubscriptionEvents = (): void => {
         document.dispatchEvent(
           new CustomEvent('notifRouteLeave', { detail: { routeId } })
         );
-        showSubscriptionToast(`Unsubscribed from Route ${routeId}.`);
+        showSubscriptionToast(
+          `Unsubscribed from ${getRouteToastLabel(routeId)}.`
+        );
       } else {
         showSubscriptionToast('Failed to unsubscribe. Please try again.');
         updateBellState(routeId, true);
@@ -794,10 +801,11 @@ const registerSubscriptionEvents = (): void => {
 
 const registerBusReportEvents = (): void => {
   document.addEventListener('busReport', (e: Event) => {
-    const { vid, routeId, lat, lon } = (
+    const { vid, routeId, routeLabel, lat, lon } = (
       e as CustomEvent<{
         vid: string;
         routeId: string;
+        routeLabel?: string;
         lat: number;
         lon: number;
       }>
@@ -806,7 +814,7 @@ const registerBusReportEvents = (): void => {
       'bus-report-form'
     ) as BusReportFormElement | null;
     if (form && typeof form.open === 'function') {
-      form.open(vid, routeId, lat, lon);
+      form.open(vid, routeId, lat, lon, routeLabel);
     }
   });
 
@@ -981,7 +989,7 @@ function addUserLocationMarker(lat: number, lng: number): void {
 }
 
 // ── Toast Notification (TUC4 Step 11) ────────────────────────────────
-function showToast(message: string): void {
+function showMapToast(message: string): void {
   // Remove existing toast if any
   const existing = document.getElementById('map-toast');
   if (existing) existing.remove();
@@ -1024,17 +1032,22 @@ function startDirectionsBusTicker(): void {
       .forEach((li) => {
         const arrival = Number(li.dataset.arrival);
         if (!arrival) return;
-        const secsLeft = Math.round((arrival - Date.now()) / 1000);
         const timeEl = li.querySelector('.directions-panel__bus-time');
-        if (timeEl)
-          timeEl.textContent =
-            secsLeft <= 0
-              ? 'NOW'
-              : secsLeft < 60
-                ? `${secsLeft}s`
-                : `${Math.ceil(secsLeft / 60)} min`;
+        if (timeEl) timeEl.textContent = formatArrivalCountdown(arrival);
       });
   }, 1000);
+}
+
+function formatArrivalCountdown(predictedArrivalTime: number): string {
+  const secsLeft = Math.round((predictedArrivalTime - Date.now()) / 1000);
+  if (secsLeft <= 0) return 'NOW';
+  if (secsLeft < 60) return `${secsLeft}s`;
+  return `${Math.ceil(secsLeft / 60)} min`;
+}
+
+function getRouteBadgeColor(routeId: string): string {
+  const routes = mapStateManager.getState().availableRoutes;
+  return routes.find((r) => r.id === routeId)?.color || '#c41230';
 }
 
 function updateDirectionsPanel(
@@ -1059,20 +1072,10 @@ function updateDirectionsPanel(
 
   let predictionsHTML = '';
   if (info.predictions.length > 0) {
-    const routes = mapStateManager.getState().availableRoutes;
     const items = info.predictions
       .map((p) => {
-        const secsLeft = Math.round(
-          (p.predictedArrivalTime - Date.now()) / 1000
-        );
-        const minText =
-          secsLeft <= 0
-            ? 'NOW'
-            : secsLeft < 60
-              ? `${secsLeft}s`
-              : `${Math.ceil(secsLeft / 60)} min`;
-        const color =
-          routes.find((r) => r.id === p.routeId)?.color || '#c41230';
+        const minText = formatArrivalCountdown(p.predictedArrivalTime);
+        const color = getRouteBadgeColor(p.routeId);
         return `<li class="directions-panel__bus" data-arrival="${p.predictedArrivalTime}">
           <span class="directions-panel__bus-badge" style="background:${color}">${p.routeId}</span>
           <span class="directions-panel__bus-time">${minText}</span>
@@ -1157,10 +1160,13 @@ function showRoutePickPopup(routeIds: string[], x: number, y: number): void {
     popup.appendChild(badge);
   });
 
+  popup.style.visibility = 'hidden';
+  mapContainer.appendChild(popup);
+
   // Position relative to map container, clamped to stay in-bounds
   const containerRect = mapContainer.getBoundingClientRect();
-  const popupWidth = 120;
-  const popupHeight = 40;
+  const popupWidth = popup.offsetWidth;
+  const popupHeight = popup.offsetHeight;
   const clampedX = Math.min(
     Math.max(x - popupWidth / 2, 8),
     containerRect.width - popupWidth - 8
@@ -1171,8 +1177,7 @@ function showRoutePickPopup(routeIds: string[], x: number, y: number): void {
   );
   popup.style.left = `${clampedX}px`;
   popup.style.top = `${clampedY}px`;
-
-  mapContainer.appendChild(popup);
+  popup.style.visibility = 'visible';
 
   // Dismiss when clicking elsewhere
   const onOutsideClick = (e: Event) => {

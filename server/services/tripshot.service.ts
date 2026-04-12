@@ -5,20 +5,17 @@ import {
   IRoute,
   IPattern,
   IStop,
-  IVehicle
+  IVehicle,
+  IPrediction
 } from '../../common/transit.interface';
-import { IAppError } from '../../common/server.responses';
 import {
   CMU_ROUTE_METADATA,
   CMURouteMetadata,
-  extractRouteIndex
+  extractRouteIndex,
+  findCmuRouteIdByTripshotRouteId
 } from './tripshot-metadata';
-import {
-  TRIPSHOT_BASE_URL,
-  TripshotRouteResponse,
-  decodePolyline,
-  fetchWithTimeout
-} from './tripshot-api';
+import tripshotLiveStatusService from './tripshot-livestatus.service';
+import cmuStaticDataService from './cmu-static-data.service';
 
 class TripshotService {
   /**
@@ -28,9 +25,10 @@ class TripshotService {
     const routes: IRoute[] = [];
 
     for (const [index, metadata] of Object.entries(CMU_ROUTE_METADATA)) {
+      const cmuRouteId = `CMU-${index}`;
       routes.push({
-        id: `CMU-${index}`,
-        name: metadata.name,
+        id: cmuRouteId,
+        name: cmuStaticDataService.getRouteName(cmuRouteId) ?? metadata.name,
         system: 'CMU',
         color: metadata.color,
         directions: ['OUTBOUND'], // CMU shuttles typically run as loops
@@ -43,73 +41,47 @@ class TripshotService {
   }
 
   /**
-   * Fetch route geometry (patterns) from Tripshot API
+   * Fetch route geometry (patterns) from static route-scoped CMU CSVs.
    * @param routeId - Format: "CMU-{index}" (e.g., "CMU-1" for A Route)
    */
   async getPatterns(routeId: string): Promise<IPattern[]> {
     const { metadata } = extractRouteIndex(routeId);
     const tripshotRouteId = metadata.routeId;
 
-    try {
-      // Get current date for the API call (format: YYYY-MM-DD)
-      const today = new Date();
-      const dateStr = today.toISOString().split('T')[0];
-
-      // Fetch route data from Tripshot API
-      const url = `${TRIPSHOT_BASE_URL}/routeSummary/${tripshotRouteId}?day=${dateStr}&withNavigation=true&embedStops=true`;
-
-      const response = await fetchWithTimeout(url);
-
-      if (!response.ok) {
-        throw new Error(`Tripshot API returned ${response.status}`);
-      }
-
-      const data: TripshotRouteResponse = await response.json();
-
-      // Process the response to extract route geometry
-      return this.processTripshotResponse(data);
-    } catch (error) {
-      console.error(
-        `[Tripshot ${new Date().toISOString()}] Failed to fetch patterns for ${routeId}:`,
-        error
+    const staticPatterns =
+      cmuStaticDataService.getPatternsForTripshotRoute(tripshotRouteId);
+    if (staticPatterns.length === 0) {
+      console.warn(
+        `[Tripshot ${new Date().toISOString()}] No static patterns found for ${routeId} (${tripshotRouteId})`
       );
-
-      // Return empty array if API fails (client will show error)
-      const appError: IAppError = {
-        type: 'ServerError',
-        name: 'UpstreamError',
-        message: `Failed to fetch CMU route geometry from Tripshot`
-      };
-      throw appError;
     }
+
+    return staticPatterns;
   }
 
   /**
-   * Process Tripshot API response to extract route geometry as IPattern[]
+   * Warm static pattern reads for all known CMU routes.
+   * Called once after the liveStatus service completes its first poll.
    */
-  private processTripshotResponse(data: TripshotRouteResponse): IPattern[] {
-    if (!data.services || data.services.length === 0) {
-      return [];
+  async warmPatternCache(): Promise<void> {
+    if (process.env.NODE_ENV === 'test') {
+      return;
     }
 
-    const service = data.services[0];
-    const shapePoints: Array<{ lat: number; lng: number }> = [];
-
-    // Iterate through all legs and steps to decode polylines
-    for (const leg of service.legs) {
-      for (const step of leg.steps) {
-        const decoded = decodePolyline(step.polyline);
-        shapePoints.push(...decoded);
+    const routeIds = Object.keys(CMU_ROUTE_METADATA).map((k) => `CMU-${k}`);
+    console.log(
+      `[Tripshot ${new Date().toISOString()}] Pre-warming pattern cache for ${routeIds.length} routes`
+    );
+    for (const routeId of routeIds) {
+      try {
+        await this.getPatterns(routeId);
+      } catch {
+        // Non-fatal — static data may be incomplete for this route.
       }
     }
-
-    // Return as single OUTBOUND pattern (CMU shuttles run as loops)
-    return [
-      {
-        direction: 'OUTBOUND',
-        path: shapePoints
-      }
-    ];
+    console.log(
+      `[Tripshot ${new Date().toISOString()}] Static pattern warm-up complete`
+    );
   }
 
   /**
@@ -130,69 +102,77 @@ class TripshotService {
 
     const tripshotRouteId = metadata.routeId;
 
-    try {
-      // Get current date for the API call (format: YYYY-MM-DD)
-      const today = new Date();
-      const dateStr = today.toISOString().split('T')[0];
-
-      const url = `${TRIPSHOT_BASE_URL}/routeSummary/${tripshotRouteId}?day=${dateStr}&withNavigation=true&embedStops=true`;
-
-      const response = await fetchWithTimeout(url);
-
-      if (!response.ok) {
-        throw new Error(`Tripshot API returned ${response.status}`);
-      }
-
-      const data: TripshotRouteResponse = await response.json();
-
-      // Extract stops from vias
-      if (!data.rides || data.rides.length === 0) {
-        return [];
-      }
-
-      const ride = data.rides[0];
-      const stops: IStop[] = [];
-
-      for (const via of ride.vias) {
-        const stop = via.ViaStop.stop;
-        stops.push({
-          stopId: stop.stopId,
-          stopName: stop.name,
-          lat: stop.location.lt,
-          lon: stop.location.lg,
-          routes: [routeId],
-          dtradd: [],
-          dtrrem: []
-        });
-      }
-
-      return stops;
-    } catch (error) {
-      console.error(
-        `[Tripshot ${new Date().toISOString()}] Failed to fetch stops for ${routeId}:`,
-        error
-      );
-
-      const appError: IAppError = {
-        type: 'ServerError',
-        name: 'UpstreamError',
-        message: `Failed to fetch CMU route stops from Tripshot`
-      };
-      throw appError;
+    const staticStops = cmuStaticDataService.getStopsForTripshotRoute(
+      tripshotRouteId,
+      routeId
+    );
+    if (staticStops.length > 0) {
+      return staticStops;
     }
+
+    if (staticStops.length === 0) {
+      console.warn(
+        `[Tripshot ${new Date().toISOString()}] No static stops found for ${routeId} (${tripshotRouteId})`
+      );
+    }
+
+    return staticStops;
   }
 
   /**
-   * Get real-time vehicle positions
-   * Note: Tripshot API may or may not support real-time vehicle tracking
-   * This is a placeholder that would need actual API endpoint configuration
+   * Get real-time vehicle positions for a CMU shuttle route.
+   * Data is sourced from the liveStatus poller (updated every 30 s).
+   * @param routeId - Format: "CMU-{index}" (e.g., "CMU-1")
    */
   async getVehicles(routeId: string): Promise<IVehicle[]> {
-    // TODO: Implement when Tripshot vehicle tracking API is available
-    console.warn(
-      `[Tripshot ${new Date().toISOString()}] Real-time vehicle tracking not yet implemented for ${routeId}`
+    const { metadata } = extractRouteIndex(routeId);
+    const vehicles = tripshotLiveStatusService.getVehiclesByTsRouteId(
+      metadata.routeId
     );
-    return [];
+    // Rewrite internal TripShot UUID to our CMU-n route ID so the client
+    // receives a consistent routeId regardless of data source.
+    return vehicles.map((v) => ({ ...v, routeId }));
+  }
+
+  /**
+   * Get ETA predictions for a TripShot stop UUID.
+   * Data is sourced from the liveStatus poller (updated every 30 s).
+   * @param stopId - TripShot stop UUID
+   */
+  getPredictions(stopId: string, routeIdFilter?: string): IPrediction[] {
+    const hasCmuRouteFilter =
+      typeof routeIdFilter === 'string' && routeIdFilter.startsWith('CMU-');
+
+    let filterTripshotRouteId: string | null = null;
+    if (hasCmuRouteFilter && routeIdFilter) {
+      try {
+        filterTripshotRouteId = extractRouteIndex(routeIdFilter)
+          .metadata.routeId.trim()
+          .toLowerCase();
+      } catch {
+        filterTripshotRouteId = null;
+      }
+    }
+
+    return tripshotLiveStatusService
+      .getPredictions(stopId)
+      .filter(
+        (p) =>
+          !filterTripshotRouteId ||
+          p.routeId.trim().toLowerCase() === filterTripshotRouteId
+      )
+      .map((p) => {
+        // When a CMU route filter is applied, preserve that route ID in the
+        // response so aliases that share a TripShot UUID (e.g., A/C) still
+        // display the member-selected route consistently.
+        if (hasCmuRouteFilter && routeIdFilter) {
+          return { ...p, routeId: routeIdFilter };
+        }
+
+        const cmuRouteId = findCmuRouteIdByTripshotRouteId(p.routeId);
+        return cmuRouteId ? { ...p, routeId: cmuRouteId } : p;
+      })
+      .sort((a, b) => a.predictedArrivalTime - b.predictedArrivalTime);
   }
 
   /**

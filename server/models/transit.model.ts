@@ -8,6 +8,7 @@
 import DAC from '../db/dac';
 import trueTimeService from '../services/truetime.service';
 import gtfsService from '../services/gtfs.service';
+import tripshotService from '../services/tripshot.service';
 import {
   IRoute,
   IStop,
@@ -182,6 +183,15 @@ export class TransitModel {
 
   /** Return stops for a route/direction from in-memory cache; on miss, read GTFS directly. */
   static async getStops(routeId: string, direction: string): Promise<IStop[]> {
+    // CMU routes are served by TripShot, not GTFS
+    if (routeId.startsWith('CMU-')) {
+      try {
+        return await tripshotService.getStops(routeId, direction);
+      } catch {
+        return [];
+      }
+    }
+
     if (TransitModel.bulkDataCache) {
       console.log(
         `[TransitModel ${new Date().toISOString()}] Stops for ${routeId}/${direction} served from memory`
@@ -454,8 +464,6 @@ export class TransitModel {
     // Add CMU routes if available and not filtered to PRT only
     if (!filters?.system || filters.system === 'CMU') {
       try {
-        const tripshotService = (await import('../services/tripshot.service'))
-          .default;
         if (tripshotService.isConfigured()) {
           const cmuRoutes = await tripshotService.getRoutes();
           routes = [...routes, ...cmuRoutes];

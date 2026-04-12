@@ -15,7 +15,7 @@ export const CMU_ROUTE_METADATA: Record<number, CMURouteMetadata> = {
     name: 'A Route- N. Oakland / W. Shadyside',
     shortName: 'A',
     color: '#C41230',
-    routeId: 'A9E22E1E-A366-4FE4-973C-871EB78E2349'
+    routeId: 'D493D9EF-7628-4116-BBEC-ADB2D208BBE5'
   },
   2: {
     name: 'AB Route- N. Oak & Shadyside Comb.',
@@ -103,6 +103,38 @@ export const CMU_ROUTE_METADATA: Record<number, CMURouteMetadata> = {
   }
 };
 
+const tripshotRouteToCmuRouteId = new Map<string, string>();
+const duplicateTripshotRouteIds = new Map<string, string[]>();
+
+for (const [index, metadata] of Object.entries(CMU_ROUTE_METADATA)) {
+  const cmuRouteId = `CMU-${index}`;
+  const normalizedTripshotRouteId = metadata.routeId.trim().toLowerCase();
+  const existing = tripshotRouteToCmuRouteId.get(normalizedTripshotRouteId);
+
+  if (existing) {
+    const aliases = duplicateTripshotRouteIds.get(
+      normalizedTripshotRouteId
+    ) ?? [existing];
+    aliases.push(cmuRouteId);
+    duplicateTripshotRouteIds.set(normalizedTripshotRouteId, aliases);
+    continue;
+  }
+
+  tripshotRouteToCmuRouteId.set(normalizedTripshotRouteId, cmuRouteId);
+}
+
+if (duplicateTripshotRouteIds.size > 0) {
+  const duplicateSummary = [...duplicateTripshotRouteIds.entries()]
+    .map(
+      ([tripshotRouteId, cmuRouteIds]) =>
+        `${tripshotRouteId}=>${cmuRouteIds.join('/')}`
+    )
+    .join(', ');
+  console.warn(
+    `[Tripshot ${new Date().toISOString()}] Duplicate TripShot route IDs configured in CMU_ROUTE_METADATA: ${duplicateSummary}`
+  );
+}
+
 /**
  * Extract and validate the numeric route index from a "CMU-{n}" route ID.
  * Returns the index and its metadata, or throws an IAppError if invalid.
@@ -133,4 +165,15 @@ export function extractRouteIndex(routeId: string): {
   }
 
   return { index, metadata };
+}
+
+/**
+ * Resolve a TripShot route UUID to our public CMU route ID format (CMU-{n}).
+ * Returns null when the UUID is unknown.
+ */
+export function findCmuRouteIdByTripshotRouteId(
+  tripshotRouteId: string
+): string | null {
+  const normalized = tripshotRouteId.trim().toLowerCase();
+  return tripshotRouteToCmuRouteId.get(normalized) ?? null;
 }

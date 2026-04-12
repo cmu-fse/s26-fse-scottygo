@@ -26,6 +26,7 @@ import type { IMapProvider, IMapMarker } from '../../../common/map.interface';
 import type { IVehicle } from '../../../common/transit.interface';
 import { MapStateManager } from '../state/map-state';
 import { MAP_POPUP_ID, closeMapPopup } from '../utils/map-popup';
+import { getRouteTitle } from '../utils/route-display';
 import { showToast } from '../utils/toast';
 
 export class VehicleTracker {
@@ -175,24 +176,12 @@ export class VehicleTracker {
   private async updateMultiRoutePositions(): Promise<void> {
     if (!this.mapProvider || this.multiRouteIds.length === 0) return;
 
-    const token = localStorage.getItem('token');
-
     for (const routeId of this.multiRouteIds) {
-      try {
-        const response = await axios.get(`/transit/vehicles/${routeId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-          validateStatus: () => true
-        });
-
-        if (
-          response.status === 200 &&
-          response.data.name === 'VehiclesLocated'
-        ) {
-          const vehicles: IVehicle[] = response.data.payload || [];
-          this.renderVehicles(vehicles);
-        }
-      } catch (error) {
-        console.error(`Error fetching vehicles for route ${routeId}:`, error);
+      const result = await this.fetchVehicleData(
+        `/transit/vehicles/${routeId}`
+      );
+      if (result !== null) {
+        this.renderVehicles(result.vehicles);
       }
     }
   }
@@ -203,53 +192,68 @@ export class VehicleTracker {
   private async updateVehiclePositions(): Promise<void> {
     if (!this.currentRouteId || !this.mapProvider) return;
 
-    try {
-      const state = this.stateManager.getState();
-      let url = `/transit/vehicles/${this.currentRouteId}`;
+    const state = this.stateManager.getState();
+    let url = `/transit/vehicles/${this.currentRouteId}`;
 
-      // Add time parameter if time filter is applied (Rule R3)
-      if (state.selectedTime && state.selectedDate) {
-        const timeString = this.formatTimeForAPI(
-          state.selectedDate,
-          state.selectedTime
-        );
-        url += `?tm=${encodeURIComponent(timeString)}`;
+    // Add time parameter if time filter is applied (Rule R3)
+    if (state.selectedTime && state.selectedDate) {
+      const timeString = this.formatTimeForAPI(
+        state.selectedDate,
+        state.selectedTime
+      );
+      url += `?tm=${encodeURIComponent(timeString)}`;
+    }
+
+    const result = await this.fetchVehicleData(url);
+    if (result === null) return;
+
+    // Check if data is from static cache (A2: PRT API Down)
+    if (result.source === 'static' && !this.hasShownStaticToast) {
+      this.showToast(
+        'Real-time tracking unavailable. Showing scheduled times only.'
+      );
+      this.hasShownStaticToast = true;
+    }
+
+    const { vehicles } = result;
+    if (vehicles.length === 0) {
+      if (!this.hasShownNoVehiclesToast) {
+        this.showToast('No active buses found for this route');
+        this.hasShownNoVehiclesToast = true;
       }
+    } else {
+      this.hasShownNoVehiclesToast = false;
+    }
 
+    this.stateManager.setActiveVehicles(vehicles);
+    this.renderVehicles(vehicles);
+  }
+
+  /**
+   * Fetch vehicle data for a single route URL.
+   * Handles auth, response validation, and error logging in one place.
+   * Returns null on any failure so callers can skip rendering cleanly.
+   */
+  private async fetchVehicleData(
+    url: string
+  ): Promise<{ vehicles: IVehicle[]; source?: string } | null> {
+    try {
       const token = localStorage.getItem('token');
       const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${token}` },
         validateStatus: () => true
       });
-
       if (response.status === 200 && response.data.name === 'VehiclesLocated') {
-        // Check if data is from static cache (A2: PRT API Down)
-        if (response.data.source === 'static' && !this.hasShownStaticToast) {
-          this.showToast(
-            'Real-time tracking unavailable. Showing scheduled times only.'
-          );
-          this.hasShownStaticToast = true;
-        }
-
-        const vehicles: IVehicle[] = response.data.payload || [];
-
-        if (vehicles.length === 0) {
-          if (!this.hasShownNoVehiclesToast) {
-            this.showToast('No active buses found for this route');
-            this.hasShownNoVehiclesToast = true;
-          }
-        } else {
-          this.hasShownNoVehiclesToast = false;
-        }
-
-        this.stateManager.setActiveVehicles(vehicles);
-        this.renderVehicles(vehicles);
-      } else {
-        console.error('Failed to fetch vehicles:', response.data);
+        return {
+          vehicles: response.data.payload || [],
+          source: response.data.source
+        };
       }
+      console.error('Failed to fetch vehicles:', response.data);
+      return null;
     } catch (error) {
       console.error('Error fetching vehicle positions:', error);
-      // Don't stop polling on transient errors
+      return null;
     }
   }
 
@@ -275,10 +279,13 @@ export class VehicleTracker {
         marker.setIcon(this.createBusIcon(vehicle));
       } else {
         // Create new marker
+        const busIcon = this.createBusIcon(vehicle);
         const marker = this.mapProvider!.addMarker({
           position: { lat: vehicle.lat, lng: vehicle.lon },
           title: `Bus ${vehicle.vid}${vehicle.isDetoured ? ' (Detoured)' : ''}`,
-          icon: this.createBusIcon(vehicle)
+          icon: busIcon.url,
+          iconAnchor: busIcon.anchor,
+          iconSize: busIcon.size
         });
 
         // Attach click handler for info popup
@@ -376,29 +383,22 @@ export class VehicleTracker {
     // Normalise heading to [0, 360).
     const heading = (((vehicle.heading ?? 0) % 360) + 360) % 360;
 
-    // Westward headings (180–359°): mirror the bus so the front stays
+    // Westward headings (180-359°): mirror the bus so the front stays
     // visually "correct" (windows above chassis, headlight at nose).
-    // Eastward headings (0–179°): standard rotation only.
+    // Eastward headings (0-179°): standard rotation only.
     const flip = heading >= 180;
 
     // Rotation angle that makes the bus front point toward `heading`.
-    //
-    // Without flip: front is +x; rotate(heading-90) maps +x → compass heading.
-    // With flip:    after scale(-1,1) the effective front is -x;
-    //              rotate(-(heading+90)) then maps -x → compass heading.
+    // Without flip: front is +x; rotate(heading-90) maps +x -> compass heading.
+    // With flip: after scale(-1,1), effective front is -x;
+    // rotate(-(heading+90)) maps -x -> compass heading.
     const rotDeg = flip ? -(heading + 90) : heading - 90;
 
-    // 40×40 viewBox; bus max radius from centre ≈ 15 px → well inside 20 px margin.
     const vbSize = 40;
-    const cx = vbSize / 2; // 20
-    const cy = vbSize / 2; // 20
+    const cx = vbSize / 2;
+    const cy = vbSize / 2;
     const sz = Math.round(vbSize * scale);
 
-    // Build the SVG transform that centres the bus and applies mirror + rotation.
-    // Transform order (SVG applies left → right on the coordinate system):
-    //   translate  → move origin to the icon centre on screen
-    //   scale      → optional horizontal mirror for westward headings
-    //   rotate     → point the bus nose toward the heading
     const groupTransform = flip
       ? `translate(${cx},${cy}) scale(-1,1) rotate(${rotDeg})`
       : `translate(${cx},${cy}) rotate(${rotDeg})`;
@@ -406,21 +406,13 @@ export class VehicleTracker {
     const svg =
       `<svg xmlns="http://www.w3.org/2000/svg" width="${sz}" height="${sz}" viewBox="0 0 ${vbSize} ${vbSize}">` +
       `<g transform="${groupTransform}">` +
-      // Bus body — main fill is the route colour
       `<rect x="-12" y="-5" width="24" height="10" rx="2" fill="${color}" stroke="rgba(0,0,0,0.35)" stroke-width="0.6"/>` +
-      // Front accent panel (covers the right side to mark the nose)
       `<rect x="9" y="-5" width="3" height="10" fill="rgba(0,0,0,0.18)"/>` +
-      // Windshield (front pane, right side of body)
       `<rect x="4.5" y="-3.5" width="5" height="7" rx="1" fill="rgba(210,235,255,0.9)" stroke="rgba(0,0,0,0.25)" stroke-width="0.4"/>` +
-      // Passenger side window 1
       `<rect x="-1.5" y="-3.5" width="3.5" height="5" rx="0.5" fill="rgba(210,235,255,0.75)" stroke="rgba(0,0,0,0.2)" stroke-width="0.3"/>` +
-      // Passenger side window 2
       `<rect x="-7" y="-3.5" width="3.5" height="5" rx="0.5" fill="rgba(210,235,255,0.75)" stroke="rgba(0,0,0,0.2)" stroke-width="0.3"/>` +
-      // Headlight at nose
       `<circle cx="12" cy="0" r="1.3" fill="rgba(255,255,200,0.95)"/>` +
-      // Front wheel
       `<rect x="5" y="4.5" width="4.5" height="2.5" rx="0.8" fill="rgba(30,30,30,0.85)"/>` +
-      // Rear wheel
       `<rect x="-9.5" y="4.5" width="4.5" height="2.5" rx="0.8" fill="rgba(30,30,30,0.85)"/>` +
       `</g>` +
       `</svg>`;
@@ -464,6 +456,11 @@ export class VehicleTracker {
     showToast(message);
   }
 
+  /** Build user-facing route text for popup subheader. */
+  private getRouteSubheaderText(routeId: string): string {
+    return getRouteTitle(routeId, this.stateManager.getState().availableRoutes);
+  }
+
   /**
    * Show info popup for a clicked bus marker.
    * Reads the latest stored data for the vehicle.
@@ -493,7 +490,7 @@ export class VehicleTracker {
     // Subheader — route
     const subheader = document.createElement('div');
     subheader.className = 'map-popup__subheader';
-    subheader.textContent = `Route ${vehicle.routeId}`;
+    subheader.textContent = this.getRouteSubheaderText(vehicle.routeId);
     popup.appendChild(subheader);
 
     // Detail rows
@@ -609,6 +606,7 @@ export class VehicleTracker {
             detail: {
               vid: latestVehicle.vid,
               routeId: latestVehicle.routeId,
+              routeLabel: this.getRouteSubheaderText(latestVehicle.routeId),
               lat: userLat,
               lon: userLon
             }

@@ -8,6 +8,16 @@ import type {
   INotification,
   IServiceAlert
 } from '../../common/transit.interface';
+import {
+  fetchRouteDisplayMap,
+  formatNotificationMessage,
+  getRouteDisplay,
+  type IRouteDisplayMeta
+} from './utils/route-display';
+import {
+  matchesAlertQuery,
+  matchesNotificationQuery
+} from './utils/notification-search';
 
 // ── Auth ───────────────────────────────────────────────────────────────────────
 
@@ -32,6 +42,18 @@ const clearBtn = document.getElementById('notif-search-clear')!;
 
 /** true while showing live notification search results (not alerts) */
 let showingNotifications = false;
+let routeDisplayById = new Map<string, IRouteDisplayMeta>();
+
+function resolveRouteDisplay(routeId: string): {
+  title: string;
+  subtitle: string;
+} {
+  return getRouteDisplay(routeId, routeDisplayById);
+}
+
+function formatMessage(message: string): string {
+  return formatNotificationMessage(message, routeDisplayById);
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -65,6 +87,8 @@ const NOTIF_ICON = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" 
 function createNotifCard(notif: INotification): HTMLLIElement {
   const li = document.createElement('li');
   li.className = 'notif-card';
+  const display = resolveRouteDisplay(notif.routeId);
+  const secondaryText = notif.vid ? `Bus #${notif.vid}` : display.subtitle;
 
   li.innerHTML = `
     <button class="notif-dismiss" aria-label="Dismiss notification">
@@ -75,9 +99,12 @@ function createNotifCard(notif: INotification): HTMLLIElement {
     </button>
     <div class="notif-card-header">
       <span class="notif-icon">${NOTIF_ICON}</span>
-      <span class="notif-title">Route ${notif.routeId} · Bus #${notif.vid}</span>
+      <div class="notif-header-text">
+        <span class="notif-title">${display.title}</span>
+          <span class="notif-subtitle">${secondaryText}</span>
+      </div>
     </div>
-    <p class="notif-body">${notif.message}</p>
+    <p class="notif-body">${formatMessage(notif.message)}</p>
     <div class="notif-card-footer">
       <span class="notif-tag">Live Update</span>
       <span class="notif-time">${formatTime(notif.createdAt)}</span>
@@ -93,6 +120,10 @@ function createNotifCard(notif: INotification): HTMLLIElement {
   );
 
   return li;
+}
+
+async function fetchRoutesForDisplay(): Promise<void> {
+  routeDisplayById = await fetchRouteDisplayMap(authHeaders());
 }
 
 // ── Alert cards ────────────────────────────────────────────────────────────────
@@ -163,7 +194,6 @@ async function searchNotifications(params: {
   const qs = new URLSearchParams();
   if (params.route) qs.set('route', params.route);
   if (params.bus) qs.set('bus', params.bus);
-  if (params.q) qs.set('q', params.q);
 
   const query = [params.route, params.bus, params.q].filter(Boolean).join(' ');
 
@@ -176,7 +206,17 @@ async function searchNotifications(params: {
 
     if (notifRes.ok) {
       const notifData = await notifRes.json();
-      const notifs: INotification[] = notifData.payload ?? [];
+      let notifs: INotification[] = notifData.payload ?? [];
+      if (params.q) {
+        notifs = notifs.filter((n) =>
+          matchesNotificationQuery(
+            n,
+            params.q!,
+            resolveRouteDisplay,
+            formatMessage
+          )
+        );
+      }
       notifs.forEach((n) => list.appendChild(createNotifCard(n)));
     }
 
@@ -184,14 +224,8 @@ async function searchNotifications(params: {
     if (alertRes.ok) {
       const alertData = await alertRes.json();
       const alerts: IServiceAlert[] = alertData.payload ?? [];
-      const lower = (query || '').toLowerCase();
-      const matched = lower
-        ? alerts.filter(
-            (a) =>
-              a.headerText.toLowerCase().includes(lower) ||
-              a.descriptionText.toLowerCase().includes(lower) ||
-              a.routeIds.some((r) => r.toLowerCase().includes(lower))
-          )
+      const matched = query
+        ? alerts.filter((a) => matchesAlertQuery(a, query, resolveRouteDisplay))
         : [];
       matched.forEach((a) => list.appendChild(createAlertCard(a)));
     }
@@ -266,6 +300,8 @@ async function init(): Promise<void> {
   }
 
   connectForAlerts();
+
+  await fetchRoutesForDisplay();
 
   const { route, bus } = getPreFill();
 

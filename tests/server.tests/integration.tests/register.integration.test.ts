@@ -59,6 +59,11 @@ jest.mock('../../../server/services/memory-monitor.service', () => ({
   }
 }));
 
+jest.mock('../../../server/services/alerts.service', () => ({
+  __esModule: true,
+  default: { start: jest.fn(), stop: jest.fn(), onAlertsChanged: null }
+}));
+
 // ============================================================================
 // Test configuration
 // ============================================================================
