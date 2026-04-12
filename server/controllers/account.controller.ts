@@ -17,8 +17,7 @@ import * as responses from '../../common/server.responses';
 import EmailService from '../services/email.service';
 import {
   SearchContext,
-  UserSearchStrategy,
-  UserSearchField
+  UserSearchStrategy
 } from '../search/search-strategy';
 
 export default class AccountController extends Controller {
@@ -206,24 +205,8 @@ export default class AccountController extends Controller {
         return;
       }
 
-      const rawField = ((req.query.field as string | undefined)
-        ?.trim()
-        .toLowerCase() ?? 'username') as UserSearchField;
-
-      if (rawField !== 'username' && rawField !== 'email') {
-        const error: responses.IAppError = {
-          type: 'ClientError',
-          name: 'InvalidSearchField',
-          message: 'field must be either "username" or "email"'
-        };
-        res.status(400).json(error);
-        return;
-      }
-
       const q = (req.query.q as string | undefined)?.trim() ?? '';
-      const context = new SearchContext<string[]>(
-        new UserSearchStrategy(rawField)
-      );
+      const context = new SearchContext<string[]>(new UserSearchStrategy());
       const usernames = await context.executeSearch(q);
 
       const successRes: responses.ISuccess = {
@@ -232,7 +215,7 @@ export default class AccountController extends Controller {
         message: usernames.length
           ? `Found ${usernames.length} matching user${usernames.length === 1 ? '' : 's'}`
           : 'No matching users found',
-        metadata: { totalItems: usernames.length, field: rawField },
+        metadata: { totalItems: usernames.length },
         payload: usernames
       };
       res.status(200).json(successRes);

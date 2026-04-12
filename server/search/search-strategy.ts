@@ -199,8 +199,6 @@ export class SearchContext<T> {
   }
 }
 
-export type UserSearchField = 'username' | 'email';
-
 // ── Concrete Strategy 1: User Search ─────────────────────────────────────────
 
 /**
@@ -209,37 +207,18 @@ export type UserSearchField = 'username' | 'email';
  *
  * Context : Manage Account page (Admin combobox, GET /account/users/search).
  * Criteria: One or more words matching an existing username (or part of one).
- * Results : Matching usernames ordered by Active users first, then Inactive,
- *           and alphabetical by username/email within each group.
+ * Results : Matching usernames in alphabetical order.
  */
 export class UserSearchStrategy implements ISearchStrategy<string[]> {
-  constructor(private readonly field: UserSearchField = 'username') {}
-
   async search(query: string): Promise<string[]> {
     const lower = query.trim().toLowerCase();
-    const users = await User.getAllUserAccounts();
+    const usernames = await User.getAllUsernames();
 
     const filtered = lower
-      ? users.filter((u) => {
-          const target =
-            this.field === 'email' ? u.email : u.credentials.username;
-          return target.toLowerCase().includes(lower);
-        })
-      : users;
+      ? usernames.filter((u) => u.toLowerCase().includes(lower))
+      : usernames;
 
-    filtered.sort((a, b) => {
-      const aGroup = a.status === 'Active' ? 0 : 1;
-      const bGroup = b.status === 'Active' ? 0 : 1;
-      if (aGroup !== bGroup) return aGroup - bGroup;
-
-      const byUsername = a.credentials.username.localeCompare(
-        b.credentials.username
-      );
-      if (byUsername !== 0) return byUsername;
-      return a.email.localeCompare(b.email);
-    });
-
-    return filtered.map((u) => u.credentials.username);
+    return filtered.sort((a, b) => a.localeCompare(b));
   }
 }
 
