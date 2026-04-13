@@ -50,6 +50,9 @@ class App {
   private dailyRefreshIntervalId: ReturnType<typeof setInterval> | null = null;
   private isShuttingDown = false;
 
+  /** Resolves once the background init chain (DB, GTFS, caches, pollers) completes. */
+  public initComplete: Promise<void>;
+
   constructor(
     controllers: Controller[],
     params: {
@@ -89,7 +92,7 @@ class App {
       );
     });
 
-    DAC.db.connect().then(async () => {
+    this.initComplete = DAC.db.connect().then(async () => {
       if (this.isShuttingDown) {
         return;
       }
