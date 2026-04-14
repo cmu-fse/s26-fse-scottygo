@@ -47,7 +47,7 @@ describe('REST smoke: memory monitoring endpoints', () => {
       getRecentMemorySamples: jest.fn().mockResolvedValue(samples)
     } as never;
 
-    const transit = new BusController('/transit');
+    const transit = BusController.getInstance('/transit');
     app.use('/transit', transit.router);
 
     await new Promise<void>((resolve) => {

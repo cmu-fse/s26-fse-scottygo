@@ -239,9 +239,9 @@ beforeAll(async () => {
   const db = new MongoDB(TEST_DB_URL);
   app = new App(
     [
-      new MapController('/'),
-      new AuthController('/auth'),
-      new AccountController('/account')
+      MapController.getInstance('/'),
+      AuthController.getInstance('/auth'),
+      AccountController.getInstance('/account')
     ],
     {
       clientDir: './.dist/client',

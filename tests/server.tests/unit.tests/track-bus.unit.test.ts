@@ -40,7 +40,7 @@ const createMockResponse = (): MockResponse => {
 };
 
 describe('TUC2 – Track Bus in Real-Time unit tests', () => {
-  const controller = new BusController('/transit');
+  const controller = BusController.getInstance('/transit');
 
   beforeEach(() => {
     jest.restoreAllMocks();

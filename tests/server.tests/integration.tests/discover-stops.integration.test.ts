@@ -283,7 +283,7 @@ const testUser = {
 
 let app: App;
 let server: HttpServer;
-let memberToken: string; // eslint-disable-line @typescript-eslint/no-unused-vars
+let memberToken: string;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -352,9 +352,9 @@ beforeAll(async () => {
   const db = new MongoDB(TEST_DB_URL);
   app = new App(
     [
-      new AuthController('/auth'),
-      new MapController('/'),
-      new BusController('/transit')
+      AuthController.getInstance('/auth'),
+      MapController.getInstance('/'),
+      BusController.getInstance('/transit')
     ],
     {
       clientDir: './.dist/client',
