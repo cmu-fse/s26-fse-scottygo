@@ -355,7 +355,7 @@ beforeAll(async () => {
   );
 
   server = await app.listen();
-  await new Promise((resolve) => setTimeout(resolve, 1500));
+  await app.initComplete;
 
   // Populate the transit cache through the real TransitModel → MongoDB flow
   await TransitModel.refreshAllCaches();
