@@ -37,7 +37,7 @@ const makeRegisterReq = (
   }) as unknown as Request;
 
 describe('Register Use Case unit tests', () => {
-  const authController = new AuthController('/auth');
+  const authController = AuthController.getInstance('/auth');
 
   const savedUser: IUser = {
     _id: 'user-id-1',

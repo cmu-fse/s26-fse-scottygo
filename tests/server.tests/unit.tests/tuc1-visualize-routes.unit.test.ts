@@ -646,7 +646,7 @@ describe('TUC1 – Visualize Routes unit tests', () => {
   // ── Controller filterRoutesByDateTime validation ─────────────────────
 
   describe('filterRoutesByDateTime controller validation', () => {
-    const controller = new BusController('/transit');
+    const controller = BusController.getInstance('/transit');
 
     // Access private method for testing
     const callFilterRoutesByDateTime = async (

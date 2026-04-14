@@ -275,7 +275,7 @@ beforeAll(async () => {
   const db = new MongoDB(TEST_DB_URL);
   app = new App(
     [
-      new AuthController('/auth'),
+      AuthController.getInstance('/auth'),
       NotificationController.getInstance('/notifications')
     ],
     {

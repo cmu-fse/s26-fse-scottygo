@@ -15,10 +15,7 @@ import jwt from 'jsonwebtoken';
 import { JWT_KEY as secretKey } from '../env';
 import * as responses from '../../common/server.responses';
 import EmailService from '../services/email.service';
-import {
-  SearchContext,
-  UserSearchStrategy
-} from '../search/search-strategy';
+import { SearchContext, UserSearchStrategy } from '../search/search-strategy';
 
 export default class AccountController extends Controller {
   private static instance: AccountController | null = null;

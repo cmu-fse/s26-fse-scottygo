@@ -269,7 +269,7 @@ describe('Administrator Action of User Profile Rule (R3)', () => {
   const mockTo = jest.fn().mockReturnValue({ emit: mockEmit });
   Controller.io = { to: mockTo } as unknown as typeof Controller.io;
 
-  const controller = new AccountController('/account');
+  const controller = AccountController.getInstance('/account');
 
   afterEach(() => {
     jest.restoreAllMocks();
@@ -489,7 +489,7 @@ describe('Member Action of User Profile Rule (R3)', () => {
   const mockTo = jest.fn().mockReturnValue({ emit: mockEmit });
   Controller.io = { to: mockTo } as unknown as typeof Controller.io;
 
-  const controller = new AccountController('/account');
+  const controller = AccountController.getInstance('/account');
 
   afterEach(() => {
     jest.restoreAllMocks();
@@ -618,7 +618,7 @@ describe('Active-Inactive Rule (R5)', () => {
     }
   } as unknown as typeof Controller.io;
 
-  const controller = new AccountController('/account');
+  const controller = AccountController.getInstance('/account');
 
   afterEach(() => {
     jest.restoreAllMocks();
