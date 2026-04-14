@@ -39,6 +39,7 @@ export class VehicleTracker {
   private pollingInterval: number | null = null;
   private currentRouteId: string | null = null;
   private currentRouteColor = '#4285F4';
+  private routeColorMap = new Map<string, string>();
   private multiRouteIds: string[] = [];
   private multiRoutePollingInterval: number | null = null;
   private vehicleMarkers = new Map<string, IMapMarker>(); // vehicleId → marker
@@ -94,6 +95,7 @@ export class VehicleTracker {
    */
   startPolling(routeId: string, routeColor = '#4285F4'): void {
     this.currentRouteColor = routeColor;
+    this.routeColorMap.set(routeId, routeColor);
     if (!this.mapProvider) {
       console.error('Map provider not initialized');
       return;
@@ -140,11 +142,17 @@ export class VehicleTracker {
    * Start polling vehicle positions for multiple routes simultaneously.
    * Used during directions mode to show selected bus locations.
    */
-  startMultiRoutePolling(routeIds: string[]): void {
+  startMultiRoutePolling(
+    routeIds: string[],
+    routeColors?: Map<string, string>
+  ): void {
     if (!this.mapProvider || routeIds.length === 0) return;
 
     this.stopMultiRoutePolling();
     this.multiRouteIds = routeIds;
+    if (routeColors) {
+      routeColors.forEach((color, id) => this.routeColorMap.set(id, color));
+    }
 
     // Initial fetch
     this.updateMultiRoutePositions();
@@ -172,18 +180,23 @@ export class VehicleTracker {
 
   /**
    * Fetch and render vehicle positions for all multi-route IDs.
+   * Collects vehicles from every route first, then renders in a single
+   * pass so that `removeStaleVehicles` doesn't discard one route's
+   * markers while processing the next.
    */
   private async updateMultiRoutePositions(): Promise<void> {
     if (!this.mapProvider || this.multiRouteIds.length === 0) return;
 
+    const allVehicles: IVehicle[] = [];
     for (const routeId of this.multiRouteIds) {
       const result = await this.fetchVehicleData(
         `/transit/vehicles/${routeId}`
       );
       if (result !== null) {
-        this.renderVehicles(result.vehicles);
+        allVehicles.push(...result.vehicles);
       }
     }
+    this.renderVehicles(allVehicles);
   }
 
   /**
@@ -374,7 +387,9 @@ export class VehicleTracker {
     size: { width: number; height: number };
   } {
     // Detoured buses keep an amber override so they stand out on the map.
-    const color = vehicle.isDetoured ? '#FFA500' : this.currentRouteColor;
+    const color = vehicle.isDetoured
+      ? '#FFA500'
+      : this.routeColorMap.get(vehicle.routeId) || this.currentRouteColor;
     const scale = Math.max(
       0.5,
       Math.min(2.5, (this.currentZoom - 10) * 0.3 + 1)

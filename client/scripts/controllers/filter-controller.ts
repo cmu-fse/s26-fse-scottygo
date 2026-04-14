@@ -1328,8 +1328,17 @@ export class FilterController {
       }
     }
 
-    // Start vehicle polling for selected routes
-    this.vehicleTracker.startMultiRoutePolling(routeIds);
+    // Start vehicle polling for selected routes, passing route colours
+    const routeColors = new Map<string, string>();
+    for (const routeId of routeIds) {
+      const route = state.availableRoutes.find((r) => r.id === routeId);
+      const color =
+        this.routeColorCache.get(routeId) ||
+        route?.color ||
+        this.getFallbackRouteColor(routeId);
+      routeColors.set(routeId, color);
+    }
+    this.vehicleTracker.startMultiRoutePolling(routeIds, routeColors);
   }
 
   /**
