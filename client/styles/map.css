@@ -461,14 +461,20 @@ body.dark .control-panel {
   background: rgba(31, 41, 55, 0.95);
 }
 
-/* Route Bell Component — sits above the zoom panel, hidden until a route is selected */
+/* Route Bell Component — sits above the zoom panel */
 route-bell {
   position: absolute;
   right: 20px;
   /* 20px (zoom-panel bottom) + 3×48px (buttons) + 2×8px (gaps) + 8px (gap to bell) = 188px */
   bottom: 188px;
-  display: none;
+  display: block;
   z-index: 20;
+}
+
+route-bell.is-disabled .bell-btn {
+  opacity: 0.35;
+  pointer-events: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
 .bell-btn.bell-subscribed {

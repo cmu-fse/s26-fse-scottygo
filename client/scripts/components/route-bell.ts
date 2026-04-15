@@ -13,6 +13,7 @@ export class RouteBell extends HTMLElement implements IRouteBellElement {
   private subscribed = false;
 
   connectedCallback(): void {
+    this.classList.add('is-disabled');
     this.innerHTML = `
       <button class="circle-btn bell-btn" id="bell-btn" title="Subscribe to route">
         <span class="material-icons-outlined">notifications_none</span>
@@ -35,13 +36,15 @@ export class RouteBell extends HTMLElement implements IRouteBellElement {
   showBell(routeId: string, isSubscribed: boolean): void {
     this.currentRouteId = routeId;
     this.subscribed = isSubscribed;
-    this.style.display = 'block';
+    this.classList.remove('is-disabled');
     this.updateIcon();
   }
 
   hideBell(): void {
     this.currentRouteId = null;
-    this.style.display = 'none';
+    this.subscribed = false;
+    this.classList.add('is-disabled');
+    this.updateIcon();
   }
 
   private updateIcon(): void {
