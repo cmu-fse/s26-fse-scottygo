@@ -3,6 +3,11 @@
 
 import { ILogin, IUser, ITokenPayload } from '../../common/user.interface';
 import { User } from '../models/user.model';
+import {
+  validateUsernameFormat,
+  validateEmailFormat,
+  validatePasswordStrength
+} from '../models/user.validation';
 import Controller from './controller';
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
@@ -83,6 +88,7 @@ export default class AuthController extends Controller {
 
   public initializeRoutes(): void {
     this.router.get('/', this.authPage.bind(this));
+    this.router.post('/validate', this.validateField.bind(this));
     this.router.post('/users', this.register.bind(this));
     this.router.post('/tokens/:username?', this.login.bind(this));
     this.router.patch('/users/:username', this.agreed.bind(this));
@@ -250,6 +256,54 @@ export default class AuthController extends Controller {
         error,
         'An unexpected error occurred in the database'
       );
+    }
+  }
+
+  public validateField(req: Request, res: Response) {
+    const { field, value } = req.body;
+
+    if (!field || typeof value !== 'string') {
+      return res
+        .status(400)
+        .json(clientError('MissingUsername', 'Field and value are required'));
+    }
+
+    try {
+      switch (field) {
+        case 'username':
+          validateUsernameFormat(value);
+          break;
+        case 'email':
+          validateEmailFormat(value);
+          break;
+        case 'password':
+          validatePasswordStrength(value);
+          break;
+        default:
+          return res
+            .status(400)
+            .json(clientError('MissingUsername', `Unknown field: ${field}`));
+      }
+
+      return res
+        .status(200)
+        .json({ name: 'ValidationPassed', message: 'Valid' });
+    } catch (error: unknown) {
+      if (
+        error &&
+        typeof error === 'object' &&
+        'type' in error &&
+        'name' in error
+      ) {
+        return res.status(400).json(error);
+      }
+      return res
+        .status(500)
+        .json({
+          type: 'ServerError',
+          name: 'MongoDBError',
+          message: 'Validation failed unexpectedly'
+        });
     }
   }
 }

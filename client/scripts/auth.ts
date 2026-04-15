@@ -9,139 +9,11 @@ import { isSuccess } from '../../common/server.responses';
 
 export {};
 
+// ── Helpers ─────────────────────────────────────────────────────────
+
 const storeAuth = (token: string, username: string): void => {
   localStorage.setItem('token', token);
   localStorage.setItem('username', username);
-};
-
-const form = document.getElementById('auth-form') as HTMLFormElement | null;
-const statusEl = document.getElementById(
-  'status'
-) as HTMLParagraphElement | null;
-const submitBtn = document.getElementById(
-  'submit-btn'
-) as HTMLButtonElement | null;
-
-const usernameInput = document.getElementById(
-  'username'
-) as HTMLInputElement | null;
-const emailInput = document.getElementById('email') as HTMLInputElement | null;
-const passwordInput = document.getElementById(
-  'password'
-) as HTMLInputElement | null;
-const tosInput = document.getElementById('tos') as HTMLInputElement | null;
-const confirmModal = document.getElementById(
-  'confirm-modal'
-) as HTMLDivElement | null;
-const confirmYes = document.getElementById(
-  'confirm-yes'
-) as HTMLButtonElement | null;
-const confirmNo = document.getElementById(
-  'confirm-no'
-) as HTMLButtonElement | null;
-const termsModal = document.getElementById(
-  'terms-modal'
-) as HTMLDivElement | null;
-const termsAccept = document.getElementById(
-  'terms-accept'
-) as HTMLButtonElement | null;
-const termsDecline = document.getElementById(
-  'terms-decline'
-) as HTMLButtonElement | null;
-const termsLink = document.getElementById(
-  'terms-link'
-) as HTMLButtonElement | null;
-const declineModal = document.getElementById(
-  'decline-modal'
-) as HTMLDivElement | null;
-const declineOk = document.getElementById(
-  'decline-ok'
-) as HTMLButtonElement | null;
-
-let pendingRegisterPayload: IUser | null = null;
-let pendingAgreementUsername: string | null = null;
-let pendingAgreementPassword: string | null = null;
-let pendingRedirectToHome = false;
-
-const setStatus = (message: string, isError = false): void => {
-  if (!statusEl) {
-    return;
-  }
-  statusEl.textContent = message;
-  statusEl.classList.toggle('status--error', isError);
-};
-
-const clearInputErrors = (): void => {
-  usernameInput?.classList.remove('form-input--error');
-  emailInput?.classList.remove('form-input--error');
-  passwordInput?.classList.remove('form-input--error');
-};
-
-const setInputError = (errorName: string): void => {
-  clearInputErrors();
-  switch (errorName) {
-    case 'MissingUsername':
-    case 'InvalidUsername':
-    case 'UserExists':
-      usernameInput?.classList.add('form-input--error');
-      break;
-    case 'MissingPassword':
-    case 'InvalidPassword':
-      passwordInput?.classList.add('form-input--error');
-      break;
-    case 'IncorrectPassword':
-      usernameInput?.classList.add('form-input--error');
-      passwordInput?.classList.add('form-input--error');
-      break;
-    case 'MissingEmail':
-    case 'InvalidEmail':
-      emailInput?.classList.add('form-input--error');
-      break;
-  }
-};
-
-const setSubmitting = (isSubmitting: boolean): void => {
-  if (!submitBtn) {
-    return;
-  }
-  submitBtn.disabled = isSubmitting;
-  submitBtn.textContent = isSubmitting ? 'Submitting...' : 'Login/Register';
-};
-
-const getResponseMessage = (
-  data: IResponse | null,
-  fallback: string
-): string => {
-  if (!data) {
-    return fallback;
-  }
-  const errorName = 'name' in data ? data.name : '';
-  // Map error names to wireframe messages
-  const errorMessages: Record<string, string> = {
-    UserExists: 'Username exists, Log in or try another username',
-    IncorrectPassword: 'Incorrect username or password',
-    InvalidUsername: 'Username less than 4 characters or invalid',
-    InvalidPassword: 'Password should be at least 4 characters',
-    InvalidEmail: 'You are ineligible, ScottyGo is CMU ONLY',
-    MissingUsername: 'Missing Username',
-    MissingPassword: 'Missing Password',
-    InactiveAccount:
-      'Your account is inactive. Please contact an administrator to reactivate your account.'
-  };
-  if (errorName in errorMessages) {
-    return errorMessages[errorName];
-  }
-  if (
-    'message' in data &&
-    typeof data.message === 'string' &&
-    data.message.length > 0
-  ) {
-    return data.message;
-  }
-  if (typeof errorName === 'string' && errorName.length > 0) {
-    return errorName;
-  }
-  return fallback;
 };
 
 const hasSuccessStatus = (status: number): boolean =>
@@ -163,35 +35,283 @@ const storeAuthFromResponse = (data: IResponse | null): void => {
   }
 };
 
-const redirectToDirectory = (message: string): void => {
-  setStatus(message);
-  window.setTimeout(() => {
-    window.location.href = '/';
-  }, 1200);
+const getResponseMessage = (
+  data: IResponse | null,
+  fallback: string
+): string => {
+  if (!data) return fallback;
+  const errorName = 'name' in data ? data.name : '';
+  const errorMessages: Record<string, string> = {
+    UserExists: 'Username exists, Log in or try another username',
+    IncorrectPassword: 'Incorrect username or password',
+    InvalidUsername: 'Username less than 4 characters or invalid',
+    InvalidPassword: 'Password should be at least 4 characters',
+    InvalidEmail: 'You are ineligible, ScottyGo is CMU ONLY',
+    MissingUsername: 'Missing Username',
+    MissingPassword: 'Missing Password',
+    InactiveAccount:
+      'Your account is inactive. Please contact an administrator to reactivate your account.'
+  };
+  if (errorName in errorMessages) return errorMessages[errorName];
+  if ('message' in data && typeof data.message === 'string' && data.message.length > 0)
+    return data.message;
+  if (typeof errorName === 'string' && errorName.length > 0) return errorName;
+  return fallback;
 };
 
-const agreeAndRefreshSession = async (
-  username: string,
-  password: string
-): Promise<{ ok: true } | { ok: false; message: string }> => {
-  const agreementResult = await confirmAgreement(username, password);
-  if (!hasSuccessStatus(agreementResult.status)) {
-    return {
-      ok: false,
-      message: getResponseMessage(
-        agreementResult.data,
-        'Agreement update failed.'
-      )
-    };
-  }
+// ── DOM References ──────────────────────────────────────────────────
 
-  const loginResult = await loginUser(username, password);
-  if (hasSuccessStatus(loginResult.status)) {
-    storeAuthFromResponse(loginResult.data);
-  }
+const loginForm = document.getElementById('login-form') as HTMLFormElement | null;
+const registerForm = document.getElementById('register-form') as HTMLFormElement | null;
+const statusEl = document.getElementById('status') as HTMLParagraphElement | null;
 
-  return { ok: true };
+// Login view inputs
+const loginUsername = document.getElementById('login-username') as HTMLInputElement | null;
+const loginPassword = document.getElementById('login-password') as HTMLInputElement | null;
+const loginBtn = document.getElementById('login-btn') as HTMLButtonElement | null;
+const showRegisterBtn = document.getElementById('show-register-btn') as HTMLButtonElement | null;
+
+// Register view inputs
+const regUsername = document.getElementById('reg-username') as HTMLInputElement | null;
+const regEmail = document.getElementById('reg-email') as HTMLInputElement | null;
+const regPassword = document.getElementById('reg-password') as HTMLInputElement | null;
+const regConfirm = document.getElementById('reg-confirm-password') as HTMLInputElement | null;
+const registerBtn = document.getElementById('register-btn') as HTMLButtonElement | null;
+const showLoginBtn = document.getElementById('show-login-btn') as HTMLButtonElement | null;
+
+// Validation hints
+const usernameHint = document.getElementById('reg-username-hint') as HTMLSpanElement | null;
+const emailHint = document.getElementById('reg-email-hint') as HTMLSpanElement | null;
+const passwordHint = document.getElementById('reg-password-hint') as HTMLSpanElement | null;
+const confirmHint = document.getElementById('reg-confirm-hint') as HTMLSpanElement | null;
+
+// Shared elements (present in both views)
+const tosInput = document.getElementById('tos') as HTMLInputElement | null;
+
+// Modals
+const confirmModal = document.getElementById('confirm-modal') as HTMLDivElement | null;
+const confirmYes = document.getElementById('confirm-yes') as HTMLButtonElement | null;
+const confirmNo = document.getElementById('confirm-no') as HTMLButtonElement | null;
+const termsModal = document.getElementById('terms-modal') as HTMLDivElement | null;
+const termsAccept = document.getElementById('terms-accept') as HTMLButtonElement | null;
+const termsDecline = document.getElementById('terms-decline') as HTMLButtonElement | null;
+const termsLink = document.getElementById('terms-link') as HTMLButtonElement | null;
+const declineModal = document.getElementById('decline-modal') as HTMLDivElement | null;
+const declineOk = document.getElementById('decline-ok') as HTMLButtonElement | null;
+
+// ── State ───────────────────────────────────────────────────────────
+
+let pendingRegisterPayload: IUser | null = null;
+let pendingAgreementUsername: string | null = null;
+let pendingAgreementPassword: string | null = null;
+let pendingRedirectToHome = false;
+
+// Track which fields have been touched for validation
+const touched: Record<string, boolean> = {
+  username: false,
+  email: false,
+  password: false,
+  confirm: false
 };
+
+// Track per-field validation state
+const fieldValid: Record<string, boolean> = {
+  username: false,
+  email: false,
+  password: false,
+  confirm: false
+};
+
+// ── Status & Error Helpers ──────────────────────────────────────────
+
+const setStatus = (message: string, isError = false): void => {
+  if (!statusEl) return;
+  statusEl.textContent = message;
+  statusEl.classList.toggle('status--error', isError);
+};
+
+const setHint = (
+  el: HTMLSpanElement | null,
+  valid: boolean,
+  message: string
+): void => {
+  if (!el) return;
+  el.textContent = message;
+  el.className = valid ? 'field-hint field-hint--valid' : 'field-hint field-hint--invalid';
+};
+
+const clearHint = (el: HTMLSpanElement | null): void => {
+  if (!el) return;
+  el.textContent = '';
+  el.className = 'field-hint';
+};
+
+const setInputError = (errorName: string): void => {
+  // Highlight relevant inputs in the currently-visible form
+  const u = loginForm?.hidden ? regUsername : loginUsername;
+  const p = loginForm?.hidden ? regPassword : loginPassword;
+  const e = regEmail;
+  u?.classList.remove('form-input--error');
+  p?.classList.remove('form-input--error');
+  e?.classList.remove('form-input--error');
+
+  switch (errorName) {
+    case 'MissingUsername':
+    case 'InvalidUsername':
+    case 'UserExists':
+      u?.classList.add('form-input--error');
+      break;
+    case 'MissingPassword':
+    case 'InvalidPassword':
+      p?.classList.add('form-input--error');
+      break;
+    case 'IncorrectPassword':
+      u?.classList.add('form-input--error');
+      p?.classList.add('form-input--error');
+      break;
+    case 'MissingEmail':
+    case 'InvalidEmail':
+      e?.classList.add('form-input--error');
+      break;
+  }
+};
+
+// ── View Switching ──────────────────────────────────────────────────
+
+const switchToRegister = (): void => {
+  if (loginForm) loginForm.hidden = true;
+  if (registerForm) registerForm.hidden = false;
+  setStatus('');
+  // Reset touched state and hints
+  Object.keys(touched).forEach((k) => { touched[k] = false; });
+  Object.keys(fieldValid).forEach((k) => { fieldValid[k] = false; });
+  clearHint(usernameHint);
+  clearHint(emailHint);
+  clearHint(passwordHint);
+  clearHint(confirmHint);
+  updateRegisterButton();
+};
+
+const switchToLogin = (): void => {
+  if (registerForm) registerForm.hidden = true;
+  if (loginForm) loginForm.hidden = false;
+  setStatus('');
+};
+
+showRegisterBtn?.addEventListener('click', switchToRegister);
+showLoginBtn?.addEventListener('click', switchToLogin);
+
+// ── Backend Validation ──────────────────────────────────────────────
+
+const validateTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+
+const validateFieldDebounced = (
+  field: 'username' | 'email' | 'password',
+  value: string,
+  hintEl: HTMLSpanElement | null,
+  successMsg: string
+): void => {
+  if (validateTimers[field]) clearTimeout(validateTimers[field]);
+
+  if (!value) {
+    fieldValid[field] = false;
+    clearHint(hintEl);
+    updateRegisterButton();
+    return;
+  }
+
+  validateTimers[field] = setTimeout(async () => {
+    try {
+      const res: AxiosResponse = await axios.post(
+        '/auth/validate',
+        { field, value },
+        { validateStatus: () => true }
+      );
+      if (res.status === 200) {
+        fieldValid[field] = true;
+        setHint(hintEl, true, `✓ ${successMsg}`);
+      } else {
+        fieldValid[field] = false;
+        const msg = res.data?.message || 'Invalid';
+        setHint(hintEl, false, `✗ ${msg}`);
+      }
+    } catch {
+      fieldValid[field] = false;
+      setHint(hintEl, false, '✗ Could not validate');
+    }
+    updateRegisterButton();
+  }, 300);
+};
+
+const validateConfirmPassword = (): void => {
+  if (!touched.confirm) return;
+  const pw = regPassword?.value ?? '';
+  const cpw = regConfirm?.value ?? '';
+  if (!cpw) {
+    fieldValid.confirm = false;
+    clearHint(confirmHint);
+  } else if (pw === cpw) {
+    fieldValid.confirm = true;
+    setHint(confirmHint, true, '✓ Passwords match');
+  } else {
+    fieldValid.confirm = false;
+    setHint(confirmHint, false, '✗ Passwords do not match');
+  }
+  updateRegisterButton();
+};
+
+const updateRegisterButton = (): void => {
+  if (!registerBtn) return;
+  const allValid =
+    fieldValid.username &&
+    fieldValid.email &&
+    fieldValid.password &&
+    fieldValid.confirm &&
+    !!tosInput?.checked;
+  registerBtn.disabled = !allValid;
+};
+
+// Wire up validation listeners
+regUsername?.addEventListener('input', () => {
+  touched.username = true;
+  validateFieldDebounced('username', regUsername.value.trim(), usernameHint, 'Looks good');
+});
+regUsername?.addEventListener('blur', () => {
+  touched.username = true;
+  validateFieldDebounced('username', regUsername.value.trim(), usernameHint, 'Looks good');
+});
+
+regEmail?.addEventListener('input', () => {
+  touched.email = true;
+  validateFieldDebounced('email', regEmail.value.trim(), emailHint, 'Valid CMU email');
+});
+regEmail?.addEventListener('blur', () => {
+  touched.email = true;
+  validateFieldDebounced('email', regEmail.value.trim(), emailHint, 'Valid CMU email');
+});
+
+regPassword?.addEventListener('input', () => {
+  touched.password = true;
+  validateFieldDebounced('password', regPassword.value, passwordHint, 'Strong password');
+  validateConfirmPassword(); // re-check confirm match
+});
+regPassword?.addEventListener('blur', () => {
+  touched.password = true;
+  validateFieldDebounced('password', regPassword.value, passwordHint, 'Strong password');
+});
+
+regConfirm?.addEventListener('input', () => {
+  touched.confirm = true;
+  validateConfirmPassword();
+});
+regConfirm?.addEventListener('blur', () => {
+  touched.confirm = true;
+  validateConfirmPassword();
+});
+
+tosInput?.addEventListener('change', updateRegisterButton);
+
+// ── API Calls ───────────────────────────────────────────────────────
 
 const registerUser = async (
   body: IUser
@@ -246,18 +366,41 @@ const confirmAgreement = async (
   }
 };
 
-const openModal = (modal: HTMLDivElement | null): void => {
-  if (!modal) {
-    return;
+const redirectToDirectory = (message: string): void => {
+  setStatus(message);
+  window.setTimeout(() => {
+    window.location.href = '/';
+  }, 1200);
+};
+
+const agreeAndRefreshSession = async (
+  username: string,
+  password: string
+): Promise<{ ok: true } | { ok: false; message: string }> => {
+  const agreementResult = await confirmAgreement(username, password);
+  if (!hasSuccessStatus(agreementResult.status)) {
+    return {
+      ok: false,
+      message: getResponseMessage(agreementResult.data, 'Agreement update failed.')
+    };
   }
+  const loginResult = await loginUser(username, password);
+  if (hasSuccessStatus(loginResult.status)) {
+    storeAuthFromResponse(loginResult.data);
+  }
+  return { ok: true };
+};
+
+// ── Modal Helpers ───────────────────────────────────────────────────
+
+const openModal = (modal: HTMLDivElement | null): void => {
+  if (!modal) return;
   modal.classList.add('is-open');
   modal.removeAttribute('inert');
 };
 
 const closeModal = (modal: HTMLDivElement | null): void => {
-  if (!modal) {
-    return;
-  }
+  if (!modal) return;
   modal.classList.remove('is-open');
   modal.setAttribute('inert', '');
 };
@@ -273,126 +416,46 @@ const openTermsModal = (
   openModal(termsModal);
 };
 
-const handleAgreementAccept = async (): Promise<void> => {
-  if (!pendingAgreementUsername || !pendingAgreementPassword) {
-    if (tosInput) {
-      tosInput.checked = true;
-    }
-    closeModal(termsModal);
-    return;
-  }
-
-  setSubmitting(true);
-  try {
-    const agreementOutcome = await agreeAndRefreshSession(
-      pendingAgreementUsername,
-      pendingAgreementPassword
-    );
-    if (!agreementOutcome.ok) {
-      setStatus(agreementOutcome.message, true);
-      return;
-    }
-
-    if (tosInput) {
-      tosInput.checked = true;
-    }
-    closeModal(termsModal);
-
-    setStatus('Agreement accepted. Redirecting to directory...');
-    if (pendingRedirectToHome) {
-      redirectToDirectory('Agreement accepted. Redirecting to directory...');
-    }
-  } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : 'Network error. Please try again.';
-    setStatus(message, true);
-  } finally {
-    pendingAgreementUsername = null;
-    pendingAgreementPassword = null;
-    pendingRedirectToHome = false;
-    setSubmitting(false);
-  }
+const setSubmitting = (btn: HTMLButtonElement | null, isSubmitting: boolean, label: string): void => {
+  if (!btn) return;
+  btn.disabled = isSubmitting;
+  btn.textContent = isSubmitting ? 'Submitting...' : label;
 };
 
-form?.addEventListener('submit', async (event: SubmitEvent) => {
+// ── Login Submit ────────────────────────────────────────────────────
+
+loginForm?.addEventListener('submit', async (event: SubmitEvent) => {
   event.preventDefault();
   setStatus('');
-  clearInputErrors();
 
-  if (!usernameInput || !passwordInput || !emailInput || !tosInput) {
-    setStatus('Form is missing fields. Please refresh and try again.', true);
+  const username = loginUsername?.value.trim() ?? '';
+  const password = loginPassword?.value ?? '';
+
+  if (!username || !password) {
+    setStatus(username ? 'Missing Password' : 'Missing Username', true);
     return;
   }
 
-  const credentials: ILogin = {
-    username: usernameInput.value.trim(),
-    password: passwordInput.value
-  };
-
-  const shouldAgree = tosInput.checked;
-  const payload: IUser = {
-    credentials,
-    email: emailInput.value.trim(),
-    agreed: false // Always false in POST; PATCH sent after if checkbox was checked
-  };
-
-  const isRegister = payload.email.length > 0;
-
-  if (isRegister) {
-    pendingRegisterPayload = { ...payload, agreed: shouldAgree }; // Store checkbox state for PATCH decision
-    openModal(confirmModal);
-    return;
-  }
-
-  setSubmitting(true);
+  setSubmitting(loginBtn, true, 'Login');
 
   try {
-    const { status, data } = await loginUser(
-      payload.credentials.username,
-      payload.credentials.password
-    );
+    const { status, data } = await loginUser(username, password);
 
     if (!hasSuccessStatus(status)) {
       const errorName = data && 'name' in data ? data.name : '';
 
-      // R5: Inactive accounts cannot log in - show error, don't show ToS modal
       if (errorName === 'InactiveAccount') {
-        const message = getResponseMessage(data, 'Your account is inactive.');
-        setStatus(message, true);
+        setStatus(getResponseMessage(data, 'Your account is inactive.'), true);
         return;
       }
 
       if (errorName === 'UnauthorizedRequest') {
-        // If user already checked the ToS checkbox, process agreement directly
-        if (shouldAgree) {
-          const agreementOutcome = await agreeAndRefreshSession(
-            payload.credentials.username,
-            payload.credentials.password
-          );
-          if (!agreementOutcome.ok) {
-            setStatus(agreementOutcome.message, true);
-            return;
-          }
-
-          redirectToDirectory(
-            'Agreement accepted. Redirecting to directory...'
-          );
-          return;
-        }
-
-        // Checkbox not checked — open the terms modal
-        openTermsModal(
-          payload.credentials.username,
-          payload.credentials.password,
-          true
-        );
+        openTermsModal(username, password, true);
         return;
       }
-      const message = getResponseMessage(data, 'Login failed.');
+
       setInputError(errorName);
-      setStatus(message, true);
+      setStatus(getResponseMessage(data, 'Login failed.'), true);
       return;
     }
 
@@ -400,27 +463,47 @@ form?.addEventListener('submit', async (event: SubmitEvent) => {
     const authenticatedUser = authPayload?.user ?? null;
 
     if (authenticatedUser && authenticatedUser.agreed === false) {
-      // User hasn't agreed yet - show terms modal with password for PATCH
       openTermsModal(
         authenticatedUser.credentials.username,
-        payload.credentials.password,
+        password,
         true
       );
       return;
     }
 
     storeAuthFromResponse(data);
-    redirectToDirectory('Login successful. Redirecting to directory...');
+    redirectToDirectory('Login successful. Redirecting...');
   } catch (error) {
     const message =
-      error instanceof Error
-        ? error.message
-        : 'Network error. Please try again.';
+      error instanceof Error ? error.message : 'Network error. Please try again.';
     setStatus(message, true);
   } finally {
-    setSubmitting(false);
+    setSubmitting(loginBtn, false, 'Login');
   }
 });
+
+// ── Register Submit ─────────────────────────────────────────────────
+
+registerForm?.addEventListener('submit', async (event: SubmitEvent) => {
+  event.preventDefault();
+  setStatus('');
+
+  const credentials: ILogin = {
+    username: regUsername?.value.trim() ?? '',
+    password: regPassword?.value ?? ''
+  };
+  const email = regEmail?.value.trim() ?? '';
+  const shouldAgree = !!tosInput?.checked;
+
+  pendingRegisterPayload = {
+    credentials,
+    email,
+    agreed: shouldAgree
+  };
+  openModal(confirmModal);
+});
+
+// ── Confirm Registration Modal ──────────────────────────────────────
 
 confirmYes?.addEventListener('click', async () => {
   if (!pendingRegisterPayload) {
@@ -429,12 +512,12 @@ confirmYes?.addEventListener('click', async () => {
   }
 
   closeModal(confirmModal);
-  setSubmitting(true);
+  setSubmitting(registerBtn, true, 'Register');
 
   const shouldAgree = pendingRegisterPayload.agreed;
   const registerBody: IUser = {
     ...pendingRegisterPayload,
-    agreed: false // Always false in POST
+    agreed: false
   };
 
   try {
@@ -467,12 +550,10 @@ confirmYes?.addEventListener('click', async () => {
         setStatus(agreementOutcome.message, true);
         return;
       }
-
-      redirectToDirectory('Registered and agreed. Redirecting to directory...');
+      redirectToDirectory('Registered successfully. Redirecting...');
       return;
     }
 
-    // User didn't check ToS checkbox - show terms modal
     openTermsModal(
       user.credentials.username,
       registerBody.credentials.password,
@@ -480,13 +561,12 @@ confirmYes?.addEventListener('click', async () => {
     );
   } catch (error) {
     const message =
-      error instanceof Error
-        ? error.message
-        : 'Network error. Please try again.';
+      error instanceof Error ? error.message : 'Network error. Please try again.';
     setStatus(message, true);
   } finally {
     pendingRegisterPayload = null;
-    setSubmitting(false);
+    setSubmitting(registerBtn, false, 'Register');
+    updateRegisterButton();
   }
 });
 
@@ -494,6 +574,48 @@ confirmNo?.addEventListener('click', () => {
   pendingRegisterPayload = null;
   closeModal(confirmModal);
 });
+
+// ── Terms Modal ─────────────────────────────────────────────────────
+
+const handleAgreementAccept = async (): Promise<void> => {
+  if (!pendingAgreementUsername || !pendingAgreementPassword) {
+    if (tosInput) tosInput.checked = true;
+    closeModal(termsModal);
+    updateRegisterButton();
+    return;
+  }
+
+  setSubmitting(registerBtn, true, 'Register');
+  try {
+    const agreementOutcome = await agreeAndRefreshSession(
+      pendingAgreementUsername,
+      pendingAgreementPassword
+    );
+    if (!agreementOutcome.ok) {
+      setStatus(agreementOutcome.message, true);
+      return;
+    }
+
+    if (tosInput) tosInput.checked = true;
+    closeModal(termsModal);
+    updateRegisterButton();
+
+    setStatus('Agreement accepted. Redirecting...');
+    if (pendingRedirectToHome) {
+      redirectToDirectory('Agreement accepted. Redirecting...');
+    }
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Network error. Please try again.';
+    setStatus(message, true);
+  } finally {
+    pendingAgreementUsername = null;
+    pendingAgreementPassword = null;
+    pendingRedirectToHome = false;
+    setSubmitting(registerBtn, false, 'Register');
+    setSubmitting(loginBtn, false, 'Login');
+  }
+};
 
 termsAccept?.addEventListener('click', async () => {
   await handleAgreementAccept();
