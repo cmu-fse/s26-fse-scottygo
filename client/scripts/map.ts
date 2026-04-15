@@ -862,6 +862,14 @@ const registerLocationSearchEvents = (): void => {
     locationSearch?.open();
   });
 
+  // When user starts typing in the search bar, close the location dropdown
+  document.addEventListener('search', (e: Event) => {
+    const query = (e as CustomEvent<{ query: string }>).detail?.query;
+    if (query) {
+      locationSearch?.close();
+    }
+  });
+
   // User selected a custom planned location
   document.addEventListener('locationSelected', (e: Event) => {
     const { lat, lng, label } = (e as CustomEvent<{ lat: number; lng: number; label: string }>).detail;

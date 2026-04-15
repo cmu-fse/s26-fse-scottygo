@@ -122,6 +122,16 @@ body.dark .panel {
   color: white;
 }
 
+.circle-btn.danger {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.circle-btn.danger:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
 body.dark .circle-btn {
   background: var(--gray-800);
   color: var(--white);
@@ -130,6 +140,16 @@ body.dark .circle-btn {
 body.dark .circle-btn.primary {
   background: var(--primary);
   color: var(--white);
+}
+
+body.dark .circle-btn.danger {
+  background: var(--gray-800);
+  color: #9ca3af;
+}
+
+body.dark .circle-btn.danger:hover {
+  background: #451a1a;
+  color: #f87171;
 }
 
 .floating {

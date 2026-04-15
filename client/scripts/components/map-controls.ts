@@ -16,11 +16,11 @@ export class MapControls extends HTMLElement {
             <span class="system-text">CMU</span>
           </div>
         </button>
-        <button class="circle-btn primary" id="direction-filter-btn" title="Direction Filter">
+        <button class="circle-btn" id="direction-filter-btn" title="Direction Filter">
           <span class="material-icons-outlined">sync_alt</span>
         </button>
-        <button class="circle-btn" id="clear-filters-btn" title="Clear All Filters">
-          <span class="material-icons-outlined">clear_all</span>
+        <button class="circle-btn danger" id="clear-filters-btn" title="Clear All Filters">
+          <span class="material-icons-outlined">filter_list_off</span>
         </button>
       </div>
     `;
