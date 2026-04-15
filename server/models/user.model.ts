@@ -377,4 +377,11 @@ export class User implements IUser {
    * Check if a user is the last active administrator
    */
   static isLastAdministrator = isLastAdministrator;
+
+  /**
+   * Mark onboarding tutorial as complete for a user
+   */
+  static async markOnboardingComplete(userId: string): Promise<boolean> {
+    return DAC.db.markOnboardingComplete(userId);
+  }
 }

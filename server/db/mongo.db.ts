@@ -34,7 +34,8 @@ const UserSchema = new Schema<IUserAccount>({
     type: String,
     default: 'Member',
     enum: ['Administrator', 'Coordinator', 'Member']
-  }
+  },
+  onboardingComplete: { type: Boolean, default: false }
 });
 
 const MUser = model<IUserAccount>('User', UserSchema);
@@ -314,6 +315,14 @@ export class MongoDB implements IDatabase {
     return count;
   }
 
+  async markOnboardingComplete(userId: string): Promise<boolean> {
+    const result = await MUser.updateOne(
+      { _id: userId },
+      { onboardingComplete: true }
+    );
+    return result.modifiedCount > 0;
+  }
+
   async seedDefaultAdmin(): Promise<void> {
     // Check if default admin already exists
     const existingAdmin = await MUser.findOne({
@@ -338,7 +347,8 @@ export class MongoDB implements IDatabase {
       agreed: true, // Default admin is pre-agreed to terms
       _id: uuidV4(),
       status: 'Active',
-      privilegeLevel: 'Administrator'
+      privilegeLevel: 'Administrator',
+      onboardingComplete: true
     };
 
     const newAdmin = new MUser(defaultAdmin);

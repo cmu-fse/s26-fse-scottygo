@@ -21,6 +21,8 @@ import './components/location-search';
 import type { ILocationSearchElement } from './components/location-search';
 import './components/toggle-panel';
 import './components/route-selector';
+import './components/onboarding-tutorial';
+import type { IOnboardingTutorialElement } from './components/onboarding-tutorial';
 import type {
   ITogglePanelConfig,
   ITogglePanelElement
@@ -423,6 +425,33 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
 
     // Restore persisted planned location marker (if user set one previously)
     restorePlannedLocationMarker();
+
+    // Start onboarding tutorial for first-time users (account-based)
+    const tutorial = document.querySelector(
+      'onboarding-tutorial'
+    ) as IOnboardingTutorialElement | null;
+    if (tutorial && userAccount && !userAccount.onboardingComplete) {
+      // Mark onboarding complete on server when tutorial finishes
+      tutorial.addEventListener('tutorial-complete', async () => {
+        const token = localStorage.getItem('token');
+        if (token) {
+          await axios.patch(
+            '/account/onboarding',
+            {},
+            { headers: { Authorization: `Bearer ${token}` }, validateStatus: () => true }
+          );
+        }
+      });
+
+      // Wait for the map to fully render before starting the tutorial
+      const provider = mapProvider as import('./maps/google-map.provider').GoogleMapProvider;
+      if (typeof provider.getNativeMap === 'function') {
+        const nativeMap = provider.getNativeMap();
+        google.maps.event.addListenerOnce(nativeMap, 'tilesloaded', () => {
+          tutorial.start();
+        });
+      }
+    }
   } else {
     console.error('Map could not be initialized: config unavailable');
     showModal(

@@ -3327,3 +3327,148 @@ body.dark .route-info__alert {
 body.dark .route-info__detour {
   color: #a5b4fc;
 }
+
+/* ============================================
+   ONBOARDING TUTORIAL
+   ============================================ */
+
+/* Full-screen overlay — blocks all interaction */
+.tutorial-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9000;
+  pointer-events: all;
+  animation: tutorialFadeIn 0.3s ease;
+}
+
+.tutorial-overlay.tutorial-fade-out {
+  animation: tutorialFadeOut 0.3s ease forwards;
+}
+
+@keyframes tutorialFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes tutorialFadeOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* Spotlight cutout — sits above overlay, highlights the target */
+.tutorial-spotlight {
+  position: fixed;
+  z-index: 9001;
+  border-radius: 14px;
+  pointer-events: none;
+  transition: top 0.3s ease, left 0.3s ease, width 0.3s ease, height 0.3s ease;
+  background: transparent;
+  /* Punch through the overlay with a bright ring */
+  outline: 4000px solid rgba(0, 0, 0, 0.5);
+}
+
+/* Popup card */
+.tutorial-popup {
+  position: fixed;
+  z-index: 9002;
+  width: 280px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.06);
+  animation: tutorialPopupIn 0.25s ease;
+}
+
+@keyframes tutorialPopupIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.tutorial-popup__step {
+  font-size: 12px;
+  font-weight: 600;
+  color: #c41230;
+  margin: 0 0 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tutorial-popup__title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #111;
+  margin: 0 0 6px;
+}
+
+.tutorial-popup__desc {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #555;
+  margin: 0 0 16px;
+}
+
+.tutorial-popup__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tutorial-popup__ok {
+  color: #c41230;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  user-select: none;
+}
+
+.tutorial-popup__ok:hover {
+  opacity: 0.7;
+}
+
+.tutorial-popup__dismiss {
+  color: #999;
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 0.15s;
+  user-select: none;
+}
+
+.tutorial-popup__dismiss:hover {
+  color: #666;
+}
+
+/* ── Dark mode ── */
+
+body.dark .tutorial-popup {
+  background: rgba(31, 41, 55, 0.92);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35), 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+
+body.dark .tutorial-popup__step {
+  color: #e8485e;
+}
+
+body.dark .tutorial-popup__title {
+  color: #e0e0e0;
+}
+
+body.dark .tutorial-popup__desc {
+  color: #9ca3af;
+}
+
+body.dark .tutorial-popup__ok {
+  color: #e8485e;
+}
+
+body.dark .tutorial-popup__dismiss {
+  color: #6b7280;
+}
+
+body.dark .tutorial-popup__dismiss:hover {
+  color: #9ca3af;
+}

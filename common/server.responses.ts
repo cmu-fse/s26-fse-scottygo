@@ -61,7 +61,8 @@ export type SuccessName =
   | 'SearchTransitCompleted'
   | 'SearchNotificationsCompleted'
   | 'RouteScheduleRetrieved'
-  | 'UsersSearchCompleted';
+  | 'UsersSearchCompleted'
+  | 'OnboardingCompleted';
 
 export type ClientErrorName =
   | 'MissingEmail'
