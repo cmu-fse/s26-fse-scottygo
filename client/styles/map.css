@@ -2786,3 +2786,336 @@ body.dark .route-pick-popup {
 .route-pick-badge:hover {
   filter: brightness(1.15);
 }
+
+/* ============================================
+   LOCATION SEARCH COMPONENT
+   ============================================ */
+
+location-search {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 520px;
+  width: calc(100% - 32px);
+  z-index: 35; /* Above search bar dropdown (z:30) but below modals */
+  pointer-events: none;
+}
+
+.location-search-dropdown {
+  position: relative;
+  top: 56px; /* Below search bar height (48px) + gap */
+  background: #fff;
+  border-radius: 16px;
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.18),
+    0 0 0 1px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+body.dark .location-search-dropdown {
+  background: #1f2937;
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.location-search-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.location-search-item:hover,
+.location-search-item:focus {
+  background: rgba(0, 0, 0, 0.04);
+  outline: none;
+}
+
+body.dark .location-search-item:hover,
+body.dark .location-search-item:focus {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.location-search-icon {
+  font-size: 22px;
+  color: #4285f4;
+  flex-shrink: 0;
+}
+
+.location-search-custom .location-search-icon {
+  color: #5f6368;
+}
+
+body.dark .location-search-icon {
+  color: #8ab4f8;
+}
+
+body.dark .location-search-custom .location-search-icon {
+  color: #9aa0a6;
+}
+
+.location-search-item-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.location-search-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #202124;
+}
+
+body.dark .location-search-label {
+  color: #e8eaed;
+}
+
+.location-search-sublabel {
+  font-size: 12px;
+  color: #5f6368;
+}
+
+body.dark .location-search-sublabel {
+  color: #9aa0a6;
+}
+
+.location-search-arrow {
+  margin-left: auto;
+  font-size: 20px;
+  color: #5f6368;
+}
+
+body.dark .location-search-arrow {
+  color: #9aa0a6;
+}
+
+.location-search-divider {
+  height: 1px;
+  background: rgba(0, 0, 0, 0.08);
+  margin: 0 16px;
+}
+
+body.dark .location-search-divider {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Places search mode */
+.location-search-places-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+.location-search-back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  color: #5f6368;
+  flex-shrink: 0;
+  padding: 0;
+  transition: background 0.15s ease;
+}
+
+.location-search-back-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+body.dark .location-search-back-btn {
+  color: #9aa0a6;
+}
+
+body.dark .location-search-back-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.location-search-places-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 14px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 8px;
+  color: #202124;
+  font-family:
+    'Inter',
+    -apple-system,
+    system-ui,
+    sans-serif;
+}
+
+body.dark .location-search-places-input {
+  background: rgba(255, 255, 255, 0.06);
+  color: #e8eaed;
+}
+
+.location-search-places-input::placeholder {
+  color: #5f6368;
+}
+
+body.dark .location-search-places-input::placeholder {
+  color: #9aa0a6;
+}
+
+/* Google Places Autocomplete dropdown styling overrides */
+.pac-container {
+  border-radius: 12px;
+  border: none;
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.18),
+    0 0 0 1px rgba(0, 0, 0, 0.04);
+  font-family:
+    'Inter',
+    -apple-system,
+    system-ui,
+    sans-serif;
+  z-index: 9999;
+}
+
+body.dark .pac-container {
+  background: #1f2937;
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+body.dark .pac-item {
+  border-top-color: rgba(255, 255, 255, 0.06);
+  color: #e8eaed;
+}
+
+body.dark .pac-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+body.dark .pac-item-query {
+  color: #e8eaed;
+}
+
+body.dark .pac-matched {
+  color: #8ab4f8;
+}
+
+/* ============================================
+   PLANNED LOCATION POPUP
+   ============================================ */
+
+.planned-location-popup {
+  position: absolute;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fff;
+  border-radius: 16px;
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(0, 0, 0, 0.04);
+  padding: 16px;
+  z-index: 50;
+  min-width: 240px;
+  max-width: 320px;
+  animation: planned-popup-in 0.2s ease-out;
+}
+
+@keyframes planned-popup-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+body.dark .planned-location-popup {
+  background: #1f2937;
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.planned-location-popup__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.planned-location-popup__icon {
+  font-size: 22px;
+  color: #c41230;
+}
+
+.planned-location-popup__label {
+  font-size: 15px;
+  font-weight: 600;
+  color: #202124;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+body.dark .planned-location-popup__label {
+  color: #e8eaed;
+}
+
+.planned-location-popup__desc {
+  font-size: 12px;
+  color: #5f6368;
+  margin: 4px 0 12px 30px;
+}
+
+body.dark .planned-location-popup__desc {
+  color: #9aa0a6;
+}
+
+.planned-location-popup__remove {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+  background: transparent;
+  color: #c41230;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  font-family:
+    'Inter',
+    -apple-system,
+    system-ui,
+    sans-serif;
+}
+
+.planned-location-popup__remove .material-icons-outlined {
+  font-size: 18px;
+}
+
+.planned-location-popup__remove:hover {
+  background: rgba(196, 18, 48, 0.06);
+}
+
+body.dark .planned-location-popup__remove {
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #f28b82;
+}
+
+body.dark .planned-location-popup__remove:hover {
+  background: rgba(242, 139, 130, 0.1);
+}

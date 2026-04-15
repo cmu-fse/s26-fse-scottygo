@@ -17,6 +17,8 @@ import type { BusReportFormElement } from './components/bus-report-form';
 import { showToast } from './utils/toast';
 import type { IRouteBellElement } from './components/route-bell';
 import { LocationIndicator } from './components/location-indicator';
+import './components/location-search';
+import type { ILocationSearchElement } from './components/location-search';
 import './components/toggle-panel';
 import './components/time-picker';
 import './components/calendar-picker';
@@ -256,9 +258,24 @@ const mapProvider: IMapProvider = new GoogleMapProvider();
 // Store user/initial location for recenter functionality
 let userLocation: { lat: number; lng: number } | null = null;
 
+/** CMU Pittsburgh campus center — fallback when GPS is denied */
+const CMU_CAMPUS_DEFAULT = { lat: 40.4433, lng: -79.9436 };
+
+/**
+ * Get the best available location for map operations.
+ * Priority: planned location → GPS location → CMU campus default.
+ */
+function getEffectiveLocation(): { lat: number; lng: number } {
+  const state = mapStateManager.getState();
+  return state.plannedLocation ?? userLocation ?? CMU_CAMPUS_DEFAULT;
+}
+
 // Store user location marker reference
 import type { IMapMarker } from '../../common/map.interface';
 let userLocationMarker: IMapMarker | null = null;
+
+// Planned location marker (distinct from GPS blue dot)
+let plannedLocationMarker: IMapMarker | null = null;
 
 // Fetch map config (API key, default center, zoom) from server
 async function getMapConfig(): Promise<IConfig | null> {
@@ -357,8 +374,8 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
       const prevRoute = mapStateManager.getState().selectedRouteId;
       if (prevRoute) {
         await filterController.applyRouteFilter(prevRoute);
-      } else if (userLocation) {
-        await filterController.restoreDefaultState(userLocation);
+      } else {
+        await filterController.restoreDefaultState(getEffectiveLocation());
       }
     });
 
@@ -413,6 +430,9 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
 
     // Request user location for centering map
     requestUserLocation();
+
+    // Restore persisted planned location marker (if user set one previously)
+    restorePlannedLocationMarker();
   } else {
     console.error('Map could not be initialized: config unavailable');
     showModal(
@@ -625,9 +645,7 @@ const registerFilterPanelToggleEvents = (): void => {
       'route-selector-panel'
     ) as IRouteSelectorElement;
     if (routeSelector) routeSelector.clearSelection();
-    if (userLocation) {
-      await filterController.restoreDefaultState(userLocation);
-    }
+    await filterController.restoreDefaultState(getEffectiveLocation());
   });
 };
 
@@ -646,13 +664,10 @@ const registerZoomAndMapEvents = (): void => {
 
   document.addEventListener('recenter', () => {
     console.log('Recenter clicked');
-    if (userLocation) {
-      mapProvider.setCenter(userLocation);
-      mapProvider.setZoom(15);
-      console.log('Recentered map on user location');
-    } else {
-      console.warn('No user location stored, cannot recenter');
-    }
+    const loc = getEffectiveLocation();
+    mapProvider.setCenter(loc);
+    mapProvider.setZoom(15);
+    console.log('Recentered map on effective location');
   });
 
   document.addEventListener('locationShown', (e: Event) => {
@@ -801,6 +816,16 @@ const registerSubscriptionEvents = (): void => {
 
 const registerBusReportEvents = (): void => {
   document.addEventListener('busReport', (e: Event) => {
+    // Gate bus report on GPS permission
+    const state = mapStateManager.getState();
+    if (!state.gpsPermissionGranted) {
+      showModal(
+        'GPS Required',
+        'Bus report submission requires GPS access. Please enable location services and reload the page.'
+      );
+      return;
+    }
+
     const { vid, routeId, routeLabel, lat, lon } = (
       e as CustomEvent<{
         vid: string;
@@ -850,11 +875,7 @@ const registerRouteSelectionEvents = (): void => {
     const route = customEvent.detail.route;
     if (!route) {
       console.log('Route deselected, returning to nearby stops view');
-      if (userLocation) {
-        await filterController.restoreDefaultState(userLocation);
-      } else {
-        await filterController.clearRouteFilter();
-      }
+      await filterController.restoreDefaultState(getEffectiveLocation());
       return;
     }
     console.log('Route selected:', route);
@@ -872,7 +893,58 @@ function setupMapEventListeners(): void {
   registerSubscriptionEvents();
   registerBusReportEvents();
   registerRouteSelectionEvents();
+  registerLocationSearchEvents();
 }
+
+// ─── Location Search Events ──────────────────────────────────────────
+const registerLocationSearchEvents = (): void => {
+  const locationSearch = document.querySelector(
+    'location-search'
+  ) as ILocationSearchElement | null;
+
+  // Pass the native Google map to the location-search component for Places API
+  if (locationSearch && 'setMap' in locationSearch) {
+    const provider = mapProvider as import('./maps/google-map.provider').GoogleMapProvider;
+    if (typeof provider.getNativeMap === 'function') {
+      locationSearch.setMap(provider.getNativeMap());
+    }
+  }
+
+  // When search bar is focused with no query, open the location search dropdown
+  document.addEventListener('searchFocusEmpty', () => {
+    locationSearch?.open();
+  });
+
+  // User selected a custom planned location
+  document.addEventListener('locationSelected', (e: Event) => {
+    const { lat, lng, label } = (e as CustomEvent<{ lat: number; lng: number; label: string }>).detail;
+    console.log('Planned location set:', label, lat, lng);
+    const plannedLoc = { lat, lng };
+    // Hide GPS blue dot, show planned marker
+    hideUserLocationMarker();
+    addPlannedLocationMarker(lat, lng, label);
+    filterController.setUserLocation(plannedLoc);
+    filterController.showNearbyStops(plannedLoc);
+    directionsController.updatePlannedLocation(plannedLoc);
+    mapProvider.setCenter(plannedLoc);
+    showSubscriptionToast(`Location set: ${label}`);
+  });
+
+  // User reset to current GPS location
+  document.addEventListener('locationReset', async () => {
+    console.log('Planned location reset to current GPS');
+    removePlannedLocationMarker();
+    directionsController.updatePlannedLocation(null);
+    const state = mapStateManager.getState();
+    if (state.currentLocation) {
+      showUserLocationMarker();
+      filterController.setUserLocation(state.currentLocation);
+      await filterController.restoreDefaultState(state.currentLocation);
+      mapProvider.setCenter(state.currentLocation);
+      showSubscriptionToast('Using current location');
+    }
+  });
+};
 
 // Request user's geographic location (VisRoute Basic Flow step 2-3)
 // Uses watchPosition for continuous updates (TUC4 Step 8)
@@ -885,6 +957,9 @@ function requestUserLocation(): void {
       (position) => {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
+
+        // Update state manager with current GPS location
+        mapStateManager.setCurrentLocation({ lat, lng });
 
         // First position: center map and validate area
         if (!initialLocationSet) {
@@ -938,12 +1013,21 @@ function requestUserLocation(): void {
       (error) => {
         if (initialLocationSet) return; // Only show error on first failure
         console.warn('Location access denied:', error.message);
+
+        // Mark GPS as denied in state manager — defaults planned location to CMU
+        mapStateManager.setGpsDenied();
+
         showModal(
           'Location Access Denied',
-          'Location access denied. Centering on Downtown Pittsburgh by default.'
+          'Location access denied. Centering on CMU Campus by default. Bus report submission is disabled without GPS access.'
         );
-        mapProvider.setCenter({ lat: 40.4406, lng: -80.0112 });
-        mapProvider.setZoom(14);
+        // Center on CMU campus and show nearby stops
+        mapProvider.setCenter(CMU_CAMPUS_DEFAULT);
+        mapProvider.setZoom(15);
+        addPlannedLocationMarker(CMU_CAMPUS_DEFAULT.lat, CMU_CAMPUS_DEFAULT.lng, 'CMU Campus');
+        filterController.setUserLocation(CMU_CAMPUS_DEFAULT);
+        filterController.showNearbyStops(CMU_CAMPUS_DEFAULT);
+        directionsController.updatePlannedLocation(CMU_CAMPUS_DEFAULT);
       },
       {
         enableHighAccuracy: true,
@@ -953,12 +1037,17 @@ function requestUserLocation(): void {
     );
   } else {
     console.warn('Geolocation not supported');
+    mapStateManager.setGpsDenied();
     showModal(
       'Geolocation Unavailable',
-      'Geolocation is not supported by your browser. Centering on Downtown Pittsburgh.'
+      'Geolocation is not supported by your browser. Centering on CMU Campus.'
     );
-    mapProvider.setCenter({ lat: 40.4406, lng: -80.0112 });
-    mapProvider.setZoom(14);
+    mapProvider.setCenter(CMU_CAMPUS_DEFAULT);
+    mapProvider.setZoom(15);
+    addPlannedLocationMarker(CMU_CAMPUS_DEFAULT.lat, CMU_CAMPUS_DEFAULT.lng, 'CMU Campus');
+    filterController.setUserLocation(CMU_CAMPUS_DEFAULT);
+    filterController.showNearbyStops(CMU_CAMPUS_DEFAULT);
+    directionsController.updatePlannedLocation(CMU_CAMPUS_DEFAULT);
   }
 }
 
@@ -986,6 +1075,136 @@ function addUserLocationMarker(lat: number, lng: number): void {
     icon: icon
   });
   console.log('User location marker added to map');
+}
+
+// ── Planned Location Marker ──────────────────────────────────────────
+function addPlannedLocationMarker(lat: number, lng: number, label: string): void {
+  removePlannedLocationMarker();
+
+  // Red pin SVG — larger and more prominent than the GPS blue dot
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="36" height="48" viewBox="0 0 36 48">
+      <path d="M18 0C8.06 0 0 8.06 0 18c0 13.5 18 30 18 30s18-16.5 18-30C36 8.06 27.94 0 18 0z" fill="#C41230"/>
+      <circle cx="18" cy="18" r="8" fill="white"/>
+      <circle cx="18" cy="18" r="4" fill="#C41230"/>
+    </svg>
+  `;
+  const icon = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg.trim());
+
+  plannedLocationMarker = mapProvider.addMarker({
+    position: { lat, lng },
+    title: label,
+    icon: icon,
+    iconSize: { width: 36, height: 48 },
+    iconAnchor: { x: 18, y: 48 },
+    zIndex: 999
+  });
+
+  // Click on planned marker → show remove popup
+  plannedLocationMarker.onClick(() => {
+    showPlannedLocationPopup(lat, lng, label);
+  });
+}
+
+function removePlannedLocationMarker(): void {
+  if (plannedLocationMarker) {
+    plannedLocationMarker.remove();
+    plannedLocationMarker = null;
+  }
+  dismissPlannedLocationPopup();
+}
+
+function hideUserLocationMarker(): void {
+  if (userLocationMarker) {
+    userLocationMarker.setVisible(false);
+  }
+}
+
+function showUserLocationMarker(): void {
+  if (userLocationMarker) {
+    userLocationMarker.setVisible(true);
+  }
+}
+
+/**
+ * Restore persisted planned location marker on page load.
+ * If the user previously set a custom planned location, re-show the red pin,
+ * hide the GPS blue dot, and center the map on the planned location.
+ */
+function restorePlannedLocationMarker(): void {
+  if (!mapStateManager.hasCustomPlannedLocation()) return;
+  const state = mapStateManager.getState();
+  if (!state.plannedLocation || !state.plannedLocationLabel) return;
+
+  const { lat, lng } = state.plannedLocation;
+  const label = state.plannedLocationLabel;
+
+  addPlannedLocationMarker(lat, lng, label);
+  hideUserLocationMarker();
+
+  // Use planned location for nearby stops, map center, and directions
+  filterController.setUserLocation({ lat, lng });
+  filterController.showNearbyStops({ lat, lng });
+  directionsController.updatePlannedLocation({ lat, lng });
+  mapProvider.setCenter({ lat, lng });
+  mapProvider.setZoom(15);
+
+  console.log('Restored persisted planned location:', label);
+}
+
+// ── Planned Location Popup ───────────────────────────────────────────
+function dismissPlannedLocationPopup(): void {
+  const el = document.getElementById('planned-location-popup');
+  if (el) el.remove();
+}
+
+function showPlannedLocationPopup(lat: number, lng: number, label: string): void {
+  dismissPlannedLocationPopup();
+
+  const mapContainer = document.querySelector('.map-container');
+  if (!mapContainer) return;
+
+  const popup = document.createElement('div');
+  popup.id = 'planned-location-popup';
+  popup.className = 'planned-location-popup';
+  popup.innerHTML = `
+    <div class="planned-location-popup__header">
+      <span class="material-icons-outlined planned-location-popup__icon">place</span>
+      <strong class="planned-location-popup__label">${label}</strong>
+    </div>
+    <p class="planned-location-popup__desc">Planned location</p>
+    <button class="planned-location-popup__remove" id="planned-location-remove">
+      <span class="material-icons-outlined">close</span>
+      Remove &amp; use current location
+    </button>
+  `;
+
+  mapContainer.appendChild(popup);
+
+  // Remove button
+  document.getElementById('planned-location-remove')?.addEventListener('click', async () => {
+    dismissPlannedLocationPopup();
+    removePlannedLocationMarker();
+    mapStateManager.resetPlannedLocationToCurrent();
+    directionsController.updatePlannedLocation(null);
+    showUserLocationMarker();
+    const state = mapStateManager.getState();
+    if (state.currentLocation) {
+      filterController.setUserLocation(state.currentLocation);
+      await filterController.restoreDefaultState(state.currentLocation);
+      mapProvider.setCenter(state.currentLocation);
+    }
+    showSubscriptionToast('Using current location');
+  });
+
+  // Close on outside click
+  const onOutsideClick = (e: Event) => {
+    if (!popup.contains(e.target as Node)) {
+      dismissPlannedLocationPopup();
+      document.removeEventListener('click', onOutsideClick, true);
+    }
+  };
+  setTimeout(() => document.addEventListener('click', onOutsideClick, true), 0);
 }
 
 // ── Toast Notification (TUC4 Step 11) ────────────────────────────────

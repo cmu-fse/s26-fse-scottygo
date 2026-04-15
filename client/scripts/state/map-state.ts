@@ -4,6 +4,7 @@
  */
 
 import type { IRoute, IVehicle } from '../../../common/transit.interface';
+import type { ILatLng } from '../../../common/map.interface';
 
 export interface IMapState {
   selectedRouteId: string | null; // Route filter (Rule R1 - single route)
@@ -27,6 +28,10 @@ export interface IMapState {
   availableRoutes: IRoute[]; // All routes from backend
   filteredRoutes: IRoute[]; // Routes after applying all filters
   activeVehicles: IVehicle[]; // Current vehicles on selected route
+  currentLocation: ILatLng | null; // GPS-based current location
+  plannedLocation: ILatLng | null; // User-selected planned location (defaults to currentLocation)
+  plannedLocationLabel: string | null; // Display name for planned location
+  gpsPermissionGranted: boolean; // Whether the user granted GPS access
 }
 
 type StateChangeListener = (state: IMapState) => void;
@@ -37,6 +42,9 @@ export class MapStateManager {
   private listeners: Set<StateChangeListener> = new Set();
 
   private constructor() {
+    // Restore persisted planned location from localStorage
+    const saved = this.loadPlannedLocation();
+
     // Initialize with default state (Rule R2: PRT ON, CMU OFF)
     this.state = {
       selectedRouteId: null,
@@ -52,7 +60,11 @@ export class MapStateManager {
       },
       availableRoutes: [],
       filteredRoutes: [],
-      activeVehicles: []
+      activeVehicles: [],
+      currentLocation: null,
+      plannedLocation: saved?.location ?? null,
+      plannedLocationLabel: saved?.label ?? null,
+      gpsPermissionGranted: false
     };
   }
 
@@ -147,7 +159,11 @@ export class MapStateManager {
       },
       availableRoutes: this.state.availableRoutes, // Keep available routes
       filteredRoutes: [],
-      activeVehicles: []
+      activeVehicles: [],
+      currentLocation: this.state.currentLocation, // Preserve location state
+      plannedLocation: this.state.plannedLocation,
+      plannedLocationLabel: this.state.plannedLocationLabel,
+      gpsPermissionGranted: this.state.gpsPermissionGranted
     };
     this.applyFilters();
     this.notifyListeners();
@@ -177,5 +193,109 @@ export class MapStateManager {
   reapplyFilters(): void {
     this.applyFilters();
     this.notifyListeners();
+  }
+
+  /**
+   * Update current GPS location
+   */
+  setCurrentLocation(location: ILatLng): void {
+    this.state.currentLocation = location;
+    this.state.gpsPermissionGranted = true;
+    // If no custom planned location is set, keep planned = current GPS
+    if (!this.state.plannedLocation) {
+      this.state.plannedLocation = location;
+      this.state.plannedLocationLabel = 'Current Location';
+    } else if (this.state.plannedLocationLabel === 'Current Location') {
+      // User hasn't set a custom location — track GPS continuously
+      this.state.plannedLocation = location;
+    }
+    this.notifyListeners();
+  }
+
+  /**
+   * Whether the user has set a custom planned location (not just GPS default)
+   */
+  hasCustomPlannedLocation(): boolean {
+    return this.state.plannedLocationLabel !== null
+      && this.state.plannedLocationLabel !== 'Current Location';
+  }
+
+  /**
+   * Set a user-chosen planned location
+   */
+  setPlannedLocation(location: ILatLng, label: string): void {
+    this.state.plannedLocation = location;
+    this.state.plannedLocationLabel = label;
+    this.savePlannedLocation(location, label);
+    this.notifyListeners();
+  }
+
+  /**
+   * Reset planned location back to current GPS location
+   */
+  resetPlannedLocationToCurrent(): void {
+    this.state.plannedLocation = this.state.currentLocation;
+    this.state.plannedLocationLabel = this.state.currentLocation
+      ? 'Current Location'
+      : null;
+    this.clearSavedPlannedLocation();
+    this.notifyListeners();
+  }
+
+  /**
+   * Mark GPS as denied and set default planned location to CMU campus
+   */
+  setGpsDenied(): void {
+    this.state.gpsPermissionGranted = false;
+    this.state.currentLocation = null;
+    // Default planned location to CMU Pittsburgh campus
+    if (!this.state.plannedLocation) {
+      this.state.plannedLocation = { lat: 40.4433, lng: -79.9436 };
+      this.state.plannedLocationLabel = 'CMU Campus';
+    }
+    this.notifyListeners();
+  }
+
+  /**
+   * Get the effective location for features (planned location or fallback)
+   */
+  getEffectiveLocation(): ILatLng | null {
+    return this.state.plannedLocation ?? this.state.currentLocation;
+  }
+
+  // ── localStorage persistence for planned location ──────────────────
+  private static PLANNED_LOCATION_KEY = 'scottygo_planned_location';
+
+  private savePlannedLocation(location: ILatLng, label: string): void {
+    try {
+      localStorage.setItem(
+        MapStateManager.PLANNED_LOCATION_KEY,
+        JSON.stringify({ lat: location.lat, lng: location.lng, label })
+      );
+    } catch {
+      // localStorage may be unavailable — ignore
+    }
+  }
+
+  private clearSavedPlannedLocation(): void {
+    try {
+      localStorage.removeItem(MapStateManager.PLANNED_LOCATION_KEY);
+    } catch {
+      // ignore
+    }
+  }
+
+  private loadPlannedLocation(): { location: ILatLng; label: string } | null {
+    try {
+      const raw = localStorage.getItem(MapStateManager.PLANNED_LOCATION_KEY);
+      if (!raw) return null;
+      const data = JSON.parse(raw) as { lat: number; lng: number; label: string };
+      if (typeof data.lat !== 'number' || typeof data.lng !== 'number' || typeof data.label !== 'string') {
+        return null;
+      }
+      return { location: { lat: data.lat, lng: data.lng }, label: data.label };
+    } catch {
+      return null;
+    }
   }
 }

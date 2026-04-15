@@ -51,6 +51,7 @@ export class DirectionsController {
   private walkingPolyline: IMapPolyline | null = null;
   private walkingPath: ILatLng[] = [];
   private userLocation: ILatLng | null = null;
+  private plannedLocation: ILatLng | null = null;
 
   // Timing / throttle state
   private lastRerouteTime = 0;
@@ -138,7 +139,7 @@ export class DirectionsController {
 
     if (!this._isActive || !this.selectedStop) return;
 
-    // Check arrival (Step 10: within 20m of stop)
+    // Deviation/arrival checks use real GPS, not planned location
     const distToStop = this.haversine(position, {
       lat: this.selectedStop.lat,
       lng: this.selectedStop.lon
@@ -149,13 +150,27 @@ export class DirectionsController {
       return;
     }
 
-    // Check path deviation (A5: >50m from planned route)
     if (this.walkingPath.length > 0) {
       const distToPath = this.distanceToPolyline(position, this.walkingPath);
       if (distToPath > DEVIATION_THRESHOLD_M) {
         this.handleDeviation();
       }
     }
+  }
+
+  /**
+   * Set the planned location to use as the origin for directions.
+   * When set, directions originate from this location instead of GPS.
+   */
+  updatePlannedLocation(position: ILatLng | null): void {
+    this.plannedLocation = position;
+  }
+
+  /**
+   * Get the effective origin for directions: planned location if set, else GPS.
+   */
+  private getDirectionsOrigin(): ILatLng | null {
+    return this.plannedLocation ?? this.userLocation;
   }
 
   /**
@@ -171,8 +186,8 @@ export class DirectionsController {
     if (now - this.lastDirectionsTap < TAP_DEBOUNCE_MS) return;
     this.lastDirectionsTap = now;
 
-    if (!this.mapProvider || !this.userLocation) {
-      console.warn('[DirectionsController] No map provider or user location');
+    if (!this.mapProvider || !this.getDirectionsOrigin()) {
+      console.warn('[DirectionsController] No map provider or location for directions');
       return;
     }
 
@@ -224,13 +239,13 @@ export class DirectionsController {
    * Fetch directions from Google Directions API and render on map.
    */
   private async fetchAndRenderRoute(): Promise<void> {
-    if (!this.mapProvider || !this.userLocation || !this.selectedStop) return;
+    const origin = this.getDirectionsOrigin();
+    if (!this.mapProvider || !origin || !this.selectedStop) return;
 
     // R2: Cancel any in-flight request
     this.cancelInflightRequest();
     this.inflightAbort = new AbortController();
 
-    const origin = this.userLocation;
     const destination: ILatLng = {
       lat: this.selectedStop.lat,
       lng: this.selectedStop.lon
