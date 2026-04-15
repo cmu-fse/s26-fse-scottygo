@@ -13,13 +13,6 @@ export interface IMapState {
     prt: boolean;
     cmu: boolean;
   };
-  selectedDate: Date | null; // Calendar filter
-  selectedTime: {
-    // Time filter
-    hour: number;
-    minute: number;
-    period: 'AM' | 'PM';
-  } | null;
   selectedDirections: {
     // Direction filter
     inbound: boolean;
@@ -52,8 +45,6 @@ export class MapStateManager {
         prt: true,
         cmu: false
       },
-      selectedDate: null,
-      selectedTime: null,
       selectedDirections: {
         inbound: true,
         outbound: true
@@ -151,8 +142,6 @@ export class MapStateManager {
         prt: true,
         cmu: false
       },
-      selectedDate: null,
-      selectedTime: null,
       selectedDirections: {
         inbound: true,
         outbound: true

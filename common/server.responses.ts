@@ -12,7 +12,8 @@ import {
   IBusReport,
   INotification,
   IServiceAlert,
-  ITransitSearchResult
+  ITransitSearchResult,
+  IRouteSchedule
 } from './transit.interface';
 import { IConfig } from './map.interface';
 
@@ -59,6 +60,7 @@ export type SuccessName =
   | 'AlertsRetrieved'
   | 'SearchTransitCompleted'
   | 'SearchNotificationsCompleted'
+  | 'RouteScheduleRetrieved'
   | 'UsersSearchCompleted';
 
 export type ClientErrorName =
@@ -130,6 +132,7 @@ export type IPayload =
   | INotification[]
   | IServiceAlert[]
   | ITransitSearchResult
+  | IRouteSchedule
   | null;
 
 export interface ISuccess {

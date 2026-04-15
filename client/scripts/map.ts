@@ -20,21 +20,11 @@ import { LocationIndicator } from './components/location-indicator';
 import './components/location-search';
 import type { ILocationSearchElement } from './components/location-search';
 import './components/toggle-panel';
-import './components/time-picker';
-import './components/calendar-picker';
 import './components/route-selector';
 import type {
   ITogglePanelConfig,
   ITogglePanelElement
 } from './components/toggle-panel';
-import type {
-  ITimePickerElement,
-  ITimeSelection
-} from './components/time-picker';
-import type {
-  ICalendarPickerElement,
-  IDateSelection
-} from './components/calendar-picker';
 import type {
   IRouteSelectorElement,
   IRouteSelection
@@ -490,15 +480,11 @@ async function initializeTogglePanels(): Promise<void> {
 function getPanels(): {
   direction: HTMLElement | null;
   system: HTMLElement | null;
-  time: HTMLElement | null;
-  calendar: HTMLElement | null;
   route: HTMLElement | null;
 } {
   return {
     direction: document.getElementById('direction-panel'),
     system: document.getElementById('system-panel'),
-    time: document.querySelector('time-picker-panel'),
-    calendar: document.querySelector('calendar-picker-panel'),
     route: document.querySelector('route-selector-panel')
   };
 }
@@ -508,8 +494,6 @@ function closeAllPanels(): void {
   const panels = getPanels();
   hidePanelIfOpen(panels.direction);
   hidePanelIfOpen(panels.system);
-  hidePanelIfOpen(panels.time);
-  hidePanelIfOpen(panels.calendar);
   hidePanelIfOpen(panels.route);
 }
 
@@ -524,8 +508,6 @@ type ToggleablePanel = {
 const panelOrder: PanelName[] = [
   'direction',
   'system',
-  'time',
-  'calendar',
   'route'
 ];
 
@@ -613,18 +595,6 @@ const registerFilterPanelToggleEvents = (): void => {
     );
   });
 
-  document.addEventListener('filterCalendar', () => {
-    handlePanelToggle('calendar', 'Calendar filter clicked');
-  });
-
-  document.addEventListener('filterTime', () => {
-    handlePanelToggle(
-      'time',
-      'Time filter clicked',
-      'Time picker panel found:'
-    );
-  });
-
   document.addEventListener('filterSystem', () => {
     handlePanelToggle('system', 'System filter clicked', 'System panel found:');
   });
@@ -703,30 +673,6 @@ const registerFilterApplicationEvents = (): void => {
     );
     mapStateManager.updateFilter('selectedDirections', { inbound, outbound });
     await filterController.applyDirectionFilter();
-  });
-
-  document.addEventListener('timeSelected', async (e: Event) => {
-    const customEvent = e as CustomEvent<ITimeSelection>;
-    const { hour, minute, period } = customEvent.detail;
-    console.log(
-      `Time selected: ${hour}:${minute.toString().padStart(2, '0')} ${period}`
-    );
-
-    const timeBtn = document.querySelector('#time-filter-btn');
-    if (timeBtn) {
-      timeBtn.classList.add('primary');
-    }
-
-    mapStateManager.updateFilter('selectedTime', { hour, minute, period });
-    await filterController.applyDateTimeFilter();
-  });
-
-  document.addEventListener('dateSelected', async (e: Event) => {
-    const customEvent = e as CustomEvent<IDateSelection>;
-    const date = customEvent.detail.date;
-    console.log('Date selected:', date.toLocaleDateString());
-    mapStateManager.updateFilter('selectedDate', date);
-    await filterController.applyDateTimeFilter();
   });
 };
 
@@ -881,6 +827,7 @@ const registerRouteSelectionEvents = (): void => {
     console.log('Route selected:', route);
     mapStateManager.updateFilter('selectedRouteId', route);
     await filterController.applyRouteFilter(route);
+    await filterController.showRouteInfoPopup(route);
   });
 };
 

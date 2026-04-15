@@ -58,28 +58,6 @@ export class URLSyncManager {
       };
     }
 
-    // Date filter
-    const dateStr = params.get('d');
-    if (dateStr && dateStr.length === 8) {
-      const year = parseInt(dateStr.substring(0, 4));
-      const month = parseInt(dateStr.substring(4, 6)) - 1; // 0-indexed
-      const day = parseInt(dateStr.substring(6, 8));
-      state.selectedDate = new Date(year, month, day);
-    }
-
-    // Time filter
-    const timeStr = params.get('t');
-    if (timeStr && timeStr.length === 4) {
-      const hour24 = parseInt(timeStr.substring(0, 2));
-      const minute = parseInt(timeStr.substring(2, 4));
-
-      // Convert to 12-hour format
-      const period: 'AM' | 'PM' = hour24 >= 12 ? 'PM' : 'AM';
-      const hour = hour24 % 12 || 12;
-
-      state.selectedTime = { hour, minute, period };
-    }
-
     // Direction filter
     const directions = params.get('dir');
     if (directions) {
@@ -114,27 +92,6 @@ export class URLSyncManager {
     ) {
       // Don't add if it's the default (PRT only)
       params.set('s', systems.join(','));
-    }
-
-    // Date filter
-    if (state.selectedDate) {
-      const year = state.selectedDate.getFullYear();
-      const month = String(state.selectedDate.getMonth() + 1).padStart(2, '0');
-      const day = String(state.selectedDate.getDate()).padStart(2, '0');
-      params.set('d', `${year}${month}${day}`);
-    }
-
-    // Time filter
-    if (state.selectedTime) {
-      const { hour, minute, period } = state.selectedTime;
-      const hour24 =
-        period === 'PM' && hour !== 12
-          ? hour + 12
-          : hour === 12 && period === 'AM'
-            ? 0
-            : hour;
-      const timeStr = `${String(hour24).padStart(2, '0')}${String(minute).padStart(2, '0')}`;
-      params.set('t', timeStr);
     }
 
     // Direction filter (only if not default)

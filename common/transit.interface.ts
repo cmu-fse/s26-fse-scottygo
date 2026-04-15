@@ -171,6 +171,24 @@ export interface ILastKnownBusStatus {
   condition?: IBusCondition;
 }
 
+// ── Route Schedule (for Route Info popup) ──────────────────────────────
+
+export interface IDirectionSchedule {
+  direction: string; // "INBOUND" | "OUTBOUND"
+  firstTrip: string; // "HH:MM" format
+  lastTrip: string; // "HH:MM" format
+}
+
+export interface IRouteSchedule {
+  routeId: string;
+  routeName: string;
+  system: 'PRT' | 'CMU';
+  operatingDays: number[]; // 0-6 (Sunday-Saturday)
+  directions: IDirectionSchedule[];
+  alerts: IServiceAlert[];
+  detours: IDetour[];
+}
+
 // ── Transit Cache ──────────────────────────────────────────────────────
 // Cached TrueTime data stored in MongoDB to respect the daily API limit.
 

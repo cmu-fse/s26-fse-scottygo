@@ -146,7 +146,7 @@ export class LocationSearch extends HTMLElement implements ILocationSearchElemen
     if (state.gpsPermissionGranted && state.currentLocation) {
       this.stateManager.resetPlannedLocationToCurrent();
       this.dispatchEvent(
-        new CustomEvent('locationReset', { bubbles: true })
+        new CustomEvent('locationReset', { bubbles: true }) 
       );
     } else {
       // GPS not available — default to CMU campus
