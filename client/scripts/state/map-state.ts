@@ -205,8 +205,10 @@ export class MapStateManager {
    * Whether the user has set a custom planned location (not just GPS default)
    */
   hasCustomPlannedLocation(): boolean {
-    return this.state.plannedLocationLabel !== null
-      && this.state.plannedLocationLabel !== 'Current Location';
+    return (
+      this.state.plannedLocationLabel !== null &&
+      this.state.plannedLocationLabel !== 'Current Location'
+    );
   }
 
   /**
@@ -278,8 +280,16 @@ export class MapStateManager {
     try {
       const raw = localStorage.getItem(MapStateManager.PLANNED_LOCATION_KEY);
       if (!raw) return null;
-      const data = JSON.parse(raw) as { lat: number; lng: number; label: string };
-      if (typeof data.lat !== 'number' || typeof data.lng !== 'number' || typeof data.label !== 'string') {
+      const data = JSON.parse(raw) as {
+        lat: number;
+        lng: number;
+        label: string;
+      };
+      if (
+        typeof data.lat !== 'number' ||
+        typeof data.lng !== 'number' ||
+        typeof data.label !== 'string'
+      ) {
         return null;
       }
       return { location: { lat: data.lat, lng: data.lng }, label: data.label };

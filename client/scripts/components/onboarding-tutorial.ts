@@ -128,7 +128,9 @@ export class OnboardingTutorial
       return;
     }
 
-    let target = document.querySelector(step.targetSelector) as HTMLElement | null;
+    let target = document.querySelector(
+      step.targetSelector
+    ) as HTMLElement | null;
 
     // For stop markers: fall back to the map center area if no marker is found
     if (!target && step.targetSelector.includes('role="button"')) {

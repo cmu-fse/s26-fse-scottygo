@@ -53,7 +53,11 @@ const getResponseMessage = (
       'Your account is inactive. Please contact an administrator to reactivate your account.'
   };
   if (errorName in errorMessages) return errorMessages[errorName];
-  if ('message' in data && typeof data.message === 'string' && data.message.length > 0)
+  if (
+    'message' in data &&
+    typeof data.message === 'string' &&
+    data.message.length > 0
+  )
     return data.message;
   if (typeof errorName === 'string' && errorName.length > 0) return errorName;
   return fallback;
@@ -61,43 +65,95 @@ const getResponseMessage = (
 
 // ── DOM References ──────────────────────────────────────────────────
 
-const loginForm = document.getElementById('login-form') as HTMLFormElement | null;
-const registerForm = document.getElementById('register-form') as HTMLFormElement | null;
-const statusEl = document.getElementById('status') as HTMLParagraphElement | null;
+const loginForm = document.getElementById(
+  'login-form'
+) as HTMLFormElement | null;
+const registerForm = document.getElementById(
+  'register-form'
+) as HTMLFormElement | null;
+const statusEl = document.getElementById(
+  'status'
+) as HTMLParagraphElement | null;
 
 // Login view inputs
-const loginUsername = document.getElementById('login-username') as HTMLInputElement | null;
-const loginPassword = document.getElementById('login-password') as HTMLInputElement | null;
-const loginBtn = document.getElementById('login-btn') as HTMLButtonElement | null;
-const showRegisterBtn = document.getElementById('show-register-btn') as HTMLButtonElement | null;
+const loginUsername = document.getElementById(
+  'login-username'
+) as HTMLInputElement | null;
+const loginPassword = document.getElementById(
+  'login-password'
+) as HTMLInputElement | null;
+const loginBtn = document.getElementById(
+  'login-btn'
+) as HTMLButtonElement | null;
+const showRegisterBtn = document.getElementById(
+  'show-register-btn'
+) as HTMLButtonElement | null;
 
 // Register view inputs
-const regUsername = document.getElementById('reg-username') as HTMLInputElement | null;
-const regEmail = document.getElementById('reg-email') as HTMLInputElement | null;
-const regPassword = document.getElementById('reg-password') as HTMLInputElement | null;
-const regConfirm = document.getElementById('reg-confirm-password') as HTMLInputElement | null;
-const registerBtn = document.getElementById('register-btn') as HTMLButtonElement | null;
-const showLoginBtn = document.getElementById('show-login-btn') as HTMLButtonElement | null;
+const regUsername = document.getElementById(
+  'reg-username'
+) as HTMLInputElement | null;
+const regEmail = document.getElementById(
+  'reg-email'
+) as HTMLInputElement | null;
+const regPassword = document.getElementById(
+  'reg-password'
+) as HTMLInputElement | null;
+const regConfirm = document.getElementById(
+  'reg-confirm-password'
+) as HTMLInputElement | null;
+const registerBtn = document.getElementById(
+  'register-btn'
+) as HTMLButtonElement | null;
+const showLoginBtn = document.getElementById(
+  'show-login-btn'
+) as HTMLButtonElement | null;
 
 // Validation hints
-const usernameHint = document.getElementById('reg-username-hint') as HTMLSpanElement | null;
-const emailHint = document.getElementById('reg-email-hint') as HTMLSpanElement | null;
-const passwordHint = document.getElementById('reg-password-hint') as HTMLSpanElement | null;
-const confirmHint = document.getElementById('reg-confirm-hint') as HTMLSpanElement | null;
+const usernameHint = document.getElementById(
+  'reg-username-hint'
+) as HTMLSpanElement | null;
+const emailHint = document.getElementById(
+  'reg-email-hint'
+) as HTMLSpanElement | null;
+const passwordHint = document.getElementById(
+  'reg-password-hint'
+) as HTMLSpanElement | null;
+const confirmHint = document.getElementById(
+  'reg-confirm-hint'
+) as HTMLSpanElement | null;
 
 // Shared elements (present in both views)
 const tosInput = document.getElementById('tos') as HTMLInputElement | null;
 
 // Modals
-const confirmModal = document.getElementById('confirm-modal') as HTMLDivElement | null;
-const confirmYes = document.getElementById('confirm-yes') as HTMLButtonElement | null;
-const confirmNo = document.getElementById('confirm-no') as HTMLButtonElement | null;
-const termsModal = document.getElementById('terms-modal') as HTMLDivElement | null;
-const termsAccept = document.getElementById('terms-accept') as HTMLButtonElement | null;
-const termsDecline = document.getElementById('terms-decline') as HTMLButtonElement | null;
-const termsLink = document.getElementById('terms-link') as HTMLButtonElement | null;
-const declineModal = document.getElementById('decline-modal') as HTMLDivElement | null;
-const declineOk = document.getElementById('decline-ok') as HTMLButtonElement | null;
+const confirmModal = document.getElementById(
+  'confirm-modal'
+) as HTMLDivElement | null;
+const confirmYes = document.getElementById(
+  'confirm-yes'
+) as HTMLButtonElement | null;
+const confirmNo = document.getElementById(
+  'confirm-no'
+) as HTMLButtonElement | null;
+const termsModal = document.getElementById(
+  'terms-modal'
+) as HTMLDivElement | null;
+const termsAccept = document.getElementById(
+  'terms-accept'
+) as HTMLButtonElement | null;
+const termsDecline = document.getElementById(
+  'terms-decline'
+) as HTMLButtonElement | null;
+const termsLink = document.getElementById(
+  'terms-link'
+) as HTMLButtonElement | null;
+const declineModal = document.getElementById(
+  'decline-modal'
+) as HTMLDivElement | null;
+const declineOk = document.getElementById(
+  'decline-ok'
+) as HTMLButtonElement | null;
 
 // ── State ───────────────────────────────────────────────────────────
 
@@ -137,7 +193,9 @@ const setHint = (
 ): void => {
   if (!el) return;
   el.textContent = message;
-  el.className = valid ? 'field-hint field-hint--valid' : 'field-hint field-hint--invalid';
+  el.className = valid
+    ? 'field-hint field-hint--valid'
+    : 'field-hint field-hint--invalid';
 };
 
 const clearHint = (el: HTMLSpanElement | null): void => {
@@ -183,8 +241,12 @@ const switchToRegister = (): void => {
   if (registerForm) registerForm.hidden = false;
   setStatus('');
   // Reset touched state and hints
-  Object.keys(touched).forEach((k) => { touched[k] = false; });
-  Object.keys(fieldValid).forEach((k) => { fieldValid[k] = false; });
+  Object.keys(touched).forEach((k) => {
+    touched[k] = false;
+  });
+  Object.keys(fieldValid).forEach((k) => {
+    fieldValid[k] = false;
+  });
   clearHint(usernameHint);
   clearHint(emailHint);
   clearHint(passwordHint);
@@ -274,30 +336,60 @@ const updateRegisterButton = (): void => {
 // Wire up validation listeners
 regUsername?.addEventListener('input', () => {
   touched.username = true;
-  validateFieldDebounced('username', regUsername.value.trim(), usernameHint, 'Looks good');
+  validateFieldDebounced(
+    'username',
+    regUsername.value.trim(),
+    usernameHint,
+    'Looks good'
+  );
 });
 regUsername?.addEventListener('blur', () => {
   touched.username = true;
-  validateFieldDebounced('username', regUsername.value.trim(), usernameHint, 'Looks good');
+  validateFieldDebounced(
+    'username',
+    regUsername.value.trim(),
+    usernameHint,
+    'Looks good'
+  );
 });
 
 regEmail?.addEventListener('input', () => {
   touched.email = true;
-  validateFieldDebounced('email', regEmail.value.trim(), emailHint, 'Valid CMU email');
+  validateFieldDebounced(
+    'email',
+    regEmail.value.trim(),
+    emailHint,
+    'Valid CMU email'
+  );
 });
 regEmail?.addEventListener('blur', () => {
   touched.email = true;
-  validateFieldDebounced('email', regEmail.value.trim(), emailHint, 'Valid CMU email');
+  validateFieldDebounced(
+    'email',
+    regEmail.value.trim(),
+    emailHint,
+    'Valid CMU email'
+  );
 });
 
 regPassword?.addEventListener('input', () => {
   touched.password = true;
-  validateFieldDebounced('password', regPassword.value, passwordHint, 'Strong password');
+  validateFieldDebounced(
+    'password',
+    regPassword.value,
+    passwordHint,
+    'Strong password'
+  );
   validateConfirmPassword(); // re-check confirm match
 });
 regPassword?.addEventListener('blur', () => {
   touched.password = true;
-  validateFieldDebounced('password', regPassword.value, passwordHint, 'Strong password');
+  validateFieldDebounced(
+    'password',
+    regPassword.value,
+    passwordHint,
+    'Strong password'
+  );
 });
 
 regConfirm?.addEventListener('input', () => {
@@ -381,7 +473,10 @@ const agreeAndRefreshSession = async (
   if (!hasSuccessStatus(agreementResult.status)) {
     return {
       ok: false,
-      message: getResponseMessage(agreementResult.data, 'Agreement update failed.')
+      message: getResponseMessage(
+        agreementResult.data,
+        'Agreement update failed.'
+      )
     };
   }
   const loginResult = await loginUser(username, password);
@@ -416,7 +511,11 @@ const openTermsModal = (
   openModal(termsModal);
 };
 
-const setSubmitting = (btn: HTMLButtonElement | null, isSubmitting: boolean, label: string): void => {
+const setSubmitting = (
+  btn: HTMLButtonElement | null,
+  isSubmitting: boolean,
+  label: string
+): void => {
   if (!btn) return;
   btn.disabled = isSubmitting;
   btn.textContent = isSubmitting ? 'Submitting...' : label;
@@ -463,11 +562,7 @@ loginForm?.addEventListener('submit', async (event: SubmitEvent) => {
     const authenticatedUser = authPayload?.user ?? null;
 
     if (authenticatedUser && authenticatedUser.agreed === false) {
-      openTermsModal(
-        authenticatedUser.credentials.username,
-        password,
-        true
-      );
+      openTermsModal(authenticatedUser.credentials.username, password, true);
       return;
     }
 
@@ -475,7 +570,9 @@ loginForm?.addEventListener('submit', async (event: SubmitEvent) => {
     redirectToDirectory('Login successful. Redirecting...');
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : 'Network error. Please try again.';
+      error instanceof Error
+        ? error.message
+        : 'Network error. Please try again.';
     setStatus(message, true);
   } finally {
     setSubmitting(loginBtn, false, 'Login');
@@ -561,7 +658,9 @@ confirmYes?.addEventListener('click', async () => {
     );
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : 'Network error. Please try again.';
+      error instanceof Error
+        ? error.message
+        : 'Network error. Please try again.';
     setStatus(message, true);
   } finally {
     pendingRegisterPayload = null;
@@ -606,7 +705,9 @@ const handleAgreementAccept = async (): Promise<void> => {
     }
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : 'Network error. Please try again.';
+      error instanceof Error
+        ? error.message
+        : 'Network error. Please try again.';
     setStatus(message, true);
   } finally {
     pendingAgreementUsername = null;

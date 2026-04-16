@@ -114,9 +114,7 @@ export default class BusController extends Controller {
 
       // Get alerts filtered to this route
       const allAlerts = alertsService.getAlerts();
-      const routeAlerts = allAlerts.filter((a) =>
-        a.routeIds.includes(routeId)
-      );
+      const routeAlerts = allAlerts.filter((a) => a.routeIds.includes(routeId));
 
       // Get detours for this route
       const detours = await TransitModel.getDetours([routeId]);

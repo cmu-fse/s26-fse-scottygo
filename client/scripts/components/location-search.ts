@@ -22,7 +22,10 @@ export interface ILocationSearchElement extends HTMLElement {
   close(): void;
 }
 
-export class LocationSearch extends HTMLElement implements ILocationSearchElement {
+export class LocationSearch
+  extends HTMLElement
+  implements ILocationSearchElement
+{
   private dropdown: HTMLElement | null = null;
   private searchContainer: HTMLElement | null = null;
   private placesInput: HTMLInputElement | null = null;
@@ -71,19 +74,28 @@ export class LocationSearch extends HTMLElement implements ILocationSearchElemen
     this.placesInput = this.querySelector('.location-search-places-input');
 
     // "Current Location" click
-    this.querySelector('.location-search-current')?.addEventListener('click', () => {
-      this.handleCurrentLocationClick();
-    });
+    this.querySelector('.location-search-current')?.addEventListener(
+      'click',
+      () => {
+        this.handleCurrentLocationClick();
+      }
+    );
 
     // "Set a different location" click
-    this.querySelector('.location-search-custom')?.addEventListener('click', () => {
-      this.showPlacesSearch();
-    });
+    this.querySelector('.location-search-custom')?.addEventListener(
+      'click',
+      () => {
+        this.showPlacesSearch();
+      }
+    );
 
     // Back button in search mode
-    this.querySelector('.location-search-back-btn')?.addEventListener('click', () => {
-      this.hidePlacesSearch();
-    });
+    this.querySelector('.location-search-back-btn')?.addEventListener(
+      'click',
+      () => {
+        this.hidePlacesSearch();
+      }
+    );
 
     // Close on outside click (treat transit-search as "inside" since it triggers us)
     document.addEventListener('click', (e) => {
@@ -145,15 +157,17 @@ export class LocationSearch extends HTMLElement implements ILocationSearchElemen
     const state = this.stateManager.getState();
     if (state.gpsPermissionGranted && state.currentLocation) {
       this.stateManager.resetPlannedLocationToCurrent();
-      this.dispatchEvent(
-        new CustomEvent('locationReset', { bubbles: true }) 
-      );
+      this.dispatchEvent(new CustomEvent('locationReset', { bubbles: true }));
     } else {
       // GPS not available — default to CMU campus
       this.stateManager.setPlannedLocation(CMU_CAMPUS, 'CMU Campus');
       this.dispatchEvent(
         new CustomEvent('locationSelected', {
-          detail: { lat: CMU_CAMPUS.lat, lng: CMU_CAMPUS.lng, label: 'CMU Campus' },
+          detail: {
+            lat: CMU_CAMPUS.lat,
+            lng: CMU_CAMPUS.lng,
+            label: 'CMU Campus'
+          },
           bubbles: true
         })
       );
@@ -162,7 +176,9 @@ export class LocationSearch extends HTMLElement implements ILocationSearchElemen
   }
 
   private showPlacesSearch(): void {
-    const defaultView = this.querySelector('.location-search-default') as HTMLElement;
+    const defaultView = this.querySelector(
+      '.location-search-default'
+    ) as HTMLElement;
     if (defaultView) defaultView.hidden = true;
     if (this.searchContainer) {
       this.searchContainer.hidden = false;
@@ -175,7 +191,9 @@ export class LocationSearch extends HTMLElement implements ILocationSearchElemen
   }
 
   private hidePlacesSearch(): void {
-    const defaultView = this.querySelector('.location-search-default') as HTMLElement;
+    const defaultView = this.querySelector(
+      '.location-search-default'
+    ) as HTMLElement;
     if (defaultView) defaultView.hidden = false;
     if (this.searchContainer) {
       this.searchContainer.hidden = true;
@@ -205,7 +223,8 @@ export class LocationSearch extends HTMLElement implements ILocationSearchElemen
 
       const lat = place.geometry.location.lat();
       const lng = place.geometry.location.lng();
-      const label = place.name || place.formatted_address || 'Selected Location';
+      const label =
+        place.name || place.formatted_address || 'Selected Location';
 
       this.stateManager.setPlannedLocation({ lat, lng }, label);
 

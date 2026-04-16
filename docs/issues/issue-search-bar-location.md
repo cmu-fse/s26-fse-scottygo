@@ -25,14 +25,14 @@ Users may want to browse transit information for a location other than where the
 ### Location Types
 
 | Location Type | Source | Purpose |
-|---|---|---|
+| --- | --- | --- |
 | **Current Location** | Device GPS | Used to validate eligibility for submitting a bus report |
 | **Planned Location** | User-selected (defaults to current location) | Used for all other location-dependent features (e.g., nearby routes, distance calculations) |
 
 ### GPS Permission Scenarios
 
 | Scenario | Current Location | Default Planned Location | Bus Report |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | GPS access **granted** | Device GPS coordinates | Same as current location | Allowed |
 | GPS access **denied** | Unavailable | CMU Pittsburgh campus center | **Not allowed** |
 

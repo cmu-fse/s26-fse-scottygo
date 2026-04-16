@@ -25,7 +25,12 @@ import axios from 'axios';
 import type { IMapProvider, IMapMarker } from '../../../common/map.interface';
 import type { IVehicle } from '../../../common/transit.interface';
 import { MapStateManager } from '../state/map-state';
-import { MAP_POPUP_ID, closeMapPopup, dismissPopup, minimizePopup } from '../utils/map-popup';
+import {
+  MAP_POPUP_ID,
+  closeMapPopup,
+  dismissPopup,
+  minimizePopup
+} from '../utils/map-popup';
 import { getRouteTitle } from '../utils/route-display';
 import { showToast } from '../utils/toast';
 
@@ -802,24 +807,41 @@ export class VehicleTracker {
     }
 
     // Report button
-    const reportBtn = popup.querySelector('.map-popup__action-btn--report') as HTMLButtonElement | null;
+    const reportBtn = popup.querySelector(
+      '.map-popup__action-btn--report'
+    ) as HTMLButtonElement | null;
     if (reportBtn) {
       reportBtn.addEventListener('click', () => {
         if (!this.userLocation) {
-          this.showToast('Location access is required to submit a bus report. Please enable location services.');
+          this.showToast(
+            'Location access is required to submit a bus report. Please enable location services.'
+          );
           return;
         }
         const latestVehicle = this.vehicleData.get(vid) ?? vehicle;
         if (!this.isAdminProximityBypass) {
-          const dist = haversineDistanceMiles(this.userLocation.lat, this.userLocation.lng, latestVehicle.lat, latestVehicle.lon);
+          const dist = haversineDistanceMiles(
+            this.userLocation.lat,
+            this.userLocation.lng,
+            latestVehicle.lat,
+            latestVehicle.lon
+          );
           if (dist > 0.5) {
             this.showToast('You need to be near this bus to submit a report.');
             return;
           }
         }
-        document.dispatchEvent(new CustomEvent('busReport', {
-          detail: { vid: latestVehicle.vid, routeId: latestVehicle.routeId, routeLabel: this.getRouteSubheaderText(latestVehicle.routeId), lat: this.userLocation.lat, lon: this.userLocation.lng }
-        }));
+        document.dispatchEvent(
+          new CustomEvent('busReport', {
+            detail: {
+              vid: latestVehicle.vid,
+              routeId: latestVehicle.routeId,
+              routeLabel: this.getRouteSubheaderText(latestVehicle.routeId),
+              lat: this.userLocation.lat,
+              lon: this.userLocation.lng
+            }
+          })
+        );
       });
     }
 
