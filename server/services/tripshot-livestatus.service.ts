@@ -43,6 +43,20 @@ function normalizeTsRouteId(routeId: string): string {
   return routeId.trim().toLowerCase();
 }
 
+/**
+ * Per-route schedule summary aggregated from TripShot `liveStatus` rides.
+ * Times are expressed as `HH:MM` in the local time zone of the server so they
+ * align with how GTFS schedule data is rendered in the Route Info popup.
+ */
+export interface TripShotRouteSchedule {
+  /** Earliest `scheduledStart` time across today's rides, as "HH:MM". */
+  firstTrip: string;
+  /** Latest `scheduledEnd` time across today's rides, as "HH:MM". */
+  lastTrip: string;
+  /** Weekdays (0=Sun..6=Sat) that have at least one ride in the current feed. */
+  operatingDays: number[];
+}
+
 class TripShotLiveStatusService {
   /**
    * In-memory store: TripShot routeId UUID → IVehicle[]
@@ -62,6 +76,15 @@ class TripShotLiveStatusService {
    * Only ViaStop entries are included (waypoints are skipped).
    */
   private stopsByTsRouteId = new Map<string, IStop[]>();
+
+  /**
+   * In-memory store: TripShot routeId UUID → TripShotRouteSchedule
+   * Aggregates today's ride `scheduledStart`/`scheduledEnd` per route so the
+   * Route Info popup can show first/last trip times for CMU shuttles.
+   * All rides (Active, Scheduled, Completed) contribute; operatingDays is
+   * derived from the set of weekdays covered by those rides.
+   */
+  private scheduleByTsRouteId = new Map<string, TripShotRouteSchedule>();
 
   /** Polling interval handle, if active. */
   private intervalId: ReturnType<typeof setInterval> | null = null;
@@ -120,6 +143,14 @@ class TripShotLiveStatusService {
         routes: [cmuRouteId]
       })
     );
+  }
+
+  /**
+   * Return today's schedule summary for a TripShot route UUID, or `null`
+   * when the feed has not produced any rides for that route yet.
+   */
+  getScheduleByTsRouteId(tsRouteId: string): TripShotRouteSchedule | null {
+    return this.scheduleByTsRouteId.get(normalizeTsRouteId(tsRouteId)) ?? null;
   }
 
   /** When the feed was last successfully fetched. */
@@ -191,12 +222,14 @@ class TripShotLiveStatusService {
 
       const data: TsLiveStatus = await res.json();
 
-      const { newVehicles, newPredictions, newStops } = this.buildIndex(data);
+      const { newVehicles, newPredictions, newStops, newSchedules } =
+        this.buildIndex(data);
 
       // Atomic swap — readers never see a half-built index
       this.vehiclesByTsRouteId = newVehicles;
       this.predictionsByStopId = newPredictions;
       this.stopsByTsRouteId = newStops;
+      this.scheduleByTsRouteId = newSchedules;
       const isFirstSuccess = this.lastFetched === null;
       this.lastFetched = new Date();
       this.consecutiveFailures = 0;
@@ -244,6 +277,7 @@ class TripShotLiveStatusService {
     newVehicles: Map<string, IVehicle[]>;
     newPredictions: Map<string, IPrediction[]>;
     newStops: Map<string, IStop[]>;
+    newSchedules: Map<string, TripShotRouteSchedule>;
   } {
     const vsMap = new Map<string, TsLiveVehicleStatus>(
       data.vehicleStatuses.map((vs) => [vs.vehicleId, vs])
@@ -252,11 +286,16 @@ class TripShotLiveStatusService {
     const newVehicles = new Map<string, IVehicle[]>();
     const newPredictions = new Map<string, IPrediction[]>();
     const newStops = new Map<string, IStop[]>();
+    const scheduleAccum = new Map<
+      string,
+      { first: number; last: number; days: Set<number> }
+    >();
 
     for (const ride of data.rides) {
       const normalizedRouteId = normalizeTsRouteId(ride.routeId);
 
       this.ensureRouteStopsIndexed(newStops, normalizedRouteId, ride);
+      this.accumulateRouteSchedule(scheduleAccum, normalizedRouteId, ride);
 
       if (!this.isActive(ride)) continue;
 
@@ -271,7 +310,67 @@ class TripShotLiveStatusService {
       this.addRidePredictions(newPredictions, ride, displayVid);
     }
 
-    return { newVehicles, newPredictions, newStops };
+    const newSchedules = this.finalizeRouteSchedules(scheduleAccum);
+
+    return { newVehicles, newPredictions, newStops, newSchedules };
+  }
+
+  /**
+   * Fold one ride's `scheduledStart` / `scheduledEnd` into the per-route
+   * schedule accumulator.  Invalid or missing timestamps are skipped.
+   */
+  private accumulateRouteSchedule(
+    accum: Map<string, { first: number; last: number; days: Set<number> }>,
+    normalizedRouteId: string,
+    ride: TsLiveRide
+  ): void {
+    const start = Date.parse(ride.scheduledStart);
+    const end = Date.parse(ride.scheduledEnd);
+    if (!Number.isFinite(start) || !Number.isFinite(end)) return;
+
+    const existing = accum.get(normalizedRouteId);
+    if (existing) {
+      if (start < existing.first) existing.first = start;
+      if (end > existing.last) existing.last = end;
+      existing.days.add(new Date(start).getDay());
+    } else {
+      accum.set(normalizedRouteId, {
+        first: start,
+        last: end,
+        days: new Set([new Date(start).getDay()])
+      });
+    }
+  }
+
+  /** Convert the mutable accumulator into the read-only schedule map. */
+  private finalizeRouteSchedules(
+    accum: Map<string, { first: number; last: number; days: Set<number> }>
+  ): Map<string, TripShotRouteSchedule> {
+    // TripShot timestamps are Eastern time; format in America/New_York so the
+    // displayed first/last trip times match the local schedule regardless of
+    // the server's own timezone (typically UTC in production).
+    const easternFmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+    const fmt = (ms: number): string => {
+      const parts = easternFmt.formatToParts(new Date(ms));
+      const hour = parts.find((p) => p.type === 'hour')?.value ?? '00';
+      const minute = parts.find((p) => p.type === 'minute')?.value ?? '00';
+      return `${hour}:${minute}`;
+    };
+
+    const schedules = new Map<string, TripShotRouteSchedule>();
+    for (const [routeId, entry] of accum) {
+      schedules.set(routeId, {
+        firstTrip: fmt(entry.first),
+        lastTrip: fmt(entry.last),
+        operatingDays: [...entry.days].sort((a, b) => a - b)
+      });
+    }
+    return schedules;
   }
 
   private ensureRouteStopsIndexed(

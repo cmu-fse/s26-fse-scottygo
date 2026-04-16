@@ -273,11 +273,14 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
       }
     });
 
-    // After initialization, if a route was restored from URL, apply route filter to render stops
+    // After initialization, if a route was restored from URL, apply route filter
+    // to render stops/polylines and show the route info popup (same as a fresh
+    // route selection — keeps the popup tab visible after a page refresh).
     const restoredState = mapStateManager.getState();
     if (restoredState.selectedRouteId) {
       console.log('Restoring route from URL:', restoredState.selectedRouteId);
       await filterController.applyRouteFilter(restoredState.selectedRouteId);
+      await filterController.showRouteInfoPopup(restoredState.selectedRouteId);
     }
 
     // Request user location for centering map

@@ -78,8 +78,11 @@ export default class BusController extends Controller {
     try {
       const { routeId } = req.params;
 
-      const schedule = gtfsService.getRouteSchedule(routeId);
-      if (!schedule) {
+      const payload = routeId.startsWith('CMU-')
+        ? await this.buildCmuRouteSchedule(routeId)
+        : await this.buildPrtRouteSchedule(routeId);
+
+      if (!payload) {
         const err: responses.IAppError = {
           type: 'ClientError',
           name: 'RouteNotFound',
@@ -88,27 +91,6 @@ export default class BusController extends Controller {
         res.status(404).json(err);
         return;
       }
-
-      // Get route info
-      const routes = gtfsService.getRoutes();
-      const route = routes.find((r) => r.id === routeId);
-
-      // Get alerts filtered to this route
-      const allAlerts = alertsService.getAlerts();
-      const routeAlerts = allAlerts.filter((a) => a.routeIds.includes(routeId));
-
-      // Get detours for this route
-      const detours = await TransitModel.getDetours([routeId]);
-
-      const payload: IRouteSchedule = {
-        routeId,
-        routeName: route?.name ?? routeId,
-        system: route?.system ?? 'PRT',
-        operatingDays: schedule.operatingDays,
-        directions: schedule.directions,
-        alerts: routeAlerts,
-        detours
-      };
 
       const success: responses.ISuccess = {
         name: 'RouteScheduleRetrieved',
@@ -124,6 +106,56 @@ export default class BusController extends Controller {
       };
       res.status(500).json(err);
     }
+  }
+
+  /** Assemble a Route Info payload for a PRT route from GTFS static data. */
+  private async buildPrtRouteSchedule(
+    routeId: string
+  ): Promise<IRouteSchedule | null> {
+    const schedule = gtfsService.getRouteSchedule(routeId);
+    if (!schedule) return null;
+
+    const route = gtfsService.getRoutes().find((r) => r.id === routeId);
+    const allAlerts = alertsService.getAlerts();
+    const routeAlerts = allAlerts.filter((a) => a.routeIds.includes(routeId));
+    const detours = await TransitModel.getDetours([routeId]);
+
+    return {
+      routeId,
+      routeName: route?.name ?? routeId,
+      system: route?.system ?? 'PRT',
+      operatingDays: schedule.operatingDays,
+      directions: schedule.directions,
+      alerts: routeAlerts,
+      detours
+    };
+  }
+
+  /**
+   * Assemble a Route Info payload for a CMU shuttle route using TripShot
+   * liveStatus ride data.  Alerts and detours are currently unavailable for
+   * CMU routes and are returned as empty arrays so the popup renders cleanly.
+   */
+  private async buildCmuRouteSchedule(
+    routeId: string
+  ): Promise<IRouteSchedule | null> {
+    if (!tripshotService.isConfigured()) return null;
+
+    const schedule = tripshotService.getRouteSchedule(routeId);
+    if (!schedule) return null;
+
+    const routes = await tripshotService.getRoutes();
+    const route = routes.find((r) => r.id === routeId);
+
+    return {
+      routeId,
+      routeName: route?.name ?? routeId,
+      system: 'CMU',
+      operatingDays: schedule.operatingDays,
+      directions: schedule.directions,
+      alerts: [],
+      detours: []
+    };
   }
 
   private registerStopRoutes(): void {
@@ -405,7 +437,14 @@ export default class BusController extends Controller {
         }
       } else {
         // PRT route — read from the in-memory GTFS-RT store (updated every 30s)
-        vehicles = vehiclePositionsService.getVehicles(routeId);
+        // Annotate each vehicle with its GTFS trip direction so the client can
+        // filter by the inbound/outbound toggle without an extra round-trip.
+        vehicles = vehiclePositionsService.getVehicles(routeId).map((v) => ({
+          ...v,
+          direction: v.tripId
+            ? gtfsService.getTripDirection(v.tripId)
+            : undefined
+        }));
       }
 
       const successRes: responses.ISuccess = {
