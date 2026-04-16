@@ -316,8 +316,7 @@ class TripShotLiveStatusService {
   private addRouteVehicle(
     newVehicles: Map<string, IVehicle[]>,
     normalizedRouteId: string,
-    vs: TsLiveVehicleStatus,
-    ride: TsLiveRide
+    vs: TsLiveVehicleStatus
   ): string {
     const displayVid = (vs.name || '').trim() || vs.vehicleId;
 
