@@ -32,6 +32,24 @@ const VALID_CROWDEDNESS: ICrowdedness[] = [
 const VALID_PRIORITY_SEATING: IPrioritySeating[] = ['Available', 'Occupied'];
 const VALID_CONDITION: IBusCondition[] = ['Clean', 'Dirty', 'Average'];
 
+type ISubmitReportData = {
+  vid: string;
+  routeId: string;
+  crowdedness?: string;
+  prioritySeating?: string;
+  condition?: string;
+  comment?: string;
+  lat: number;
+  lon: number;
+  bypassProximityCheck?: boolean;
+};
+
+type IModerationResult = {
+  commentFlagged: boolean;
+  commentFlagCategory?: 'inappropriate' | 'irrelevant';
+  moderatedComment?: string;
+};
+
 export class NotificationModel {
   /**
    * In-memory last-known status per vehicle (R12).
@@ -151,32 +169,7 @@ export class NotificationModel {
     }
   }
 
-  // ── Bus Reports ────────────────────────────────────────────────────
-
-  /**
-   * Validate and store a bus report.
-   * Returns { report, notification?, commentFlagged }.
-   */
-  static async submitReport(
-    userId: string,
-    data: {
-      vid: string;
-      routeId: string;
-      crowdedness?: string;
-      prioritySeating?: string;
-      condition?: string;
-      comment?: string;
-      lat: number;
-      lon: number;
-      bypassProximityCheck?: boolean;
-    }
-  ): Promise<{
-    report: IBusReport;
-    notification: INotification | null;
-    commentFlagged: boolean;
-    commentFlagCategory?: 'inappropriate' | 'irrelevant';
-  }> {
-    // Validate required fields
+  private static assertReportHasRequiredFields(data: ISubmitReportData): void {
     if (!data.vid || !data.routeId || data.lat == null || data.lon == null) {
       const error: IAppError = {
         type: 'ClientError',
@@ -185,8 +178,11 @@ export class NotificationModel {
       };
       throw error;
     }
+  }
 
-    // R5/A5: at least one optional field must be provided
+  private static assertReportHasAtLeastOneAnswer(
+    data: ISubmitReportData
+  ): void {
     if (
       !data.crowdedness &&
       !data.prioritySeating &&
@@ -200,43 +196,47 @@ export class NotificationModel {
       };
       throw error;
     }
+  }
 
-    // Validate enum values
-    if (
-      data.crowdedness &&
-      !VALID_CROWDEDNESS.includes(data.crowdedness as ICrowdedness)
-    ) {
-      const error: IAppError = {
-        type: 'ClientError',
-        name: 'InvalidReportField',
-        message: `Invalid crowdedness value. Must be one of: ${VALID_CROWDEDNESS.join(', ')}`
-      };
-      throw error;
-    }
-    if (
-      data.prioritySeating &&
-      !VALID_PRIORITY_SEATING.includes(data.prioritySeating as IPrioritySeating)
-    ) {
-      const error: IAppError = {
-        type: 'ClientError',
-        name: 'InvalidReportField',
-        message: `Invalid prioritySeating value. Must be one of: ${VALID_PRIORITY_SEATING.join(', ')}`
-      };
-      throw error;
-    }
-    if (
-      data.condition &&
-      !VALID_CONDITION.includes(data.condition as IBusCondition)
-    ) {
-      const error: IAppError = {
-        type: 'ClientError',
-        name: 'InvalidReportField',
-        message: `Invalid condition value. Must be one of: ${VALID_CONDITION.join(', ')}`
-      };
-      throw error;
-    }
+  private static assertValidEnumValue(
+    fieldName: string,
+    value: string | undefined,
+    validValues: readonly string[]
+  ): void {
+    if (!value || validValues.includes(value)) return;
 
-    // R9: Server-side proximity validation
+    const error: IAppError = {
+      type: 'ClientError',
+      name: 'InvalidReportField',
+      message: `Invalid ${fieldName} value. Must be one of: ${validValues.join(', ')}`
+    };
+    throw error;
+  }
+
+  private static validateReportData(data: ISubmitReportData): void {
+    NotificationModel.assertReportHasRequiredFields(data);
+    NotificationModel.assertReportHasAtLeastOneAnswer(data);
+
+    NotificationModel.assertValidEnumValue(
+      'crowdedness',
+      data.crowdedness,
+      VALID_CROWDEDNESS
+    );
+    NotificationModel.assertValidEnumValue(
+      'prioritySeating',
+      data.prioritySeating,
+      VALID_PRIORITY_SEATING
+    );
+    NotificationModel.assertValidEnumValue(
+      'condition',
+      data.condition,
+      VALID_CONDITION
+    );
+  }
+
+  private static async enforceProximityRule(
+    data: ISubmitReportData
+  ): Promise<void> {
     const bus = await NotificationModel.findLiveVehicle(data.routeId, data.vid);
     if (!bus) {
       const error: IAppError = {
@@ -247,9 +247,9 @@ export class NotificationModel {
       throw error;
     }
 
-    const distance =
+    const distanceMiles =
       haversineDistanceMeters(data.lat, data.lon, bus.lat, bus.lon) / 1609.344;
-    if (!data.bypassProximityCheck && distance > PROXIMITY_LIMIT_MILES) {
+    if (!data.bypassProximityCheck && distanceMiles > PROXIMITY_LIMIT_MILES) {
       const error: IAppError = {
         type: 'ClientError',
         name: 'ProximityViolation',
@@ -257,22 +257,38 @@ export class NotificationModel {
       };
       throw error;
     }
+  }
 
-    // R11: LLM content moderation for comments
-    let commentFlagged = false;
-    let commentFlagCategory: 'inappropriate' | 'irrelevant' | undefined;
-    let moderatedComment = data.comment;
-    if (data.comment) {
-      const moderationResult = await moderationService.moderate(data.comment);
-      if (moderationResult.flagged) {
-        commentFlagged = true;
-        commentFlagCategory = moderationResult.category;
-        moderatedComment = undefined; // Exclude from notification
-      }
+  private static async moderateReportComment(
+    comment: string | undefined
+  ): Promise<IModerationResult> {
+    if (!comment) {
+      return {
+        commentFlagged: false,
+        moderatedComment: undefined
+      };
     }
 
-    // Store the report
-    const report: IBusReport = {
+    const moderationResult = await moderationService.moderate(comment);
+    if (moderationResult.flagged) {
+      return {
+        commentFlagged: true,
+        commentFlagCategory: moderationResult.category,
+        moderatedComment: undefined
+      };
+    }
+
+    return {
+      commentFlagged: false,
+      moderatedComment: comment
+    };
+  }
+
+  private static buildBusReport(
+    userId: string,
+    data: ISubmitReportData
+  ): IBusReport {
+    return {
       _id: uuidV4(),
       userId,
       vid: data.vid,
@@ -280,16 +296,17 @@ export class NotificationModel {
       crowdedness: data.crowdedness as ICrowdedness | undefined,
       prioritySeating: data.prioritySeating as IPrioritySeating | undefined,
       condition: data.condition as IBusCondition | undefined,
-      comment: data.comment, // Store original comment in report
+      comment: data.comment,
       lat: data.lat,
       lon: data.lon,
       createdAt: new Date().toISOString()
     };
+  }
 
-    const savedReport = await DAC.db.saveBusReport(report);
-
-    // R6/R12: Compare against last known status and detect changes
-    const lastStatus = NotificationModel.lastKnownStatus.get(data.vid) ?? {};
+  private static determineChangedFields(
+    data: ISubmitReportData,
+    lastStatus: ILastKnownBusStatus
+  ): string[] {
     const changedFields: string[] = [];
 
     if (data.crowdedness && data.crowdedness !== lastStatus.crowdedness) {
@@ -305,28 +322,33 @@ export class NotificationModel {
       changedFields.push('condition');
     }
 
-    // Update last known status (R12)
-    const updatedStatus: ILastKnownBusStatus = { ...lastStatus };
-    if (data.crowdedness)
-      updatedStatus.crowdedness = data.crowdedness as ICrowdedness;
-    if (data.prioritySeating)
-      updatedStatus.prioritySeating = data.prioritySeating as IPrioritySeating;
-    if (data.condition)
-      updatedStatus.condition = data.condition as IBusCondition;
-    NotificationModel.lastKnownStatus.set(data.vid, updatedStatus);
+    return changedFields;
+  }
 
-    // A18: If no field changed, do not publish a notification
-    if (changedFields.length === 0) {
-      return {
-        report: savedReport,
-        notification: null,
-        commentFlagged,
-        commentFlagCategory
-      };
+  private static updateLastKnownStatus(
+    vid: string,
+    data: ISubmitReportData,
+    lastStatus: ILastKnownBusStatus
+  ): void {
+    const updatedStatus: ILastKnownBusStatus = { ...lastStatus };
+    if (data.crowdedness) {
+      updatedStatus.crowdedness = data.crowdedness as ICrowdedness;
+    }
+    if (data.prioritySeating) {
+      updatedStatus.prioritySeating = data.prioritySeating as IPrioritySeating;
+    }
+    if (data.condition) {
+      updatedStatus.condition = data.condition as IBusCondition;
     }
 
-    // R6: Construct notification message highlighting only changed fields
-    const messageParts = changedFields
+    NotificationModel.lastKnownStatus.set(vid, updatedStatus);
+  }
+
+  private static buildChangedFieldMessageParts(
+    changedFields: string[],
+    data: ISubmitReportData
+  ): string[] {
+    return changedFields
       .map((field) => {
         switch (field) {
           case 'crowdedness':
@@ -340,25 +362,97 @@ export class NotificationModel {
         }
       })
       .filter(Boolean);
+  }
 
-    // Include moderated comment if present and not flagged
+  private static buildNotificationMessage(
+    data: ISubmitReportData,
+    changedFields: string[],
+    moderatedComment?: string
+  ): string {
+    const messageParts = NotificationModel.buildChangedFieldMessageParts(
+      changedFields,
+      data
+    );
+
     if (moderatedComment) {
       messageParts.push(`Comment: "${moderatedComment}"`);
     }
 
-    const message = `Bus #${data.vid} on Route ${data.routeId} — ${messageParts.join(', ')}`;
+    return `Bus #${data.vid} on Route ${data.routeId} — ${messageParts.join(', ')}`;
+  }
 
-    const notification: INotification = {
+  private static buildNotification(
+    data: ISubmitReportData,
+    savedReport: IBusReport,
+    changedFields: string[],
+    moderatedComment?: string
+  ): INotification {
+    return {
       _id: uuidV4(),
       routeId: data.routeId,
       vid: data.vid,
-      message,
+      message: NotificationModel.buildNotificationMessage(
+        data,
+        changedFields,
+        moderatedComment
+      ),
       changedFields,
       reportId: savedReport._id!,
       createdAt: new Date().toISOString()
     };
+  }
 
-    const savedNotification = await DAC.db.saveNotification(notification);
+  // ── Bus Reports ────────────────────────────────────────────────────
+
+  /**
+   * Validate and store a bus report.
+   * Returns { report, notification?, commentFlagged }.
+   */
+  static async submitReport(
+    userId: string,
+    data: ISubmitReportData
+  ): Promise<{
+    report: IBusReport;
+    notification: INotification | null;
+    commentFlagged: boolean;
+    commentFlagCategory?: 'inappropriate' | 'irrelevant';
+  }> {
+    NotificationModel.validateReportData(data);
+    await NotificationModel.enforceProximityRule(data);
+
+    const { commentFlagged, commentFlagCategory, moderatedComment } =
+      await NotificationModel.moderateReportComment(data.comment);
+
+    const savedReport = await DAC.db.saveBusReport(
+      NotificationModel.buildBusReport(userId, data)
+    );
+
+    const lastStatus = NotificationModel.lastKnownStatus.get(data.vid) ?? {};
+    const changedFields = NotificationModel.determineChangedFields(
+      data,
+      lastStatus
+    );
+
+    NotificationModel.updateLastKnownStatus(data.vid, data, lastStatus);
+
+    // A18: If no field changed, do not publish a notification
+    if (changedFields.length === 0) {
+      return {
+        report: savedReport,
+        notification: null,
+        commentFlagged,
+        commentFlagCategory
+      };
+    }
+
+    const savedNotification = await DAC.db.saveNotification(
+      NotificationModel.buildNotification(
+        data,
+        savedReport,
+        changedFields,
+        moderatedComment
+      )
+    );
 
     return {
       report: savedReport,

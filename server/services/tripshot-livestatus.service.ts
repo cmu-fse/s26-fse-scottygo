@@ -254,63 +254,101 @@ class TripShotLiveStatusService {
     const newStops = new Map<string, IStop[]>();
 
     for (const ride of data.rides) {
-      // ── Stops — extracted from every ride, not just active ones ─────
-      // Only record the first ride's stops per route to avoid duplicates
-      // (all rides for a route share the same stop sequence).
       const normalizedRouteId = normalizeTsRouteId(ride.routeId);
 
-      if (!newStops.has(normalizedRouteId)) {
-        const stops: IStop[] = [];
-        for (const via of ride.vias) {
-          if (!isTsViaStop(via)) continue;
-          const s = via.ViaStop.stop;
-          stops.push({
-            stopId: s.stopId,
-            stopName: s.name,
-            lat: s.location.lt,
-            lon: s.location.lg,
-            routes: [], // caller fills in CMU-n route ID
-            dtradd: [],
-            dtrrem: []
-          });
-        }
-        if (stops.length > 0) {
-          newStops.set(normalizedRouteId, stops);
-        }
-      }
+      this.ensureRouteStopsIndexed(newStops, normalizedRouteId, ride);
 
       if (!this.isActive(ride)) continue;
 
       const vs = ride.vehicleId ? vsMap.get(ride.vehicleId) : null;
       if (!vs || !vs.liveDataAvailable) continue;
 
-      // ── Vehicle record ───────────────────────────────────────────────
-      const displayVid = (vs.name || '').trim() || vs.vehicleId;
-
-      const vehicle: IVehicle = {
-        vid: displayVid,
-        lat: vs.location.lt,
-        lon: vs.location.lg,
-        routeId: normalizedRouteId, // TripShot UUID; callers rewrite to CMU-n
-        heading: vs.bearing ?? 0,
-        speed: vs.speed,
-        source: 'live',
-        lastUpdate: vs.when,
-        isDetoured: false
-      };
-
-      const vehicleList = newVehicles.get(normalizedRouteId) ?? [];
-      vehicleList.push(vehicle);
-      newVehicles.set(normalizedRouteId, vehicleList);
-
-      // ── Stop predictions from Awaiting entries ───────────────────────
-      for (const ss of ride.stopStatus) {
-        if (!('Awaiting' in ss)) continue;
-        this.addPrediction(newPredictions, ss, ride, displayVid);
-      }
+      const displayVid = this.addRouteVehicle(
+        newVehicles,
+        normalizedRouteId,
+        vs,
+        ride
+      );
+      this.addRidePredictions(newPredictions, ride, displayVid);
     }
 
     return { newVehicles, newPredictions, newStops };
+  }
+
+  private ensureRouteStopsIndexed(
+    newStops: Map<string, IStop[]>,
+    normalizedRouteId: string,
+    ride: TsLiveRide
+  ): void {
+    // Only record the first ride's stops per route to avoid duplicates
+    // (all rides for a route share the same stop sequence).
+    if (newStops.has(normalizedRouteId)) {
+      return;
+    }
+
+    const stops = this.extractStopsFromRide(ride);
+    if (stops.length > 0) {
+      newStops.set(normalizedRouteId, stops);
+    }
+  }
+
+  private extractStopsFromRide(ride: TsLiveRide): IStop[] {
+    const stops: IStop[] = [];
+
+    for (const via of ride.vias) {
+      if (!isTsViaStop(via)) continue;
+
+      const s = via.ViaStop.stop;
+      stops.push({
+        stopId: s.stopId,
+        stopName: s.name,
+        lat: s.location.lt,
+        lon: s.location.lg,
+        routes: [], // caller fills in CMU-n route ID
+        dtradd: [],
+        dtrrem: []
+      });
+    }
+
+    return stops;
+  }
+
+  private addRouteVehicle(
+    newVehicles: Map<string, IVehicle[]>,
+    normalizedRouteId: string,
+    vs: TsLiveVehicleStatus,
+    ride: TsLiveRide
+  ): string {
+    const displayVid = (vs.name || '').trim() || vs.vehicleId;
+
+    const vehicle: IVehicle = {
+      vid: displayVid,
+      lat: vs.location.lt,
+      lon: vs.location.lg,
+      routeId: normalizedRouteId, // TripShot UUID; callers rewrite to CMU-n
+      heading: vs.bearing ?? 0,
+      speed: vs.speed,
+      source: 'live',
+      lastUpdate: vs.when,
+      isDetoured: false
+    };
+
+    const vehicleList = newVehicles.get(normalizedRouteId) ?? [];
+    vehicleList.push(vehicle);
+    newVehicles.set(normalizedRouteId, vehicleList);
+
+    return displayVid;
+  }
+
+  private addRidePredictions(
+    newPredictions: Map<string, IPrediction[]>,
+    ride: TsLiveRide,
+    displayVid: string
+  ): void {
+    for (const ss of ride.stopStatus) {
+      if (!('Awaiting' in ss)) continue;
+      this.addPrediction(newPredictions, ss, ride, displayVid);
+    }
   }
 
   /** True only for rides whose state object contains the "Active" key. */
