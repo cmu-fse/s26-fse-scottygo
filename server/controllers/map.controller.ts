@@ -129,22 +129,7 @@ export default class MapController extends Controller {
       };
       return res.status(200).json(successRes);
     } catch (error: unknown) {
-      if (
-        error &&
-        typeof error === 'object' &&
-        'type' in error &&
-        'name' in error
-      ) {
-        const appError = error as responses.IAppError;
-        const statusCode = appError.type === 'ClientError' ? 400 : 500;
-        return res.status(statusCode).json(appError);
-      }
-      const unexpectedError: responses.IAppError = {
-        type: 'ServerError',
-        name: 'MongoDBError',
-        message: 'An unexpected error occurred in the database'
-      };
-      return res.status(500).json(unexpectedError);
+      return this.handleAppError(res, error, 'An unexpected error occurred in the database');
     }
   }
 
@@ -157,16 +142,8 @@ export default class MapController extends Controller {
    * Applies stop word filtering (R2).
    */
   public async searchRoutes(req: Request, res: Response): Promise<void> {
-    const q = (req.query.q as string | undefined)?.trim();
-    if (!q) {
-      const error: responses.IAppError = {
-        type: 'ClientError',
-        name: 'MissingSearchQuery',
-        message: 'Query parameter "q" is required'
-      };
-      res.status(400).json(error);
-      return;
-    }
+    const q = this.requireSearchQuery(req, res);
+    if (!q) return;
 
     try {
       const context = new SearchContext<IRoute[]>(new RouteSearchStrategy());
@@ -180,12 +157,7 @@ export default class MapController extends Controller {
       };
       res.status(200).json(success);
     } catch (error: unknown) {
-      const err: responses.IAppError = {
-        type: 'ServerError',
-        name: 'GetRequestFailure',
-        message: 'Unexpected error during route search'
-      };
-      res.status(500).json(err);
+      this.handleAppError(res, error, 'Unexpected error during route search');
     }
   }
 
@@ -196,16 +168,8 @@ export default class MapController extends Controller {
    * Applies stop word filtering (R2).
    */
   public async searchTransit(req: Request, res: Response): Promise<void> {
-    const q = (req.query.q as string | undefined)?.trim();
-    if (!q) {
-      const error: responses.IAppError = {
-        type: 'ClientError',
-        name: 'MissingSearchQuery',
-        message: 'Query parameter "q" is required'
-      };
-      res.status(400).json(error);
-      return;
-    }
+    const q = this.requireSearchQuery(req, res);
+    if (!q) return;
 
     try {
       const context = new SearchContext<ITransitSearchResult>(
@@ -223,13 +187,22 @@ export default class MapController extends Controller {
       };
       res.status(200).json(success);
     } catch (error: unknown) {
-      const err: responses.IAppError = {
-        type: 'ServerError',
-        name: 'GetRequestFailure',
-        message: 'Unexpected error during transit search'
-      };
-      res.status(500).json(err);
+      this.handleAppError(res, error, 'Unexpected error during transit search');
     }
+  }
+
+  private requireSearchQuery(req: Request, res: Response): string | null {
+    const q = (req.query.q as string | undefined)?.trim();
+    if (!q) {
+      const error: responses.IAppError = {
+        type: 'ClientError',
+        name: 'MissingSearchQuery',
+        message: 'Query parameter "q" is required'
+      };
+      res.status(400).json(error);
+      return null;
+    }
+    return q;
   }
 
   // Return Google Maps config to the client (API key, default center, zoom)

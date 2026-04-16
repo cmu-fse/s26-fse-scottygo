@@ -51,7 +51,7 @@ class App {
   private isShuttingDown = false;
 
   /** Resolves once the background init chain (DB, GTFS, caches, pollers) completes. */
-  public initComplete: Promise<void>;
+  public initComplete!: Promise<void>;
 
   constructor(
     controllers: Controller[],

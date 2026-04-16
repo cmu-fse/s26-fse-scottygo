@@ -1,6 +1,5 @@
-import axios, { AxiosResponse } from 'axios';
-import type { IUser, IUserAccount } from '../../common/user.interface';
-import type { IResponse } from '../../common/server.responses';
+import axios from 'axios';
+import { authService } from './services/auth.service';
 import type { IMapProvider, IConfig } from '../../common/map.interface';
 import type { IStop, IPrediction } from '../../common/transit.interface';
 import { GoogleMapProvider } from './maps/google-map.provider';
@@ -97,147 +96,6 @@ const directionsController = DirectionsController.getInstance();
 const routeRenderer = RouteRenderer.getInstance();
 const vehicleTracker = VehicleTracker.getInstance();
 
-// Check whether user is logged in
-async function isLoggedIn(): Promise<boolean> {
-  const token = localStorage.getItem('token'); // Get fresh token from localStorage
-  if (!token) {
-    return false;
-  }
-  const username = localStorage.getItem('username') as string;
-  if (!username) {
-    return false;
-  }
-  const userInDB = await getUser(username);
-  if (!userInDB) {
-    return false;
-  }
-  return true;
-}
-
-// Get User information from server using username
-async function getUser(username: string): Promise<IUser | null> {
-  try {
-    const token = localStorage.getItem('token'); // Get fresh token from localStorage
-    const res: AxiosResponse = await axios.request({
-      method: 'get',
-      headers: { Authorization: `Bearer ${token}` },
-      url: '/users/' + username,
-      validateStatus: () => true
-    });
-    // Now handle response
-    const response: IResponse = res.data;
-
-    // Get request successful - ISuccess response with IUser as payload
-    // SuccessName = 'UserFound'
-    if (res.status === 200 && response.name === 'UserFound') {
-      console.log(response.message);
-      const user: IUser = response.payload as IUser;
-      return user;
-    } else if (
-      res.status === 400 &&
-      'type' in response &&
-      response.type === 'ClientError'
-    ) {
-      // If User not found
-      // ClientErrorName = 'UserNotFound'
-      if (response.name === 'UserNotFound') {
-        showModal('User Not Found', 'User does not exist: ' + response.message);
-        return null;
-      } else {
-        showModal('Error', response.message);
-        return null;
-      }
-    } else if (
-      res.status === 401 &&
-      'type' in response &&
-      response.type === 'ClientError'
-    ) {
-      // If token invalid or user unauthorized
-      // ClientErrorName could be 'MissingToken', 'InvalidToken', or 'UserNotFound'
-      console.error('Unauthorized: ' + response.message);
-      // User's token invalid or they were deleted - remove token and username
-      // from localStorage and redirect to auth
-      localStorage.removeItem('token'); // Remove unneeded token
-      localStorage.removeItem('username'); // Remove username
-      window.location.replace('/auth');
-      return null;
-    } else if (
-      res.status === 500 &&
-      'type' in response &&
-      response.type === 'ServerError'
-    ) {
-      // If MongoDB error, pass error message to User
-      if (response.name === 'MongoDBError') {
-        showModal('Database Error', response.message);
-        return null;
-      }
-      // Handle any other server errors
-      else {
-        showModal('Server Error', response.message);
-        return null;
-      }
-    } else {
-      console.error('Client failed to send message to server');
-      return null;
-    }
-  } catch (error) {
-    console.error('Error: ', error);
-    return null;
-  }
-}
-
-// Get current user account information for role-based UI behavior.
-async function getCurrentUserAccount(
-  username: string
-): Promise<IUserAccount | null> {
-  try {
-    const token = localStorage.getItem('token');
-    const res: AxiosResponse = await axios.request({
-      method: 'get',
-      headers: { Authorization: `Bearer ${token}` },
-      url: `/account/users/${encodeURIComponent(username)}`,
-      validateStatus: () => true
-    });
-
-    const response: IResponse = res.data;
-    if (res.status === 200 && response.name === 'AccountRetrieved') {
-      return response.payload as IUserAccount;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-// ─── Subscription helpers ──────────────────────────────────────────────────────
-// Subscriptions are authoritative on the server. We keep a local Set as a fast
-// cache so the bell icon renders synchronously; it is synced from the API on load.
-
-const subscribedRoutes = new Set<string>();
-
-function isRouteSubscribed(routeId: string): boolean {
-  return subscribedRoutes.has(routeId);
-}
-
-async function syncSubscriptionsFromServer(): Promise<void> {
-  const token = localStorage.getItem('token');
-  if (!token) return;
-  try {
-    const res = await axios.get('/notifications/subscriptions', {
-      headers: { Authorization: `Bearer ${token}` },
-      validateStatus: () => true
-    });
-    if (res.status === 200 && res.data.name === 'SubscriptionsRetrieved') {
-      subscribedRoutes.clear();
-      (res.data.payload as { routeId: string }[]).forEach((s) =>
-        subscribedRoutes.add(s.routeId)
-      );
-    }
-  } catch {
-    // Best-effort — bell state may be stale until next load
-  }
-}
-
 function showSubscriptionToast(message: string): void {
   showToast(message);
 }
@@ -292,14 +150,16 @@ async function getMapConfig(): Promise<IConfig | null> {
 // Document-ready event handler
 document.addEventListener('DOMContentLoaded', async function (e: Event) {
   e.preventDefault();
-  const loggedIn: boolean = await isLoggedIn(); // Check if user logged in
+  const loggedIn: boolean = await authService.isLoggedIn(); // Check if user logged in
   if (!loggedIn) {
     window.location.replace('/auth'); // Redirect to auth page
     return;
   }
 
   const username = localStorage.getItem('username');
-  const userAccount = username ? await getCurrentUserAccount(username) : null;
+  const userAccount = username
+    ? await authService.getCurrentUserAccount(username)
+    : null;
   const isAdminUser = userAccount?.privilegeLevel === 'Administrator';
 
   // Initialize map via provider abstraction
@@ -392,7 +252,7 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
     await filterController.initialize();
 
     // Sync subscription state from server so bell icons are accurate
-    await syncSubscriptionsFromServer();
+    await authService.syncSubscriptionsFromServer();
 
     // Setup event listeners for filter panels
     setupMapEventListeners();
@@ -406,7 +266,7 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
       if (state.selectedRouteId) {
         bell.showBell(
           state.selectedRouteId,
-          isRouteSubscribed(state.selectedRouteId)
+          authService.isRouteSubscribed(state.selectedRouteId)
         );
       } else {
         bell.hideBell();
@@ -737,7 +597,7 @@ const registerSubscriptionEvents = (): void => {
         }
       );
       if (res.status === 201 && res.data.name === 'RouteSubscribed') {
-        subscribedRoutes.add(routeId);
+        authService.addSubscription(routeId);
         document.dispatchEvent(
           new CustomEvent('notifRouteJoin', { detail: { routeId } })
         );
@@ -754,7 +614,7 @@ const registerSubscriptionEvents = (): void => {
         res.status === 409 &&
         res.data.name === 'DuplicateSubscription'
       ) {
-        subscribedRoutes.add(routeId);
+        authService.addSubscription(routeId);
         document.dispatchEvent(
           new CustomEvent('notifRouteJoin', { detail: { routeId } })
         );
@@ -780,7 +640,7 @@ const registerSubscriptionEvents = (): void => {
         }
       );
       if (res.status === 200 || res.status === 404) {
-        subscribedRoutes.delete(routeId);
+        authService.removeSubscription(routeId);
         document.dispatchEvent(
           new CustomEvent('notifRouteLeave', { detail: { routeId } })
         );
@@ -1018,16 +878,7 @@ function requestUserLocation(): void {
           'Location access denied. Centering on CMU Campus by default. Bus report submission is disabled without GPS access.'
         );
         // Center on CMU campus and show nearby stops
-        mapProvider.setCenter(CMU_CAMPUS_DEFAULT);
-        mapProvider.setZoom(15);
-        addPlannedLocationMarker(
-          CMU_CAMPUS_DEFAULT.lat,
-          CMU_CAMPUS_DEFAULT.lng,
-          'CMU Campus'
-        );
-        filterController.setUserLocation(CMU_CAMPUS_DEFAULT);
-        filterController.showNearbyStops(CMU_CAMPUS_DEFAULT);
-        directionsController.updatePlannedLocation(CMU_CAMPUS_DEFAULT);
+        centerOnCmuCampus();
       },
       {
         enableHighAccuracy: true,
@@ -1042,17 +893,17 @@ function requestUserLocation(): void {
       'Geolocation Unavailable',
       'Geolocation is not supported by your browser. Centering on CMU Campus.'
     );
-    mapProvider.setCenter(CMU_CAMPUS_DEFAULT);
-    mapProvider.setZoom(15);
-    addPlannedLocationMarker(
-      CMU_CAMPUS_DEFAULT.lat,
-      CMU_CAMPUS_DEFAULT.lng,
-      'CMU Campus'
-    );
-    filterController.setUserLocation(CMU_CAMPUS_DEFAULT);
-    filterController.showNearbyStops(CMU_CAMPUS_DEFAULT);
-    directionsController.updatePlannedLocation(CMU_CAMPUS_DEFAULT);
+    centerOnCmuCampus();
   }
+}
+
+function centerOnCmuCampus(): void {
+  mapProvider.setCenter(CMU_CAMPUS_DEFAULT);
+  mapProvider.setZoom(15);
+  addPlannedLocationMarker(CMU_CAMPUS_DEFAULT.lat, CMU_CAMPUS_DEFAULT.lng, 'CMU Campus');
+  filterController.setUserLocation(CMU_CAMPUS_DEFAULT);
+  filterController.showNearbyStops(CMU_CAMPUS_DEFAULT);
+  directionsController.updatePlannedLocation(CMU_CAMPUS_DEFAULT);
 }
 
 // Add a blue dot marker on the map for user location

@@ -6,8 +6,16 @@
 import type { IRoute, IVehicle } from '../../../common/transit.interface';
 import type { ILatLng } from '../../../common/map.interface';
 
+export interface ISelectedTime {
+  hour: number;
+  minute: number;
+  period: 'AM' | 'PM';
+}
+
 export interface IMapState {
   selectedRouteId: string | null; // Route filter (Rule R1 - single route)
+  selectedDate: Date | null; // Date filter for schedule-based queries
+  selectedTime: ISelectedTime | null; // Time filter for schedule-based queries
   selectedSystems: {
     // System filter (Rule R2 - PRT default ON)
     prt: boolean;
@@ -40,22 +48,24 @@ export class MapStateManager {
 
     // Initialize with default state (Rule R2: PRT ON, CMU OFF)
     this.state = {
-      selectedRouteId: null,
-      selectedSystems: {
-        prt: true,
-        cmu: false
-      },
-      selectedDirections: {
-        inbound: true,
-        outbound: true
-      },
+      ...this.defaultFilterValues(),
       availableRoutes: [],
-      filteredRoutes: [],
-      activeVehicles: [],
       currentLocation: null,
       plannedLocation: saved?.location ?? null,
       plannedLocationLabel: saved?.label ?? null,
       gpsPermissionGranted: false
+    };
+  }
+
+  private defaultFilterValues() {
+    return {
+      selectedRouteId: null,
+      selectedDate: null,
+      selectedTime: null,
+      selectedSystems: { prt: true, cmu: false },
+      selectedDirections: { inbound: true, outbound: true },
+      filteredRoutes: [],
+      activeVehicles: []
     };
   }
 
@@ -137,18 +147,8 @@ export class MapStateManager {
    */
   resetFilters(): void {
     this.state = {
-      selectedRouteId: null,
-      selectedSystems: {
-        prt: true,
-        cmu: false
-      },
-      selectedDirections: {
-        inbound: true,
-        outbound: true
-      },
+      ...this.defaultFilterValues(),
       availableRoutes: this.state.availableRoutes, // Keep available routes
-      filteredRoutes: [],
-      activeVehicles: [],
       currentLocation: this.state.currentLocation, // Preserve location state
       plannedLocation: this.state.plannedLocation,
       plannedLocationLabel: this.state.plannedLocationLabel,
