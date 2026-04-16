@@ -26,7 +26,12 @@ import type { IVehicle } from '../../../common/transit.interface';
 import { MapStateManager } from '../state/map-state';
 import { createBusIcon } from '../utils/bus-icon';
 import { transitApiService } from '../services/transit-api.service';
-import { MAP_POPUP_ID, closeMapPopup, dismissPopup, minimizePopup } from '../utils/map-popup';
+import {
+  MAP_POPUP_ID,
+  closeMapPopup,
+  dismissPopup,
+  minimizePopup
+} from '../utils/map-popup';
 import { getRouteTitle } from '../utils/route-display';
 import { showToast } from '../utils/toast';
 
@@ -212,7 +217,10 @@ export class VehicleTracker {
       timeParam = this.formatTimeForAPI(state.selectedDate, state.selectedTime);
     }
 
-    const result = await transitApiService.getVehicles(this.currentRouteId, timeParam);
+    const result = await transitApiService.getVehicles(
+      this.currentRouteId,
+      timeParam
+    );
     if (result === null) return;
 
     // Check if data is from static cache (A2: PRT API Down)
@@ -256,10 +264,20 @@ export class VehicleTracker {
         const marker = this.vehicleMarkers.get(vehicle.vid)!;
         marker.animatePosition({ lat: vehicle.lat, lng: vehicle.lon }, 5000);
         // Update icon in case heading changed
-        marker.setIcon(createBusIcon(vehicle, this.currentZoom, this.routeColorMap.get(vehicle.routeId) || this.currentRouteColor));
+        marker.setIcon(
+          createBusIcon(
+            vehicle,
+            this.currentZoom,
+            this.routeColorMap.get(vehicle.routeId) || this.currentRouteColor
+          )
+        );
       } else {
         // Create new marker
-        const busIcon = createBusIcon(vehicle, this.currentZoom, this.routeColorMap.get(vehicle.routeId) || this.currentRouteColor);
+        const busIcon = createBusIcon(
+          vehicle,
+          this.currentZoom,
+          this.routeColorMap.get(vehicle.routeId) || this.currentRouteColor
+        );
         const marker = this.mapProvider!.addMarker({
           position: { lat: vehicle.lat, lng: vehicle.lon },
           title: `Bus ${vehicle.vid}${vehicle.isDetoured ? ' (Detoured)' : ''}`,
@@ -330,7 +348,13 @@ export class VehicleTracker {
     this.vehicleMarkers.forEach((marker, vid) => {
       const vehicle = this.vehicleData.get(vid);
       if (vehicle) {
-        marker.setIcon(createBusIcon(vehicle, this.currentZoom, this.routeColorMap.get(vehicle.routeId) || this.currentRouteColor));
+        marker.setIcon(
+          createBusIcon(
+            vehicle,
+            this.currentZoom,
+            this.routeColorMap.get(vehicle.routeId) || this.currentRouteColor
+          )
+        );
       }
     });
   }
@@ -478,73 +502,7 @@ export class VehicleTracker {
       container.appendChild(popup);
     }
 
-    // Minimize button — collapse to docked tab
-    const minimizeBtn = popup.querySelector('.map-popup__minimize');
-    if (minimizeBtn) {
-      minimizeBtn.addEventListener('click', () => {
-        this.stopPopupUpdatedTicker();
-        const selectedId = this.stateManager.getState().selectedRouteId;
-        const routeColor = selectedId
-          ? this.routeColorMap.get(selectedId)
-          : undefined;
-        minimizePopup(
-          `Bus ${vehicle.vid}`,
-          () => this.rebindVehiclePopupEvents(vid),
-          undefined,
-          routeColor
-        );
-      });
-    }
-
-    // Report button — proximity check using cached location (R9, R10, A16, A17)
-    const reportBtn = popup.querySelector(
-      '.map-popup__action-btn--report'
-    ) as HTMLButtonElement | null;
-    if (reportBtn) {
-      reportBtn.addEventListener('click', () => {
-        if (!this.userLocation) {
-          this.showToast(
-            'Location access is required to submit a bus report. Please enable location services.'
-          );
-          return;
-        }
-
-        const userLat = this.userLocation.lat;
-        const userLon = this.userLocation.lng;
-        const latestVehicle = this.vehicleData.get(vid) ?? vehicle;
-        if (!this.isAdminProximityBypass) {
-          const dist = haversineDistanceMiles(
-            userLat,
-            userLon,
-            latestVehicle.lat,
-            latestVehicle.lon
-          );
-          if (dist > 0.5) {
-            this.showToast('You need to be near this bus to submit a report.');
-            return;
-          }
-        }
-        document.dispatchEvent(
-          new CustomEvent('busReport', {
-            detail: {
-              vid: latestVehicle.vid,
-              routeId: latestVehicle.routeId,
-              routeLabel: this.getRouteSubheaderText(latestVehicle.routeId),
-              lat: userLat,
-              lon: userLon
-            }
-          })
-        );
-      });
-    }
-
-    // Check button — navigate to notifications page pre-filtered by bus (A3)
-    const checkBtn = popup.querySelector('.map-popup__action-btn--check');
-    if (checkBtn) {
-      checkBtn.addEventListener('click', () => {
-        window.location.href = `/notifications?bus=${encodeURIComponent(vehicle.vid)}`;
-      });
-    }
+    this.bindVehiclePopupActionButtons(popup, vid, vehicle);
 
     this.startPopupUpdatedTicker();
     this.refreshOpenPopupUpdatedTime();
@@ -634,6 +592,92 @@ export class VehicleTracker {
       : `${Math.round(secsAgo / 60)}m ago`;
   }
 
+  private getSelectedRouteColor(): string | undefined {
+    const selectedId = this.stateManager.getState().selectedRouteId;
+    return selectedId ? this.routeColorMap.get(selectedId) : undefined;
+  }
+
+  private handlePopupMinimize(vid: string, vehicle: IVehicle): void {
+    this.stopPopupUpdatedTicker();
+    minimizePopup(
+      `Bus ${vehicle.vid}`,
+      () => this.rebindVehiclePopupEvents(vid),
+      undefined,
+      this.getSelectedRouteColor()
+    );
+  }
+
+  private handlePopupReport(vid: string, fallbackVehicle: IVehicle): void {
+    if (!this.userLocation) {
+      this.showToast(
+        'Location access is required to submit a bus report. Please enable location services.'
+      );
+      return;
+    }
+
+    const userLat = this.userLocation.lat;
+    const userLon = this.userLocation.lng;
+    const latestVehicle = this.vehicleData.get(vid) ?? fallbackVehicle;
+
+    if (!this.isAdminProximityBypass) {
+      const dist = haversineDistanceMiles(
+        userLat,
+        userLon,
+        latestVehicle.lat,
+        latestVehicle.lon
+      );
+      if (dist > 0.5) {
+        this.showToast('You need to be near this bus to submit a report.');
+        return;
+      }
+    }
+
+    document.dispatchEvent(
+      new CustomEvent('busReport', {
+        detail: {
+          vid: latestVehicle.vid,
+          routeId: latestVehicle.routeId,
+          routeLabel: this.getRouteSubheaderText(latestVehicle.routeId),
+          lat: userLat,
+          lon: userLon
+        }
+      })
+    );
+  }
+
+  private handlePopupCheck(vehicle: IVehicle): void {
+    window.location.href = `/notifications?bus=${encodeURIComponent(vehicle.vid)}`;
+  }
+
+  private bindVehiclePopupActionButtons(
+    popup: HTMLElement,
+    vid: string,
+    vehicle: IVehicle
+  ): void {
+    const minimizeBtn = popup.querySelector('.map-popup__minimize');
+    if (minimizeBtn) {
+      minimizeBtn.addEventListener('click', () => {
+        this.handlePopupMinimize(vid, vehicle);
+      });
+    }
+
+    const reportBtn = popup.querySelector(
+      '.map-popup__action-btn--report'
+    ) as HTMLButtonElement | null;
+    if (reportBtn) {
+      reportBtn.addEventListener('click', () => {
+        this.handlePopupReport(vid, vehicle);
+      });
+    }
+
+    const checkBtn = popup.querySelector('.map-popup__action-btn--check');
+    if (checkBtn) {
+      checkBtn.addEventListener('click', () => {
+        this.handlePopupCheck(vehicle);
+      });
+    }
+  }
+
   private startPopupUpdatedTicker(): void {
     this.stopPopupUpdatedTicker();
     this.popupUpdatedInterval = window.setInterval(() => {
@@ -679,53 +723,7 @@ export class VehicleTracker {
     const vehicle = this.vehicleData.get(vid);
     if (!vehicle) return;
 
-    // Minimize button
-    const minimizeBtn = popup.querySelector('.map-popup__minimize');
-    if (minimizeBtn) {
-      minimizeBtn.addEventListener('click', () => {
-        this.stopPopupUpdatedTicker();
-        const selectedId = this.stateManager.getState().selectedRouteId;
-        const routeColor = selectedId
-          ? this.routeColorMap.get(selectedId)
-          : undefined;
-        minimizePopup(
-          `Bus ${vehicle.vid}`,
-          () => this.rebindVehiclePopupEvents(vid),
-          undefined,
-          routeColor
-        );
-      });
-    }
-
-    // Report button
-    const reportBtn = popup.querySelector('.map-popup__action-btn--report') as HTMLButtonElement | null;
-    if (reportBtn) {
-      reportBtn.addEventListener('click', () => {
-        if (!this.userLocation) {
-          this.showToast('Location access is required to submit a bus report. Please enable location services.');
-          return;
-        }
-        const latestVehicle = this.vehicleData.get(vid) ?? vehicle;
-        if (!this.isAdminProximityBypass) {
-          const dist = haversineDistanceMiles(this.userLocation.lat, this.userLocation.lng, latestVehicle.lat, latestVehicle.lon);
-          if (dist > 0.5) {
-            this.showToast('You need to be near this bus to submit a report.');
-            return;
-          }
-        }
-        document.dispatchEvent(new CustomEvent('busReport', {
-          detail: { vid: latestVehicle.vid, routeId: latestVehicle.routeId, routeLabel: this.getRouteSubheaderText(latestVehicle.routeId), lat: this.userLocation.lat, lon: this.userLocation.lng }
-        }));
-      });
-    }
-
-    // Check button
-    const checkBtn = popup.querySelector('.map-popup__action-btn--check');
-    if (checkBtn) {
-      checkBtn.addEventListener('click', () => {
-        window.location.href = `/notifications?bus=${encodeURIComponent(vehicle.vid)}`;
-      });
-    }
+    this.bindVehiclePopupActionButtons(popup, vid, vehicle);
 
     // Restart updated ticker
     this.startPopupUpdatedTicker();

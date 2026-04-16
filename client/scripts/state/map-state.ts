@@ -6,8 +6,16 @@
 import type { IRoute, IVehicle } from '../../../common/transit.interface';
 import type { ILatLng } from '../../../common/map.interface';
 
+export interface ISelectedTime {
+  hour: number;
+  minute: number;
+  period: 'AM' | 'PM';
+}
+
 export interface IMapState {
   selectedRouteId: string | null; // Route filter (Rule R1 - single route)
+  selectedDate: Date | null; // Date filter for schedule-based queries
+  selectedTime: ISelectedTime | null; // Time filter for schedule-based queries
   selectedSystems: {
     // System filter (Rule R2 - PRT default ON)
     prt: boolean;
@@ -41,6 +49,8 @@ export class MapStateManager {
     // Initialize with default state (Rule R2: PRT ON, CMU OFF)
     this.state = {
       selectedRouteId: null,
+      selectedDate: null,
+      selectedTime: null,
       selectedSystems: {
         prt: true,
         cmu: false
@@ -138,6 +148,8 @@ export class MapStateManager {
   resetFilters(): void {
     this.state = {
       selectedRouteId: null,
+      selectedDate: null,
+      selectedTime: null,
       selectedSystems: {
         prt: true,
         cmu: false
@@ -205,8 +217,10 @@ export class MapStateManager {
    * Whether the user has set a custom planned location (not just GPS default)
    */
   hasCustomPlannedLocation(): boolean {
-    return this.state.plannedLocationLabel !== null
-      && this.state.plannedLocationLabel !== 'Current Location';
+    return (
+      this.state.plannedLocationLabel !== null &&
+      this.state.plannedLocationLabel !== 'Current Location'
+    );
   }
 
   /**
@@ -278,8 +292,16 @@ export class MapStateManager {
     try {
       const raw = localStorage.getItem(MapStateManager.PLANNED_LOCATION_KEY);
       if (!raw) return null;
-      const data = JSON.parse(raw) as { lat: number; lng: number; label: string };
-      if (typeof data.lat !== 'number' || typeof data.lng !== 'number' || typeof data.label !== 'string') {
+      const data = JSON.parse(raw) as {
+        lat: number;
+        lng: number;
+        label: string;
+      };
+      if (
+        typeof data.lat !== 'number' ||
+        typeof data.lng !== 'number' ||
+        typeof data.label !== 'string'
+      ) {
         return null;
       }
       return { location: { lat: data.lat, lng: data.lng }, label: data.label };
