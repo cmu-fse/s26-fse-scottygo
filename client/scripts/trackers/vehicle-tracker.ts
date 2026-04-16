@@ -21,10 +21,11 @@ function haversineDistanceMiles(
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-import axios from 'axios';
 import type { IMapProvider, IMapMarker } from '../../../common/map.interface';
 import type { IVehicle } from '../../../common/transit.interface';
 import { MapStateManager } from '../state/map-state';
+import { createBusIcon } from '../utils/bus-icon';
+import { transitApiService } from '../services/transit-api.service';
 import { MAP_POPUP_ID, closeMapPopup, dismissPopup, minimizePopup } from '../utils/map-popup';
 import { getRouteTitle } from '../utils/route-display';
 import { showToast } from '../utils/toast';
@@ -189,9 +190,7 @@ export class VehicleTracker {
 
     const allVehicles: IVehicle[] = [];
     for (const routeId of this.multiRouteIds) {
-      const result = await this.fetchVehicleData(
-        `/transit/vehicles/${routeId}`
-      );
+      const result = await transitApiService.getVehicles(routeId);
       if (result !== null) {
         allVehicles.push(...result.vehicles);
       }
@@ -206,18 +205,14 @@ export class VehicleTracker {
     if (!this.currentRouteId || !this.mapProvider) return;
 
     const state = this.stateManager.getState();
-    let url = `/transit/vehicles/${this.currentRouteId}`;
+    let timeParam: string | undefined;
 
     // Add time parameter if time filter is applied (Rule R3)
     if (state.selectedTime && state.selectedDate) {
-      const timeString = this.formatTimeForAPI(
-        state.selectedDate,
-        state.selectedTime
-      );
-      url += `?tm=${encodeURIComponent(timeString)}`;
+      timeParam = this.formatTimeForAPI(state.selectedDate, state.selectedTime);
     }
 
-    const result = await this.fetchVehicleData(url);
+    const result = await transitApiService.getVehicles(this.currentRouteId, timeParam);
     if (result === null) return;
 
     // Check if data is from static cache (A2: PRT API Down)
@@ -243,34 +238,6 @@ export class VehicleTracker {
   }
 
   /**
-   * Fetch vehicle data for a single route URL.
-   * Handles auth, response validation, and error logging in one place.
-   * Returns null on any failure so callers can skip rendering cleanly.
-   */
-  private async fetchVehicleData(
-    url: string
-  ): Promise<{ vehicles: IVehicle[]; source?: string } | null> {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(url, {
-        headers: { Authorization: `Bearer ${token}` },
-        validateStatus: () => true
-      });
-      if (response.status === 200 && response.data.name === 'VehiclesLocated') {
-        return {
-          vehicles: response.data.payload || [],
-          source: response.data.source
-        };
-      }
-      console.error('Failed to fetch vehicles:', response.data);
-      return null;
-    } catch (error) {
-      console.error('Error fetching vehicle positions:', error);
-      return null;
-    }
-  }
-
-  /**
    * Render vehicle markers on map
    */
   private renderVehicles(vehicles: IVehicle[]): void {
@@ -289,10 +256,10 @@ export class VehicleTracker {
         const marker = this.vehicleMarkers.get(vehicle.vid)!;
         marker.animatePosition({ lat: vehicle.lat, lng: vehicle.lon }, 5000);
         // Update icon in case heading changed
-        marker.setIcon(this.createBusIcon(vehicle));
+        marker.setIcon(createBusIcon(vehicle, this.currentZoom, this.routeColorMap.get(vehicle.routeId) || this.currentRouteColor));
       } else {
         // Create new marker
-        const busIcon = this.createBusIcon(vehicle);
+        const busIcon = createBusIcon(vehicle, this.currentZoom, this.routeColorMap.get(vehicle.routeId) || this.currentRouteColor);
         const marker = this.mapProvider!.addMarker({
           position: { lat: vehicle.lat, lng: vehicle.lon },
           title: `Bus ${vehicle.vid}${vehicle.isDetoured ? ' (Detoured)' : ''}`,
@@ -363,80 +330,9 @@ export class VehicleTracker {
     this.vehicleMarkers.forEach((marker, vid) => {
       const vehicle = this.vehicleData.get(vid);
       if (vehicle) {
-        marker.setIcon(this.createBusIcon(vehicle));
+        marker.setIcon(createBusIcon(vehicle, this.currentZoom, this.routeColorMap.get(vehicle.routeId) || this.currentRouteColor));
       }
     });
-  }
-
-  /**
-   * Create a bus icon tinted with the route color.
-   *
-   * Design notes:
-   * - The bus is drawn as a side-view facing RIGHT (+x = East) at origin.
-   * - For eastward headings (0–179°) the group is simply rotated.
-   * - For westward headings (180–359°) the bus is mirrored horizontally
-   *   (scale -1 on x) and then rotated by a corrected angle so the front
-   *   still faces the direction of travel without the icon appearing
-   *   upside-down (which a plain 180° rotation would cause).
-   * - The 40×40 viewBox gives enough clearance at every rotation angle so
-   *   no part of the icon is clipped by the bounding box.
-   */
-  private createBusIcon(vehicle: IVehicle): {
-    url: string;
-    anchor: { x: number; y: number };
-    size: { width: number; height: number };
-  } {
-    // Detoured buses keep an amber override so they stand out on the map.
-    const color = vehicle.isDetoured
-      ? '#FFA500'
-      : this.routeColorMap.get(vehicle.routeId) || this.currentRouteColor;
-    const scale = Math.max(
-      0.5,
-      Math.min(2.5, (this.currentZoom - 10) * 0.3 + 1)
-    );
-
-    // Normalise heading to [0, 360).
-    const heading = (((vehicle.heading ?? 0) % 360) + 360) % 360;
-
-    // Westward headings (180-359°): mirror the bus so the front stays
-    // visually "correct" (windows above chassis, headlight at nose).
-    // Eastward headings (0-179°): standard rotation only.
-    const flip = heading >= 180;
-
-    // Rotation angle that makes the bus front point toward `heading`.
-    // Without flip: front is +x; rotate(heading-90) maps +x -> compass heading.
-    // With flip: after scale(-1,1), effective front is -x;
-    // rotate(-(heading+90)) maps -x -> compass heading.
-    const rotDeg = flip ? -(heading + 90) : heading - 90;
-
-    const vbSize = 40;
-    const cx = vbSize / 2;
-    const cy = vbSize / 2;
-    const sz = Math.round(vbSize * scale);
-
-    const groupTransform = flip
-      ? `translate(${cx},${cy}) scale(-1,1) rotate(${rotDeg})`
-      : `translate(${cx},${cy}) rotate(${rotDeg})`;
-
-    const svg =
-      `<svg xmlns="http://www.w3.org/2000/svg" width="${sz}" height="${sz}" viewBox="0 0 ${vbSize} ${vbSize}">` +
-      `<g transform="${groupTransform}">` +
-      `<rect x="-12" y="-5" width="24" height="10" rx="2" fill="${color}" stroke="rgba(0,0,0,0.35)" stroke-width="0.6"/>` +
-      `<rect x="9" y="-5" width="3" height="10" fill="rgba(0,0,0,0.18)"/>` +
-      `<rect x="4.5" y="-3.5" width="5" height="7" rx="1" fill="rgba(210,235,255,0.9)" stroke="rgba(0,0,0,0.25)" stroke-width="0.4"/>` +
-      `<rect x="-1.5" y="-3.5" width="3.5" height="5" rx="0.5" fill="rgba(210,235,255,0.75)" stroke="rgba(0,0,0,0.2)" stroke-width="0.3"/>` +
-      `<rect x="-7" y="-3.5" width="3.5" height="5" rx="0.5" fill="rgba(210,235,255,0.75)" stroke="rgba(0,0,0,0.2)" stroke-width="0.3"/>` +
-      `<circle cx="12" cy="0" r="1.3" fill="rgba(255,255,200,0.95)"/>` +
-      `<rect x="5" y="4.5" width="4.5" height="2.5" rx="0.8" fill="rgba(30,30,30,0.85)"/>` +
-      `<rect x="-9.5" y="4.5" width="4.5" height="2.5" rx="0.8" fill="rgba(30,30,30,0.85)"/>` +
-      `</g>` +
-      `</svg>`;
-
-    return {
-      url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
-      anchor: { x: Math.round(cx * scale), y: Math.round(cy * scale) },
-      size: { width: sz, height: sz }
-    };
   }
 
   /**

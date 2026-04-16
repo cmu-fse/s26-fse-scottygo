@@ -2,6 +2,7 @@ import express from 'express';
 import { AddressInfo } from 'net';
 import { Server as HttpServer } from 'http';
 import BusController from '../../../server/controllers/transit.controller';
+import HealthController from '../../../server/controllers/health.controller';
 import DAC from '../../../server/db/dac';
 
 describe('REST smoke: memory monitoring endpoints', () => {
@@ -48,7 +49,9 @@ describe('REST smoke: memory monitoring endpoints', () => {
     } as never;
 
     const transit = BusController.getInstance('/transit');
+    const health = HealthController.getInstance('/transit');
     app.use('/transit', transit.router);
+    app.use('/transit', health.router);
 
     await new Promise<void>((resolve) => {
       server = app.listen(0, resolve);

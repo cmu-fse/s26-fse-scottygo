@@ -4,14 +4,13 @@
  * Implements the progressive filtering strategy
  */
 
-import axios, { AxiosResponse } from 'axios';
+import { transitApiService } from '../services/transit-api.service';
 import type {
   IRoute,
   IStop,
   IPattern,
   IBulkTransitData,
   IDetour,
-  IPrediction,
   INearbyStop,
   INearbyStopsPayload,
   IRouteSchedule
@@ -22,6 +21,7 @@ import { RouteRenderer, type RouteData } from '../renderers/route-renderer';
 import { MAP_POPUP_ID, dismissPopup, minimizePopup } from '../utils/map-popup';
 import { VehicleTracker } from '../trackers/vehicle-tracker';
 import { DirectionsController } from './directions-controller';
+import { PredictionController } from './prediction-controller';
 import { URLSyncManager } from '../state/url-sync';
 import type { IRouteOption } from '../components/route-selector';
 import {
@@ -44,7 +44,6 @@ export class FilterController {
   private routeRenderer: RouteRenderer;
   private vehicleTracker: VehicleTracker;
   private urlSync: URLSyncManager;
-  private token: string | null = null;
   private routeSelectorUpdateCallback:
     | ((routes: IRouteOption[]) => void)
     | null = null;
@@ -70,24 +69,12 @@ export class FilterController {
   private colorsWereAvailable = false;
   /** Directions controller reference */
   private directionsController: DirectionsController;
-  /** Currently minimised stop (for A3 restore) */
-  private minimisedStop: IStop | null = null;
-  /** Cached predictions for minimised stop */
-  private minimisedPredictions: IPrediction[] = [];
   /** Member's current location for TUC4 walk-time estimates */
   private userLocation: ILatLng | null = null;
   /** Whether nearby stops are currently rendered on the map */
   private nearbyStopsActive = false;
   /** Route IDs that have nearby stops (used to restore hidden routes) */
   private nearbyRouteIds = new Set<string>();
-  /** Stop ID of the currently open prediction popup (for live refresh) */
-  private openPopupStopId: string | null = null;
-  /** Route filter bound to the currently open stop popup, if any */
-  private openPopupRouteId: string | null = null;
-  /** Interval handle for prediction auto-refresh (30 s) */
-  private predictionPollInterval: number | null = null;
-  /** Interval handle for 1-second countdown ticker */
-  private predictionTickerInterval: number | null = null;
 
   /** Walk-time heuristic: 1 km ≈ 15 min (TUC4 R4) */
   private static readonly WALK_MINUTES_PER_KM = 15;
@@ -98,7 +85,14 @@ export class FilterController {
     this.vehicleTracker = VehicleTracker.getInstance();
     this.directionsController = DirectionsController.getInstance();
     this.urlSync = URLSyncManager.getInstance();
-    this.token = localStorage.getItem('token');
+
+    const predCtrl = PredictionController.getInstance();
+    predCtrl.setRouteColorProvider(
+      (routeId) => this.routeColorCache.get(routeId) || this.getFallbackRouteColor(routeId)
+    );
+    predCtrl.setWalkTimeProvider(
+      (lat, lon) => this.estimateWalkMinutes(lat, lon)
+    );
   }
 
   static getInstance(): FilterController {
@@ -196,43 +190,7 @@ export class FilterController {
    * Fetch all available routes from backend
    */
   private async fetchAllRoutes(): Promise<IRoute[]> {
-    try {
-      const response: AxiosResponse = await axios.get('/transit/routes', {
-        headers: { Authorization: `Bearer ${this.token}` },
-        validateStatus: () => true
-      });
-
-      if (response.status === 200 && response.data.name === 'RoutesRetrieved') {
-        // Check if we're using fallback data (A2: PRT API is down)
-        if (response.data.metadata?.usingFallback) {
-          console.warn(
-            'Using fallback route data - real-time tracking unavailable'
-          );
-          const showModal = window.showModal;
-          if (showModal && typeof showModal === 'function') {
-            showModal(
-              'Real-time Tracking Unavailable',
-              'Real-time tracking is currently unavailable. Showing scheduled times only.'
-            );
-          }
-        }
-        return response.data.payload || [];
-      } else {
-        console.error('Failed to fetch routes:', response.data);
-        return [];
-      }
-    } catch (error) {
-      console.error('Error fetching routes:', error);
-      // A1: No Network Access
-      const showModal = window.showModal;
-      if (showModal && typeof showModal === 'function') {
-        showModal(
-          'Connection Lost',
-          'Unable to connect to the server. Please check your internet connection.'
-        );
-      }
-      return [];
-    }
+    return transitApiService.getRoutes();
   }
 
   /**
@@ -241,52 +199,28 @@ export class FilterController {
    * operations never need additional network requests for static data.
    */
   private async fetchBulkData(): Promise<IRoute[]> {
-    try {
-      const response: AxiosResponse = await axios.get('/transit/bulk', {
-        headers: { Authorization: `Bearer ${this.token}` },
-        validateStatus: () => true
-      });
-
-      if (
-        response.status === 200 &&
-        response.data.name === 'BulkDataRetrieved'
-      ) {
-        const bulk: IBulkTransitData = response.data.payload;
-
-        // Populate local caches
-        this.patternCache.clear();
-        this.stopCache.clear();
-
-        for (const [routeId, patterns] of Object.entries(bulk.patterns)) {
-          this.patternCache.set(routeId, patterns);
-        }
-        for (const [key, stops] of Object.entries(bulk.stops)) {
-          this.stopCache.set(key, stops);
-        }
-
-        this.bulkLoaded = true;
-        console.log(
-          `Bulk data loaded: ${bulk.routes.length} routes, ` +
-            `${this.patternCache.size} pattern sets, ` +
-            `${this.stopCache.size} stop sets`
-        );
-
-        return bulk.routes;
-      } else {
-        console.warn('Bulk endpoint failed, falling back to /transit/routes');
-        return this.fetchAllRoutes();
-      }
-    } catch (error) {
-      console.error('Error fetching bulk data:', error);
-      const showModal = window.showModal;
-      if (showModal && typeof showModal === 'function') {
-        showModal(
-          'Connection Lost',
-          'Unable to connect to the server. Please check your internet connection.'
-        );
-      }
-      return [];
+    const bulk = await transitApiService.getBulkData();
+    if (!bulk) {
+      console.warn('Bulk endpoint failed, falling back to /transit/routes');
+      return this.fetchAllRoutes();
     }
+
+    // Populate local caches
+    this.patternCache.clear();
+    this.stopCache.clear();
+    for (const [routeId, patterns] of Object.entries(bulk.patterns)) {
+      this.patternCache.set(routeId, patterns);
+    }
+    for (const [key, stops] of Object.entries(bulk.stops)) {
+      this.stopCache.set(key, stops);
+    }
+    this.bulkLoaded = true;
+    console.log(
+      `Bulk data loaded: ${bulk.routes.length} routes, ` +
+        `${this.patternCache.size} pattern sets, ` +
+        `${this.stopCache.size} stop sets`
+    );
+    return bulk.routes;
   }
 
   /**
@@ -490,22 +424,7 @@ export class FilterController {
    */
   private async fetchAndShowDetours(routeId: string): Promise<void> {
     try {
-      const geometryRes = await axios.get(
-        `/transit/detours/${routeId}/geometry`,
-        {
-          headers: { Authorization: `Bearer ${this.token}` },
-          validateStatus: () => true
-        }
-      );
-
-      let geometryDetours: IDetour[] = [];
-      if (
-        geometryRes.status === 200 &&
-        geometryRes.data.name === 'DetoursRetrieved'
-      ) {
-        geometryDetours = geometryRes.data.payload || [];
-      }
-
+      const geometryDetours = await transitApiService.getDetourGeometry(routeId);
       this.routeRenderer.clearDetourPolylines(routeId);
       if (geometryDetours.some((d) => (d.geometry?.length ?? 0) > 0)) {
         this.routeRenderer.renderDetourGeometry(routeId, geometryDetours);
@@ -667,7 +586,7 @@ export class FilterController {
           routeId,
           stops,
           direction,
-          (stop) => this.handleStopClick(stop)
+          (stop) => PredictionController.getInstance().handleStopClick(stop)
         );
       }
     }
@@ -793,23 +712,12 @@ export class FilterController {
       return null;
     }
 
-    const response: AxiosResponse = await axios.get(
-      `/transit/routes/${routeId}`,
-      {
-        headers: { Authorization: `Bearer ${this.token}` },
-        validateStatus: () => true
-      }
-    );
-
-    if (response.status === 200 && response.data.name === 'PathGenerated') {
-      return response.data.payload as RouteData;
-    } else if (response.status === 404) {
+    const patterns = await transitApiService.getPatterns(routeId);
+    if (patterns === null) {
       // Route has no geometry data - throw so caller can handle gracefully
-      throw { response, type: 'ClientError', name: 'RouteNotFound' };
-    } else {
-      console.error('Failed to fetch route geometry:', response.data);
-      return null;
+      throw { type: 'ClientError', name: 'RouteNotFound' };
     }
+    return patterns as unknown as RouteData;
   }
 
   /**
@@ -833,39 +741,9 @@ export class FilterController {
       const timeStr = `${hour24.toString().padStart(2, '0')}:${time.minute.toString().padStart(2, '0')}`;
 
       console.log('Fetching routes for:', { date: dateStr, time: timeStr });
-
-      const response: AxiosResponse = await axios.post(
-        '/transit/routes/available',
-        { date: dateStr, time: timeStr },
-        {
-          headers: { Authorization: `Bearer ${this.token}` },
-          validateStatus: () => true
-        }
-      );
-
-      if (response.status === 200 && response.data.name === 'RoutesRetrieved') {
-        return response.data.payload || [];
-      } else {
-        console.error('Failed to fetch available routes:', response.data);
-        // Don't show error modal for expected errors like no service available
-        // The caller will handle showing the "No Service Available" modal
-        if (response.status === 500 && window.showModal) {
-          window.showModal(
-            'Service Error',
-            'Unable to fetch route schedules. Please try again later.'
-          );
-        }
-        return [];
-      }
+      return transitApiService.filterRoutesByDateTime(dateStr, timeStr);
     } catch (error) {
       console.error('Error fetching available routes:', error);
-      // Show error modal for network errors
-      if (window.showModal) {
-        window.showModal(
-          'Network Error',
-          'Unable to connect to the server. Please check your internet connection.'
-        );
-      }
       return [];
     }
   }
@@ -885,545 +763,15 @@ export class FilterController {
       return this.stopCache.get(cacheKey) || [];
     }
 
-    try {
-      const response: AxiosResponse = await axios.get(
-        `/transit/stops/${routeId}?dir=${direction}`,
-        {
-          headers: { Authorization: `Bearer ${this.token}` },
-          validateStatus: () => true
-        }
-      );
-
-      if (response.status === 200 && response.data.name === 'StopsRetrieved') {
-        return response.data.payload || [];
-      } else {
-        console.error('Failed to fetch stops:', response.data);
-        return [];
-      }
-    } catch (error) {
-      console.error('Error fetching stops:', error);
-      return [];
-    }
+    return transitApiService.getStops(routeId, direction);
   }
 
   /**
    * Public helper for map search stop selections.
-   * Reuses the same prediction + popup flow as marker clicks.
+   * Delegates to PredictionController which owns the popup lifecycle.
    */
   async showStopDetailsFromSearch(stop: IStop): Promise<void> {
-    await this.handleStopClick(stop);
-  }
-
-  /**
-   * Handle a stop marker click: fetch predictions and show popup.
-   * Supports A3 (restore minimised popup) and A1 (select another stop before directions).
-   */
-  private async handleStopClick(stop: IStop): Promise<void> {
-    // If in directions mode, ignore stop clicks
-    if (this.directionsController.isActive) return;
-
-    // A3: If this stop was minimised, restore its popup
-    if (this.restoreMinimisedPopup(stop)) return;
-
-    try {
-      const routeFilter =
-        this.stateManager.getState().selectedRouteId ?? undefined;
-      const predictions = await this.fetchPredictions(stop.stopId, routeFilter);
-      this.showStopPopup(stop, predictions);
-    } catch (error) {
-      console.error('Error handling stop click:', error);
-    }
-  }
-
-  /**
-   * Fetch arrival predictions for a stop from the backend (served from the
-   * in-memory GTFS-RT trip-updates cache).
-   */
-  private async fetchPredictions(
-    stopId: string,
-    routeId?: string
-  ): Promise<IPrediction[]> {
-    try {
-      const params = routeId ? { routeId } : undefined;
-      const response: AxiosResponse = await axios.get(
-        `/transit/stops/${stopId}/predictions`,
-        {
-          params,
-          headers: { Authorization: `Bearer ${this.token}` },
-          validateStatus: () => true
-        }
-      );
-
-      if (
-        response.status === 200 &&
-        response.data.name === 'PredictionsRetrieved'
-      ) {
-        return response.data.payload || [];
-      }
-      return [];
-    } catch (error) {
-      console.error('Error fetching predictions:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Render the stop-info popup on the map overlay.
-   * Includes Directions button (TUC4 Step 5) and minimize button (A3).
-   */
-  private showStopPopup(stop: IStop, predictions: IPrediction[]): void {
-    // Remove any existing map popup (stop or bus) first
-    dismissPopup();
-    this.stopPredictionPolling();
-    // Clear minimised state since we're opening a new popup
-    this.minimisedStop = null;
-
-    // Track which predictions the user selects (by index)
-    const selectedIndices = new Set<number>();
-    const displayPredictions = predictions.slice(0, 8);
-
-    const popup = document.createElement('div');
-    popup.id = MAP_POPUP_ID;
-    popup.className = 'map-popup';
-
-    // Header with minimize (–) button only (no close)
-    const header = document.createElement('div');
-    header.className = 'map-popup__header';
-    header.innerHTML = `
-      <span class="material-icons-outlined map-popup__icon map-popup__icon--stop">place</span>
-      <strong class="map-popup__title">${stop.stopName}</strong>
-      <button class="map-popup__minimize" aria-label="Minimize" title="Minimize">&ndash;</button>
-    `;
-    popup.appendChild(header);
-
-    const subheader = document.createElement('div');
-    subheader.className = 'map-popup__subheader';
-    const isUuidStopId =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        stop.stopId
-      );
-    subheader.textContent = isUuidStopId
-      ? 'CMU Shuttle Stop'
-      : `Stop #${stop.stopId}`;
-    popup.appendChild(subheader);
-
-    // Walking time estimate (TUC4 Step 4, R4: 1km ≈ 15 min)
-    const walkMin = this.estimateWalkMinutes(stop.lat, stop.lon);
-    if (walkMin !== null) {
-      const walkRow = document.createElement('div');
-      walkRow.className = 'map-popup__walk-time';
-      walkRow.innerHTML = `
-        <span class="material-icons-outlined map-popup__walk-icon">directions_walk</span>
-        <span>~${walkMin} min walk</span>
-      `;
-      popup.appendChild(walkRow);
-    }
-
-    // Hint for selection
-    if (displayPredictions.length > 0) {
-      const hint = document.createElement('p');
-      hint.className = 'map-popup__select-hint';
-      hint.textContent = 'Tap buses to include in directions';
-      popup.appendChild(hint);
-    }
-
-    // Predictions list (selectable)
-    if (displayPredictions.length === 0) {
-      const empty = document.createElement('p');
-      empty.className = 'map-popup__empty';
-      empty.textContent = 'No upcoming arrivals';
-      popup.appendChild(empty);
-    } else {
-      const list = document.createElement('ul');
-      list.className = 'map-popup__list';
-      for (let i = 0; i < displayPredictions.length; i++) {
-        const p = displayPredictions[i];
-        const li = document.createElement('li');
-        li.className = 'map-popup__arrival map-popup__arrival--selectable';
-        li.dataset.predIndex = String(i);
-        li.dataset.arrival = String(p.predictedArrivalTime);
-
-        const routeBadge = document.createElement('span');
-        routeBadge.className = 'map-popup__route-badge';
-        const color = this.routeColorCache.get(p.routeId) || '#c41230';
-        routeBadge.style.backgroundColor = color;
-        routeBadge.textContent = p.routeId;
-
-        const mins = document.createElement('span');
-        mins.className = 'map-popup__minutes';
-        mins.textContent = this.formatCountdown(p.predictedArrivalTime);
-
-        const meta = document.createElement('span');
-        meta.className = 'map-popup__meta';
-        const parts: string[] = [];
-        if (p.vid) parts.push(`Bus ${p.vid}`);
-        if (p.isDelayed) parts.push('Delayed');
-        meta.textContent = parts.join(' · ');
-
-        li.appendChild(routeBadge);
-        li.appendChild(mins);
-        li.appendChild(meta);
-
-        // Toggle selection on click
-        li.addEventListener('click', () => {
-          if (selectedIndices.has(i)) {
-            selectedIndices.delete(i);
-            li.classList.remove('map-popup__arrival--selected');
-          } else {
-            selectedIndices.add(i);
-            li.classList.add('map-popup__arrival--selected');
-          }
-          // Update directions button label
-          this.updateDirectionsBtnLabel(directionsBtn, selectedIndices.size);
-        });
-
-        list.appendChild(li);
-      }
-      popup.appendChild(list);
-    }
-
-    // Directions button (TUC4 Step 5)
-    const directionsBtn = document.createElement('button');
-    directionsBtn.className = 'map-popup__directions-btn';
-    directionsBtn.innerHTML = `
-      <span class="material-icons-outlined">directions_walk</span>
-      Directions
-    `;
-    popup.appendChild(directionsBtn);
-
-    // Append to map container
-    const container = document.querySelector('.map-container');
-    if (container) {
-      container.appendChild(popup);
-    }
-
-    // Minimize button handler — dock tab at bottom
-    const minBtn = popup.querySelector('.map-popup__minimize');
-    if (minBtn) {
-      minBtn.addEventListener('click', () => {
-        this.minimisedStop = stop;
-        this.minimisedPredictions = predictions;
-        this.stopPredictionPolling();
-
-        const routeColor = this.routeColorCache.get(
-          this.stateManager.getState().selectedRouteId ?? ''
-        );
-        minimizePopup(
-          stop.stopName,
-          () => this.rebindStopPopupEvents(stop, predictions, selectedIndices, displayPredictions),
-          undefined,
-          routeColor
-        );
-      });
-    }
-
-    // Directions button handler (TUC4 Step 5)
-    directionsBtn.addEventListener('click', async () => {
-      const selectedPreds = displayPredictions.filter((_, idx) =>
-        selectedIndices.has(idx)
-      );
-      await this.directionsController.startDirections(stop, selectedPreds);
-      // Render routes/stops/vehicles for selected bus predictions
-      if (selectedPreds.length > 0) {
-        await this.renderSelectedBusRoutes(selectedPreds);
-      }
-    });
-
-    // Start live prediction refresh (30 s)
-    this.startPredictionPolling(stop, selectedIndices, displayPredictions);
-  }
-
-  /** Update the directions button label to reflect selection count. */
-  private updateDirectionsBtnLabel(
-    btn: HTMLButtonElement,
-    count: number
-  ): void {
-    const label =
-      count > 0
-        ? `Directions (${count} bus${count > 1 ? 'es' : ''})`
-        : 'Directions';
-    btn.innerHTML = `
-      <span class="material-icons-outlined">directions_walk</span>
-      ${label}
-    `;
-  }
-
-  // -------------------------------------------------------------------
-  // Prediction Auto-Refresh
-  // -------------------------------------------------------------------
-
-  /** Start polling predictions every 30 s for the open stop popup. */
-  private startPredictionPolling(
-    stop: IStop,
-    selectedIndices: Set<number>,
-    displayPredictions: IPrediction[]
-  ): void {
-    this.stopPredictionPolling();
-    this.openPopupStopId = stop.stopId;
-    this.openPopupRouteId = this.stateManager.getState().selectedRouteId;
-
-    // 1-second countdown ticker
-    this.predictionTickerInterval = window.setInterval(() => {
-      if (!document.getElementById(MAP_POPUP_ID)) {
-        this.stopPredictionPolling();
-        return;
-      }
-      this.tickPredictionCountdowns();
-    }, 1000);
-
-    // 30-second full refresh from server
-    this.predictionPollInterval = window.setInterval(async () => {
-      if (!document.getElementById(MAP_POPUP_ID)) {
-        this.stopPredictionPolling();
-        return;
-      }
-
-      const fresh = await this.fetchPredictions(
-        stop.stopId,
-        this.openPopupRouteId ?? undefined
-      );
-      this.refreshPredictionList(
-        fresh.slice(0, 8),
-        selectedIndices,
-        displayPredictions
-      );
-    }, 30_000);
-  }
-
-  /** Stop prediction polling. */
-  private stopPredictionPolling(): void {
-    if (this.predictionPollInterval !== null) {
-      clearInterval(this.predictionPollInterval);
-      this.predictionPollInterval = null;
-    }
-    if (this.predictionTickerInterval !== null) {
-      clearInterval(this.predictionTickerInterval);
-      this.predictionTickerInterval = null;
-    }
-    this.openPopupStopId = null;
-    this.openPopupRouteId = null;
-  }
-
-  /** Tick all visible prediction countdowns by recalculating from arrival time. */
-  private tickPredictionCountdowns(): void {
-    const popup = document.getElementById(MAP_POPUP_ID);
-    if (!popup) return;
-
-    const items = popup.querySelectorAll<HTMLElement>('.map-popup__arrival');
-    items.forEach((li) => {
-      const arrival = Number(li.dataset.arrival);
-      if (!arrival) return;
-      const minsEl = li.querySelector('.map-popup__minutes');
-      if (minsEl) minsEl.textContent = this.formatCountdown(arrival);
-    });
-  }
-
-  /** Format a predicted arrival timestamp as a live countdown string. */
-  private formatCountdown(arrivalTimestamp: number): string {
-    const secsLeft = Math.round((arrivalTimestamp - Date.now()) / 1000);
-    if (secsLeft <= 0) return 'NOW';
-    if (secsLeft < 60) return `${secsLeft}s`;
-    return `${Math.ceil(secsLeft / 60)} min`;
-  }
-
-  /**
-   * Update prediction minutes and metadata in the open popup DOM without
-   * rebuilding the list (so user selections are preserved).
-   */
-  private refreshPredictionList(
-    freshPreds: IPrediction[],
-    selectedIndices: Set<number>,
-    displayPredictions: IPrediction[]
-  ): void {
-    const popup = document.getElementById(MAP_POPUP_ID);
-    if (!popup) return;
-
-    const items = popup.querySelectorAll<HTMLElement>('.map-popup__arrival');
-
-    // Update existing items with fresh data (matched by index)
-    items.forEach((li) => {
-      const idx = Number(li.dataset.predIndex);
-      if (idx >= freshPreds.length) {
-        // This prediction is gone — remove from DOM
-        li.remove();
-        selectedIndices.delete(idx);
-        return;
-      }
-      const p = freshPreds[idx];
-      // Sync backing array so directions button picks up fresh data
-      displayPredictions[idx] = p;
-
-      // Update arrival timestamp for the countdown ticker
-      li.dataset.arrival = String(p.predictedArrivalTime);
-
-      const minsEl = li.querySelector('.map-popup__minutes');
-      if (minsEl)
-        minsEl.textContent = this.formatCountdown(p.predictedArrivalTime);
-
-      const metaEl = li.querySelector('.map-popup__meta');
-      if (metaEl) {
-        const parts: string[] = [];
-        if (p.vid) parts.push(`Bus ${p.vid}`);
-        if (p.isDelayed) parts.push('Delayed');
-        metaEl.textContent = parts.join(' · ');
-      }
-
-      // Update route badge in case routeId changed
-      const badge = li.querySelector('.map-popup__route-badge') as HTMLElement;
-      if (badge) {
-        badge.textContent = p.routeId;
-        badge.style.backgroundColor =
-          this.routeColorCache.get(p.routeId) || '#c41230';
-      }
-    });
-
-    // Handle "No upcoming arrivals" ↔ predictions toggle
-    const emptyEl = popup.querySelector('.map-popup__empty');
-    if (freshPreds.length === 0 && !emptyEl) {
-      const list = popup.querySelector('.map-popup__list');
-      if (list) list.remove();
-      const hint = popup.querySelector('.map-popup__select-hint');
-      if (hint) hint.remove();
-      const empty = document.createElement('p');
-      empty.className = 'map-popup__empty';
-      empty.textContent = 'No upcoming arrivals';
-      const dirBtn = popup.querySelector('.map-popup__directions-btn');
-      if (dirBtn) popup.insertBefore(empty, dirBtn);
-    } else if (freshPreds.length > 0 && emptyEl) {
-      emptyEl.remove();
-    }
-  }
-
-  /**
-   * Render routes, stops, patterns, and start vehicle polling for routes
-   * associated with the user's selected bus predictions during directions mode.
-   */
-  private async renderSelectedBusRoutes(
-    predictions: IPrediction[]
-  ): Promise<void> {
-    // Deduplicate route IDs
-    const routeIds = [...new Set(predictions.map((p) => p.routeId))];
-    const state = this.stateManager.getState();
-
-    for (const routeId of routeIds) {
-      // Render route geometry
-      const geometry = await this.fetchRouteGeometry(routeId);
-      if (geometry) {
-        const route = state.availableRoutes.find((r) => r.id === routeId);
-        const color =
-          route?.color ||
-          this.routeColorCache.get(routeId) ||
-          this.getFallbackRouteColor(routeId);
-        this.routeRenderer.renderRouteGeometry(routeId, geometry, color);
-      }
-
-      // Render stop markers for both directions
-      for (const direction of ['INBOUND', 'OUTBOUND']) {
-        const stops = await this.fetchStops(routeId, direction);
-        if (stops.length > 0) {
-          this.routeRenderer.renderStopMarkers(
-            routeId,
-            stops,
-            direction,
-            () => {} // No-op click handler while in directions mode
-          );
-        }
-      }
-    }
-
-    // Start vehicle polling for selected routes, passing route colours
-    const routeColors = new Map<string, string>();
-    for (const routeId of routeIds) {
-      const route = state.availableRoutes.find((r) => r.id === routeId);
-      const color =
-        this.routeColorCache.get(routeId) ||
-        route?.color ||
-        this.getFallbackRouteColor(routeId);
-      routeColors.set(routeId, color);
-    }
-    this.vehicleTracker.startMultiRoutePolling(routeIds, routeColors);
-  }
-
-  /**
-   * Restore a minimised stop popup (A3).
-   * Called when the user clicks the same stop marker again.
-   */
-  restoreMinimisedPopup(stop: IStop): boolean {
-    if (this.minimisedStop && this.minimisedStop.stopId === stop.stopId) {
-      this.showStopPopup(stop, this.minimisedPredictions);
-      this.minimisedStop = null;
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * Re-bind event handlers on a restored stop popup (after minimize → restore).
-   * Called by the map-popup restore callback.
-   */
-  private rebindStopPopupEvents(
-    stop: IStop,
-    predictions: IPrediction[],
-    selectedIndices: Set<number>,
-    displayPredictions: IPrediction[]
-  ): void {
-    const popup = document.getElementById(MAP_POPUP_ID);
-    if (!popup) return;
-
-    // Re-bind minimize
-    const minBtn = popup.querySelector('.map-popup__minimize');
-    if (minBtn) {
-      minBtn.addEventListener('click', () => {
-        this.minimisedStop = stop;
-        this.minimisedPredictions = predictions;
-        this.stopPredictionPolling();
-        const routeColor = this.routeColorCache.get(
-          this.stateManager.getState().selectedRouteId ?? ''
-        );
-        minimizePopup(
-          stop.stopName,
-          () => this.rebindStopPopupEvents(stop, predictions, selectedIndices, displayPredictions),
-          undefined,
-          routeColor
-        );
-      });
-    }
-
-    // Re-bind prediction selection
-    const items = popup.querySelectorAll('.map-popup__arrival--selectable');
-    const directionsBtn = popup.querySelector('.map-popup__directions-btn') as HTMLButtonElement | null;
-    items.forEach((li) => {
-      const idx = parseInt((li as HTMLElement).dataset.predIndex ?? '-1', 10);
-      if (idx < 0) return;
-      li.addEventListener('click', () => {
-        if (selectedIndices.has(idx)) {
-          selectedIndices.delete(idx);
-          li.classList.remove('map-popup__arrival--selected');
-        } else {
-          selectedIndices.add(idx);
-          li.classList.add('map-popup__arrival--selected');
-        }
-        if (directionsBtn) {
-          this.updateDirectionsBtnLabel(directionsBtn, selectedIndices.size);
-        }
-      });
-    });
-
-    // Re-bind directions button
-    if (directionsBtn) {
-      directionsBtn.addEventListener('click', async () => {
-        const selectedPreds = displayPredictions.filter((_, i) =>
-          selectedIndices.has(i)
-        );
-        await this.directionsController.startDirections(stop, selectedPreds);
-        if (selectedPreds.length > 0) {
-          await this.renderSelectedBusRoutes(selectedPreds);
-        }
-      });
-    }
-
-    // Restart polling
-    this.startPredictionPolling(stop, selectedIndices, displayPredictions);
+    await PredictionController.getInstance().handleStopClick(stop);
   }
 
   // -------------------------------------------------------------------
@@ -1471,20 +819,11 @@ export class FilterController {
 
     // Fetch schedule data
     try {
-      const res: AxiosResponse = await axios.get(
-        `/transit/routes/${encodeURIComponent(routeId)}/schedule`,
-        {
-          headers: { Authorization: `Bearer ${this.token}` },
-          validateStatus: () => true
-        }
-      );
-
-      if (res.status !== 200 || res.data.name !== 'RouteScheduleRetrieved') {
+      const schedule = await transitApiService.getRouteSchedule(routeId);
+      if (!schedule) {
         body.innerHTML = '<div class="map-popup__empty">Schedule not available</div>';
         return;
       }
-
-      const schedule: IRouteSchedule = res.data.payload;
       this.renderRouteInfoBody(body, schedule, routeColor);
 
       // Re-bind minimize after body replaced
@@ -1694,7 +1033,7 @@ export class FilterController {
           routeKey,
           stops,
           'NEARBY',
-          (stop) => this.handleStopClick(stop)
+          (stop) => PredictionController.getInstance().handleStopClick(stop)
         );
       }
 
@@ -1720,7 +1059,7 @@ export class FilterController {
     // Clear everything from the map
     this.routeRenderer.clearAllRoutes();
     this.vehicleTracker.stopPolling();
-    this.stopPredictionPolling();
+    PredictionController.getInstance().stopPolling();
     dismissPopup();
 
     // Reset all filters to defaults
@@ -1774,33 +1113,7 @@ export class FilterController {
     lon: number,
     system?: string
   ): Promise<INearbyStopsPayload | null> {
-    try {
-      const params: Record<string, string | number> = { lat, lon };
-      if (system) params.system = system;
-      const response: AxiosResponse = await axios.get(
-        '/transit/stops/nearbystops',
-        {
-          params,
-          headers: { Authorization: `Bearer ${this.token}` },
-          validateStatus: () => true
-        }
-      );
-
-      if (
-        response.status === 200 &&
-        response.data.name === 'NearbyStopsRetrieved'
-      ) {
-        return response.data.payload as INearbyStopsPayload;
-      }
-      console.warn(
-        '[FilterController] Nearby stops request failed:',
-        response.data
-      );
-      return null;
-    } catch (error) {
-      console.error('[FilterController] Error fetching nearby stops:', error);
-      return null;
-    }
+    return transitApiService.getNearbyStops(lat, lon, system);
   }
 
   // -------------------------------------------------------------------
@@ -1860,27 +1173,8 @@ export class FilterController {
   /** Fetch health status and show/hide the service-status banner. */
   private async checkServiceHealth(): Promise<void> {
     try {
-      const response: AxiosResponse = await axios.get('/transit/health', {
-        headers: { Authorization: `Bearer ${this.token}` },
-        validateStatus: () => true
-      });
-
-      if (response.status !== 200) return;
-
-      const health = response.data as {
-        vehiclePositions: {
-          healthy: boolean;
-          consecutiveFailures: number;
-          error: string | null;
-        };
-        tripUpdates: {
-          healthy: boolean;
-          consecutiveFailures: number;
-          error: string | null;
-        };
-        trueTimeColors: { available: boolean };
-        overall: boolean;
-      };
+      const health = await transitApiService.getHealth();
+      if (!health) return;
 
       // If colors just became available, re-fetch routes to get real colors
       if (health.trueTimeColors.available && !this.colorsWereAvailable) {
@@ -1921,15 +1215,8 @@ export class FilterController {
    */
   private async refreshRouteColors(): Promise<void> {
     try {
-      const response: AxiosResponse = await axios.get('/transit/routes', {
-        headers: { Authorization: `Bearer ${this.token}` },
-        validateStatus: () => true
-      });
-
-      if (response.status !== 200 || response.data.name !== 'RoutesRetrieved')
-        return;
-
-      const freshRoutes: IRoute[] = response.data.payload || [];
+      const freshRoutes = await transitApiService.getRoutes();
+      if (!freshRoutes.length) return;
 
       // Update the local route cache and color cache
       const state = this.stateManager.getState();
