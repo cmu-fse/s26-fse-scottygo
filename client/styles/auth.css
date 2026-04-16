@@ -56,7 +56,9 @@ body {
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
 }
 
 .form-input:focus {
@@ -129,7 +131,10 @@ body {
   font-weight: 600;
   cursor: pointer;
   box-shadow: 0 2px 6px rgba(196, 18, 48, 0.25);
-  transition: background-color 0.2s, box-shadow 0.2s, transform 0.1s;
+  transition:
+    background-color 0.2s,
+    box-shadow 0.2s,
+    transform 0.1s;
 }
 
 .submit-btn:hover {
@@ -224,7 +229,9 @@ body {
   font-weight: 600;
   cursor: pointer;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
-  transition: background-color 0.2s, transform 0.1s;
+  transition:
+    background-color 0.2s,
+    transform 0.1s;
 }
 
 .modal-btn:active {

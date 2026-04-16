@@ -10,7 +10,12 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
 import { spawn } from 'child_process';
-import { IRoute, IPattern, IStop, IDirectionSchedule } from '../../common/transit.interface';
+import {
+  IRoute,
+  IPattern,
+  IStop,
+  IDirectionSchedule
+} from '../../common/transit.interface';
 import { IAppError } from '../../common/server.responses';
 
 const GTFS_URL = 'https://www.rideprt.org/developerresources/GTFS.zip';

@@ -75,7 +75,8 @@ export function minimizePopup(
   tab.id = MAP_POPUP_TAB_ID;
   tab.className = 'map-popup-tab';
 
-  let inner = '<span class="material-icons-outlined map-popup-tab__arrow">expand_less</span>';
+  let inner =
+    '<span class="material-icons-outlined map-popup-tab__arrow">expand_less</span>';
   if (badgeText) {
     const style = badgeColor ? ` style="background:${badgeColor}"` : '';
     inner += `<span class="map-popup-tab__badge"${style}>${badgeText}</span>`;

@@ -297,13 +297,11 @@ export default class AuthController extends Controller {
       ) {
         return res.status(400).json(error);
       }
-      return res
-        .status(500)
-        .json({
-          type: 'ServerError',
-          name: 'MongoDBError',
-          message: 'Validation failed unexpectedly'
-        });
+      return res.status(500).json({
+        type: 'ServerError',
+        name: 'MongoDBError',
+        message: 'Validation failed unexpectedly'
+      });
     }
   }
 }

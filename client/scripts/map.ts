@@ -297,13 +297,17 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
           await axios.patch(
             '/account/onboarding',
             {},
-            { headers: { Authorization: `Bearer ${token}` }, validateStatus: () => true }
+            {
+              headers: { Authorization: `Bearer ${token}` },
+              validateStatus: () => true
+            }
           );
         }
       });
 
       // Wait for the map to fully render before starting the tutorial
-      const provider = mapProvider as import('./maps/google-map.provider').GoogleMapProvider;
+      const provider =
+        mapProvider as import('./maps/google-map.provider').GoogleMapProvider;
       if (typeof provider.getNativeMap === 'function') {
         const nativeMap = provider.getNativeMap();
         google.maps.event.addListenerOnce(nativeMap, 'tilesloaded', () => {
@@ -393,11 +397,7 @@ type ToggleablePanel = {
   toggle: () => void;
 };
 
-const panelOrder: PanelName[] = [
-  'direction',
-  'system',
-  'route'
-];
+const panelOrder: PanelName[] = ['direction', 'system', 'route'];
 
 const isToggleablePanel = (panel: unknown): panel is ToggleablePanel =>
   !!panel &&
@@ -450,9 +450,18 @@ const handlePanelToggle = (
 
 const registerTransitSearchEvents = (): void => {
   document.addEventListener('search', (e: Event) => {
-    const customEvent = e as CustomEvent;
-    const query = customEvent.detail.query;
+    const customEvent = e as CustomEvent<{ query?: string }>;
+    const query = customEvent.detail?.query?.trim() ?? '';
     console.log('Search query:', query);
+
+    if (!query) {
+      // Clear route-filter visual selection and restore default nearby-stops view.
+      const routeSelector = document.querySelector(
+        'route-selector-panel'
+      ) as IRouteSelectorElement | null;
+      routeSelector?.clearSelection();
+      void filterController.restoreDefaultState(getEffectiveLocation());
+    }
   });
 
   document.addEventListener('searchSelectRoute', (e: Event) => {
@@ -739,7 +748,8 @@ const registerLocationSearchEvents = (): void => {
 
   // Pass the native Google map to the location-search component for Places API
   if (locationSearch && 'setMap' in locationSearch) {
-    const provider = mapProvider as import('./maps/google-map.provider').GoogleMapProvider;
+    const provider =
+      mapProvider as import('./maps/google-map.provider').GoogleMapProvider;
     if (typeof provider.getNativeMap === 'function') {
       locationSearch.setMap(provider.getNativeMap());
     }
@@ -760,7 +770,9 @@ const registerLocationSearchEvents = (): void => {
 
   // User selected a custom planned location
   document.addEventListener('locationSelected', (e: Event) => {
-    const { lat, lng, label } = (e as CustomEvent<{ lat: number; lng: number; label: string }>).detail;
+    const { lat, lng, label } = (
+      e as CustomEvent<{ lat: number; lng: number; label: string }>
+    ).detail;
     console.log('Planned location set:', label, lat, lng);
     const plannedLoc = { lat, lng };
     // Hide GPS blue dot, show planned marker
@@ -867,7 +879,11 @@ function requestUserLocation(): void {
         // Center on CMU campus and show nearby stops
         mapProvider.setCenter(CMU_CAMPUS_DEFAULT);
         mapProvider.setZoom(15);
-        addPlannedLocationMarker(CMU_CAMPUS_DEFAULT.lat, CMU_CAMPUS_DEFAULT.lng, 'CMU Campus');
+        addPlannedLocationMarker(
+          CMU_CAMPUS_DEFAULT.lat,
+          CMU_CAMPUS_DEFAULT.lng,
+          'CMU Campus'
+        );
         filterController.setUserLocation(CMU_CAMPUS_DEFAULT);
         filterController.showNearbyStops(CMU_CAMPUS_DEFAULT);
         directionsController.updatePlannedLocation(CMU_CAMPUS_DEFAULT);
@@ -887,7 +903,11 @@ function requestUserLocation(): void {
     );
     mapProvider.setCenter(CMU_CAMPUS_DEFAULT);
     mapProvider.setZoom(15);
-    addPlannedLocationMarker(CMU_CAMPUS_DEFAULT.lat, CMU_CAMPUS_DEFAULT.lng, 'CMU Campus');
+    addPlannedLocationMarker(
+      CMU_CAMPUS_DEFAULT.lat,
+      CMU_CAMPUS_DEFAULT.lng,
+      'CMU Campus'
+    );
     filterController.setUserLocation(CMU_CAMPUS_DEFAULT);
     filterController.showNearbyStops(CMU_CAMPUS_DEFAULT);
     directionsController.updatePlannedLocation(CMU_CAMPUS_DEFAULT);
@@ -921,7 +941,11 @@ function addUserLocationMarker(lat: number, lng: number): void {
 }
 
 // ── Planned Location Marker ──────────────────────────────────────────
-function addPlannedLocationMarker(lat: number, lng: number, label: string): void {
+function addPlannedLocationMarker(
+  lat: number,
+  lng: number,
+  label: string
+): void {
   removePlannedLocationMarker();
 
   // Red pin SVG — larger and more prominent than the GPS blue dot
@@ -932,7 +956,8 @@ function addPlannedLocationMarker(lat: number, lng: number, label: string): void
       <circle cx="18" cy="18" r="4" fill="#C41230"/>
     </svg>
   `;
-  const icon = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg.trim());
+  const icon =
+    'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg.trim());
 
   plannedLocationMarker = mapProvider.addMarker({
     position: { lat, lng },
@@ -1001,7 +1026,11 @@ function dismissPlannedLocationPopup(): void {
   if (el) el.remove();
 }
 
-function showPlannedLocationPopup(lat: number, lng: number, label: string): void {
+function showPlannedLocationPopup(
+  lat: number,
+  lng: number,
+  label: string
+): void {
   dismissPlannedLocationPopup();
 
   const mapContainer = document.querySelector('.map-container');
@@ -1025,20 +1054,22 @@ function showPlannedLocationPopup(lat: number, lng: number, label: string): void
   mapContainer.appendChild(popup);
 
   // Remove button
-  document.getElementById('planned-location-remove')?.addEventListener('click', async () => {
-    dismissPlannedLocationPopup();
-    removePlannedLocationMarker();
-    mapStateManager.resetPlannedLocationToCurrent();
-    directionsController.updatePlannedLocation(null);
-    showUserLocationMarker();
-    const state = mapStateManager.getState();
-    if (state.currentLocation) {
-      filterController.setUserLocation(state.currentLocation);
-      await filterController.restoreDefaultState(state.currentLocation);
-      mapProvider.setCenter(state.currentLocation);
-    }
-    showSubscriptionToast('Using current location');
-  });
+  document
+    .getElementById('planned-location-remove')
+    ?.addEventListener('click', async () => {
+      dismissPlannedLocationPopup();
+      removePlannedLocationMarker();
+      mapStateManager.resetPlannedLocationToCurrent();
+      directionsController.updatePlannedLocation(null);
+      showUserLocationMarker();
+      const state = mapStateManager.getState();
+      if (state.currentLocation) {
+        filterController.setUserLocation(state.currentLocation);
+        await filterController.restoreDefaultState(state.currentLocation);
+        mapProvider.setCenter(state.currentLocation);
+      }
+      showSubscriptionToast('Using current location');
+    });
 
   // Close on outside click
   const onOutsideClick = (e: Event) => {
