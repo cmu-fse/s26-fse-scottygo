@@ -17,12 +17,23 @@
  */
 
 import type { IStop, IPrediction } from '../../../common/transit.interface';
+
+/** Bundles the mutable state shared across stop-popup lifecycle methods. */
+interface StopPopupContext {
+  stop: IStop;
+  /** Original full prediction list (used for minimize/restore). */
+  predictions: IPrediction[];
+  /** Indices of user-selected arrivals. */
+  selectedIndices: Set<number>;
+  /** Mutable display slice (up to 8, updated on each refresh). */
+  displayPredictions: IPrediction[];
+}
 import { MapStateManager } from '../state/map-state';
 import { RouteRenderer } from '../renderers/route-renderer';
 import { VehicleTracker } from '../trackers/vehicle-tracker';
 import { DirectionsController } from './directions-controller';
 import { transitApiService } from '../services/transit-api.service';
-import { MAP_POPUP_ID, dismissPopup, minimizePopup } from '../utils/map-popup';
+import { MAP_POPUP_ID, createMapPopup, dismissPopup, minimizePopup } from '../utils/map-popup';
 
 export class PredictionController {
   private static instance: PredictionController;
@@ -148,123 +159,42 @@ export class PredictionController {
     this.stopPolling();
     this.minimisedStop = null;
 
-    const selectedIndices = new Set<number>();
-    const displayPredictions = predictions.slice(0, 8);
+    const ctx: StopPopupContext = {
+      stop,
+      predictions,
+      selectedIndices: new Set<number>(),
+      displayPredictions: predictions.slice(0, 8)
+    };
 
-    const popup = document.createElement('div');
-    popup.id = MAP_POPUP_ID;
-    popup.className = 'map-popup';
+    const { popup, subheader } = createMapPopup('stop', 'place', stop.stopName, 'Minimize');
 
-    // Header with minimize (–) button only (no close)
-    const header = document.createElement('div');
-    header.className = 'map-popup__header';
-    header.innerHTML = `
-      <span class="material-icons-outlined map-popup__icon map-popup__icon--stop">place</span>
-      <strong class="map-popup__title">${stop.stopName}</strong>
-      <button class="map-popup__minimize" aria-label="Minimize" title="Minimize">&ndash;</button>
-    `;
-    popup.appendChild(header);
-
-    const subheader = document.createElement('div');
-    subheader.className = 'map-popup__subheader';
     const isUuidStopId =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
         stop.stopId
       );
-    subheader.textContent = isUuidStopId
-      ? 'CMU Shuttle Stop'
-      : `Stop #${stop.stopId}`;
-    popup.appendChild(subheader);
+    subheader.textContent = isUuidStopId ? 'CMU Shuttle Stop' : `Stop #${stop.stopId}`;
 
     // Walking time estimate (TUC4 Step 4, R4: 1km ≈ 15 min)
     const walkMin = this.getWalkMinutes(stop.lat, stop.lon);
     if (walkMin !== null) {
-      const walkRow = document.createElement('div');
-      walkRow.className = 'map-popup__walk-time';
-      walkRow.innerHTML = `
-        <span class="material-icons-outlined map-popup__walk-icon">directions_walk</span>
-        <span>~${walkMin} min walk</span>
-      `;
-      popup.appendChild(walkRow);
+      popup.appendChild(this.buildWalkTimeRow(walkMin));
     }
 
-    if (displayPredictions.length > 0) {
-      const hint = document.createElement('p');
-      hint.className = 'map-popup__select-hint';
-      hint.textContent = 'Tap buses to include in directions';
-      popup.appendChild(hint);
-    }
-
-    if (displayPredictions.length === 0) {
-      const empty = document.createElement('p');
-      empty.className = 'map-popup__empty';
-      empty.textContent = 'No upcoming arrivals';
-      popup.appendChild(empty);
-    } else {
-      const list = document.createElement('ul');
-      list.className = 'map-popup__list';
-      for (let i = 0; i < displayPredictions.length; i++) {
-        const p = displayPredictions[i];
-        const li = document.createElement('li');
-        li.className = 'map-popup__arrival map-popup__arrival--selectable';
-        li.dataset.predIndex = String(i);
-        li.dataset.arrival = String(p.predictedArrivalTime);
-
-        const routeBadge = document.createElement('span');
-        routeBadge.className = 'map-popup__route-badge';
-        routeBadge.style.backgroundColor = this.getRouteColor(p.routeId);
-        routeBadge.textContent = p.routeId;
-
-        const mins = document.createElement('span');
-        mins.className = 'map-popup__minutes';
-        mins.textContent = this.formatCountdown(p.predictedArrivalTime);
-
-        const meta = document.createElement('span');
-        meta.className = 'map-popup__meta';
-        const parts: string[] = [];
-        if (p.vid) parts.push(`Bus ${p.vid}`);
-        if (p.isDelayed) parts.push('Delayed');
-        meta.textContent = parts.join(' · ');
-
-        li.appendChild(routeBadge);
-        li.appendChild(mins);
-        li.appendChild(meta);
-
-        li.addEventListener('click', () => {
-          if (selectedIndices.has(i)) {
-            selectedIndices.delete(i);
-            li.classList.remove('map-popup__arrival--selected');
-          } else {
-            selectedIndices.add(i);
-            li.classList.add('map-popup__arrival--selected');
-          }
-          this.updateDirectionsBtnLabel(directionsBtn, selectedIndices.size);
-        });
-
-        list.appendChild(li);
-      }
-      popup.appendChild(list);
-    }
-
-    const directionsBtn = document.createElement('button');
-    directionsBtn.className = 'map-popup__directions-btn';
-    directionsBtn.innerHTML = `
-      <span class="material-icons-outlined">directions_walk</span>
-      Directions
-    `;
+    const directionsBtn = this.buildDirectionsButton();
+    this.buildPredictionListSection(ctx, directionsBtn).forEach((el) =>
+      popup.appendChild(el)
+    );
     popup.appendChild(directionsBtn);
 
     const container = document.querySelector('.map-container');
-    if (container) {
-      container.appendChild(popup);
-    }
+    if (container) container.appendChild(popup);
 
-    this.bindMinimizeButton(popup, stop, predictions, selectedIndices, displayPredictions);
+    this.bindMinimizeButton(popup, ctx);
 
     // Directions button handler (TUC4 Step 5)
     directionsBtn.addEventListener('click', async () => {
-      const selectedPreds = displayPredictions.filter((_, idx) =>
-        selectedIndices.has(idx)
+      const selectedPreds = ctx.displayPredictions.filter((_, idx) =>
+        ctx.selectedIndices.has(idx)
       );
       await this.directionsController.startDirections(stop, selectedPreds);
       if (selectedPreds.length > 0) {
@@ -272,7 +202,105 @@ export class PredictionController {
       }
     });
 
-    this.startPredictionPolling(stop, selectedIndices, displayPredictions);
+    this.startPredictionPolling(ctx);
+  }
+
+  private buildWalkTimeRow(walkMin: number): HTMLElement {
+    const walkRow = document.createElement('div');
+    walkRow.className = 'map-popup__walk-time';
+    walkRow.innerHTML = `
+      <span class="material-icons-outlined map-popup__walk-icon">directions_walk</span>
+      <span>~${walkMin} min walk</span>
+    `;
+    return walkRow;
+  }
+
+  /**
+   * Build the hint + list (or empty-state) nodes for the prediction popup.
+   * Also wires click handlers on each arrival row.
+   */
+  private buildPredictionListSection(
+    ctx: StopPopupContext,
+    directionsBtn: HTMLButtonElement
+  ): HTMLElement[] {
+    const { displayPredictions, selectedIndices } = ctx;
+    const nodes: HTMLElement[] = [];
+
+    if (displayPredictions.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'map-popup__empty';
+      empty.textContent = 'No upcoming arrivals';
+      nodes.push(empty);
+      return nodes;
+    }
+
+    const hint = document.createElement('p');
+    hint.className = 'map-popup__select-hint';
+    hint.textContent = 'Tap buses to include in directions';
+    nodes.push(hint);
+
+    const list = document.createElement('ul');
+    list.className = 'map-popup__list';
+    for (let i = 0; i < displayPredictions.length; i++) {
+      list.appendChild(this.buildArrivalRow(displayPredictions[i], i, selectedIndices, directionsBtn));
+    }
+    nodes.push(list);
+    return nodes;
+  }
+
+  private buildArrivalRow(
+    p: IPrediction,
+    index: number,
+    selectedIndices: Set<number>,
+    directionsBtn: HTMLButtonElement
+  ): HTMLLIElement {
+    const li = document.createElement('li');
+    li.className = 'map-popup__arrival map-popup__arrival--selectable';
+    li.dataset.predIndex = String(index);
+    li.dataset.arrival = String(p.predictedArrivalTime);
+
+    const routeBadge = document.createElement('span');
+    routeBadge.className = 'map-popup__route-badge';
+    routeBadge.style.backgroundColor = this.getRouteColor(p.routeId);
+    routeBadge.textContent = p.routeId;
+
+    const mins = document.createElement('span');
+    mins.className = 'map-popup__minutes';
+    mins.textContent = this.formatCountdown(p.predictedArrivalTime);
+
+    const meta = document.createElement('span');
+    meta.className = 'map-popup__meta';
+    const parts: string[] = [];
+    if (p.vid) parts.push(`Bus ${p.vid}`);
+    if (p.isDelayed) parts.push('Delayed');
+    meta.textContent = parts.join(' · ');
+
+    li.appendChild(routeBadge);
+    li.appendChild(mins);
+    li.appendChild(meta);
+
+    li.addEventListener('click', () => {
+      if (selectedIndices.has(index)) {
+        selectedIndices.delete(index);
+        li.classList.remove('map-popup__arrival--selected');
+      } else {
+        selectedIndices.add(index);
+        li.classList.add('map-popup__arrival--selected');
+      }
+      this.updateDirectionsBtnLabel(directionsBtn, selectedIndices.size);
+    });
+
+    return li;
+  }
+
+  private buildDirectionsButton(): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.className = 'map-popup__directions-btn';
+    btn.innerHTML = `
+      <span class="material-icons-outlined">directions_walk</span>
+      Directions
+    `;
+    return btn;
   }
 
   private updateDirectionsBtnLabel(
@@ -293,13 +321,9 @@ export class PredictionController {
   // Private — polling
   // -------------------------------------------------------------------------
 
-  private startPredictionPolling(
-    stop: IStop,
-    selectedIndices: Set<number>,
-    displayPredictions: IPrediction[]
-  ): void {
+  private startPredictionPolling(ctx: StopPopupContext): void {
     this.stopPolling();
-    this.openPopupStopId = stop.stopId;
+    this.openPopupStopId = ctx.stop.stopId;
     this.openPopupRouteId = this.stateManager.getState().selectedRouteId;
 
     // 1-second countdown ticker
@@ -318,14 +342,10 @@ export class PredictionController {
         return;
       }
       const fresh = await this.fetchPredictions(
-        stop.stopId,
+        ctx.stop.stopId,
         this.openPopupRouteId ?? undefined
       );
-      this.refreshPredictionList(
-        fresh.slice(0, 8),
-        selectedIndices,
-        displayPredictions
-      );
+      this.refreshPredictionList(fresh.slice(0, 8), ctx);
     }, 30_000);
   }
 
@@ -350,9 +370,9 @@ export class PredictionController {
 
   private refreshPredictionList(
     freshPreds: IPrediction[],
-    selectedIndices: Set<number>,
-    displayPredictions: IPrediction[]
+    ctx: StopPopupContext
   ): void {
+    const { selectedIndices, displayPredictions } = ctx;
     const popup = document.getElementById(MAP_POPUP_ID);
     if (!popup) return;
 
@@ -404,47 +424,31 @@ export class PredictionController {
     }
   }
 
-  private bindMinimizeButton(
-    popup: Element,
-    stop: IStop,
-    predictions: IPrediction[],
-    selectedIndices: Set<number>,
-    displayPredictions: IPrediction[]
-  ): void {
+  private bindMinimizeButton(popup: Element, ctx: StopPopupContext): void {
     const minBtn = popup.querySelector('.map-popup__minimize');
     if (!minBtn) return;
     minBtn.addEventListener('click', () => {
-      this.minimisedStop = stop;
-      this.minimisedPredictions = predictions;
+      this.minimisedStop = ctx.stop;
+      this.minimisedPredictions = ctx.predictions;
       this.stopPolling();
       const routeColor = this.getRouteColor(
         this.stateManager.getState().selectedRouteId ?? ''
       );
       minimizePopup(
-        stop.stopName,
-        () =>
-          this.rebindStopPopupEvents(
-            stop,
-            predictions,
-            selectedIndices,
-            displayPredictions
-          ),
+        ctx.stop.stopName,
+        () => this.rebindStopPopupEvents(ctx),
         undefined,
         routeColor
       );
     });
   }
 
-  private rebindStopPopupEvents(
-    stop: IStop,
-    predictions: IPrediction[],
-    selectedIndices: Set<number>,
-    displayPredictions: IPrediction[]
-  ): void {
+  private rebindStopPopupEvents(ctx: StopPopupContext): void {
+    const { stop, displayPredictions, selectedIndices } = ctx;
     const popup = document.getElementById(MAP_POPUP_ID);
     if (!popup) return;
 
-    this.bindMinimizeButton(popup, stop, predictions, selectedIndices, displayPredictions);
+    this.bindMinimizeButton(popup, ctx);
 
     const items = popup.querySelectorAll('.map-popup__arrival--selectable');
     const directionsBtn = popup.querySelector(
@@ -479,7 +483,7 @@ export class PredictionController {
       });
     }
 
-    this.startPredictionPolling(stop, selectedIndices, displayPredictions);
+    this.startPredictionPolling(ctx);
   }
 
   // -------------------------------------------------------------------------

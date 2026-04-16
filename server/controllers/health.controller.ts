@@ -237,20 +237,6 @@ export default class HealthController extends Controller {
       `[Health Controller ${new Date().toISOString()}] Error:`,
       error
     );
-
-    if (
-      error &&
-      typeof error === 'object' &&
-      'type' in error &&
-      'name' in error &&
-      'message' in error
-    ) {
-      const appError = error as responses.IAppError;
-      const status = appError.type === 'ClientError' ? 400 : 500;
-      res.status(status).json(appError);
-      return;
-    }
-
     if (error instanceof Error) {
       console.error(
         `[Health Controller ${new Date().toISOString()}] Unexpected Error:`,
@@ -258,13 +244,10 @@ export default class HealthController extends Controller {
         error.stack
       );
     }
-
-    const serverError: responses.IAppError = {
-      type: 'ServerError',
-      name: 'GetRequestFailure',
-      message:
-        error instanceof Error ? error.message : 'An unexpected error occurred'
-    };
-    res.status(500).json(serverError);
+    this.handleAppError(
+      res,
+      error,
+      error instanceof Error ? error.message : 'An unexpected error occurred'
+    );
   }
 }

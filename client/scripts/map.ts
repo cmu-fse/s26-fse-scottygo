@@ -878,16 +878,7 @@ function requestUserLocation(): void {
           'Location access denied. Centering on CMU Campus by default. Bus report submission is disabled without GPS access.'
         );
         // Center on CMU campus and show nearby stops
-        mapProvider.setCenter(CMU_CAMPUS_DEFAULT);
-        mapProvider.setZoom(15);
-        addPlannedLocationMarker(
-          CMU_CAMPUS_DEFAULT.lat,
-          CMU_CAMPUS_DEFAULT.lng,
-          'CMU Campus'
-        );
-        filterController.setUserLocation(CMU_CAMPUS_DEFAULT);
-        filterController.showNearbyStops(CMU_CAMPUS_DEFAULT);
-        directionsController.updatePlannedLocation(CMU_CAMPUS_DEFAULT);
+        centerOnCmuCampus();
       },
       {
         enableHighAccuracy: true,
@@ -902,17 +893,17 @@ function requestUserLocation(): void {
       'Geolocation Unavailable',
       'Geolocation is not supported by your browser. Centering on CMU Campus.'
     );
-    mapProvider.setCenter(CMU_CAMPUS_DEFAULT);
-    mapProvider.setZoom(15);
-    addPlannedLocationMarker(
-      CMU_CAMPUS_DEFAULT.lat,
-      CMU_CAMPUS_DEFAULT.lng,
-      'CMU Campus'
-    );
-    filterController.setUserLocation(CMU_CAMPUS_DEFAULT);
-    filterController.showNearbyStops(CMU_CAMPUS_DEFAULT);
-    directionsController.updatePlannedLocation(CMU_CAMPUS_DEFAULT);
+    centerOnCmuCampus();
   }
+}
+
+function centerOnCmuCampus(): void {
+  mapProvider.setCenter(CMU_CAMPUS_DEFAULT);
+  mapProvider.setZoom(15);
+  addPlannedLocationMarker(CMU_CAMPUS_DEFAULT.lat, CMU_CAMPUS_DEFAULT.lng, 'CMU Campus');
+  filterController.setUserLocation(CMU_CAMPUS_DEFAULT);
+  filterController.showNearbyStops(CMU_CAMPUS_DEFAULT);
+  directionsController.updatePlannedLocation(CMU_CAMPUS_DEFAULT);
 }
 
 // Add a blue dot marker on the map for user location

@@ -60,6 +60,19 @@ export default class AuthController extends Controller {
     return AuthController.instance;
   }
 
+  /**
+   * Validate and extract credentials from route params + body.
+   * Sends a 400 response and returns null on failure.
+   */
+  private parseCredentials(req: Request, res: Response): ILogin | null {
+    const credentialError = validateCredentials(req.params.username, req.body.password);
+    if (credentialError) {
+      res.status(400).json(credentialError);
+      return null;
+    }
+    return { username: req.params.username, password: req.body.password };
+  }
+
   public initializeRoutes(): void {
     this.router.get('/', this.authPage.bind(this));
     this.router.post('/validate', this.validateField.bind(this));
@@ -121,18 +134,8 @@ export default class AuthController extends Controller {
   }
 
   public async login(req: Request, res: Response) {
-    const credentialError = validateCredentials(
-      req.params.username,
-      req.body.password
-    );
-    if (credentialError) {
-      return res.status(400).json(credentialError);
-    }
-
-    const credentials: ILogin = {
-      username: req.params.username,
-      password: req.body.password
-    };
+    const credentials = this.parseCredentials(req, res);
+    if (!credentials) return;
 
     try {
       // R5: Check account status before validating password
@@ -200,18 +203,8 @@ export default class AuthController extends Controller {
   }
 
   public async agreed(req: Request, res: Response) {
-    const credentialError = validateCredentials(
-      req.params.username,
-      req.body.password
-    );
-    if (credentialError) {
-      return res.status(400).json(credentialError);
-    }
-
-    const credentials: ILogin = {
-      username: req.params.username,
-      password: req.body.password
-    };
+    const credentials = this.parseCredentials(req, res);
+    if (!credentials) return;
 
     try {
       const userToUpdate: IUser = await User.validateUser(credentials);

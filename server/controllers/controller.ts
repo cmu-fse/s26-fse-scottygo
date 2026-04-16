@@ -48,6 +48,22 @@ abstract class Controller {
   public abstract initializeRoutes(): void;
 
   /**
+   * Narrow an unknown caught value to IAppError, or return null.
+   * Use this instead of repeating the inline type guard.
+   */
+  protected asAppError(error: unknown): responses.IAppError | null {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'type' in error &&
+      'name' in error
+    ) {
+      return error as responses.IAppError;
+    }
+    return null;
+  }
+
+  /**
    * Uniform error handler for caught exceptions.
    * Forwards known IAppError shapes directly; wraps unknown errors as ServerError.
    */
@@ -56,13 +72,8 @@ abstract class Controller {
     error: unknown,
     fallbackMessage: string = 'An unexpected error occurred'
   ): void {
-    if (
-      error &&
-      typeof error === 'object' &&
-      'type' in error &&
-      'name' in error
-    ) {
-      const appError = error as responses.IAppError;
+    const appError = this.asAppError(error);
+    if (appError) {
       const statusCode = appError.type === 'ClientError' ? 400 : 500;
       res.status(statusCode).json(appError);
       return;

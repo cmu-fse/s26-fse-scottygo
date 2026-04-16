@@ -266,8 +266,7 @@ class TripShotLiveStatusService {
       const displayVid = this.addRouteVehicle(
         newVehicles,
         normalizedRouteId,
-        vs,
-        ride
+        vs
       );
       this.addRidePredictions(newPredictions, ride, displayVid);
     }

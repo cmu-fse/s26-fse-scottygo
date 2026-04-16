@@ -274,13 +274,8 @@ export default class NotificationController extends Controller {
     error: unknown,
     fallbackName: responses.ServerErrorName
   ): void {
-    if (
-      error &&
-      typeof error === 'object' &&
-      'type' in error &&
-      'name' in error
-    ) {
-      const appError = error as responses.IAppError;
+    const appError = this.asAppError(error);
+    if (appError) {
       const statusMap: Record<string, number> = {
         MissingParameter: 400,
         EmptyReport: 400,

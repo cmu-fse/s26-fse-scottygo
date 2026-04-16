@@ -28,6 +28,7 @@ import { createBusIcon } from '../utils/bus-icon';
 import { transitApiService } from '../services/transit-api.service';
 import {
   MAP_POPUP_ID,
+  createMapPopup,
   closeMapPopup,
   dismissPopup,
   minimizePopup
@@ -408,25 +409,8 @@ export class VehicleTracker {
     dismissPopup();
     this.openPopupVehicleId = vid;
 
-    const popup = document.createElement('div');
-    popup.id = MAP_POPUP_ID;
-    popup.className = 'map-popup';
-
-    // Header
-    const header = document.createElement('div');
-    header.className = 'map-popup__header';
-    header.innerHTML = `
-      <span class="material-icons-outlined map-popup__icon map-popup__icon--bus">directions_bus</span>
-      <strong class="map-popup__title">Bus ${vehicle.vid}</strong>
-      <button class="map-popup__minimize" aria-label="Minimize">&minus;</button>
-    `;
-    popup.appendChild(header);
-
-    // Subheader — route
-    const subheader = document.createElement('div');
-    subheader.className = 'map-popup__subheader';
+    const { popup, subheader } = createMapPopup('bus', 'directions_bus', `Bus ${vehicle.vid}`);
     subheader.textContent = this.getRouteSubheaderText(vehicle.routeId);
-    popup.appendChild(subheader);
 
     // Detail rows
     const details = document.createElement('div');

@@ -8,6 +8,42 @@
 /** The single id used for every map overlay popup. */
 export const MAP_POPUP_ID = 'map-popup';
 
+/**
+ * Create a bare popup shell with a header row.
+ * Returns { popup, header, subheader } ready to be populated by the caller.
+ *
+ * @param iconModifier  BEM modifier for the icon span, e.g. 'stop' or 'bus'
+ * @param iconName      Material icon name, e.g. 'place' or 'directions_bus'
+ * @param titleHtml     Inner HTML for the bold title element
+ * @param minimizeTitle Optional title attribute on the minimize button
+ */
+export function createMapPopup(
+  iconModifier: string,
+  iconName: string,
+  titleHtml: string,
+  minimizeTitle?: string
+): { popup: HTMLDivElement; subheader: HTMLDivElement } {
+  const popup = document.createElement('div');
+  popup.id = MAP_POPUP_ID;
+  popup.className = 'map-popup';
+
+  const header = document.createElement('div');
+  header.className = 'map-popup__header';
+  const titleAttr = minimizeTitle ? ` title="${minimizeTitle}"` : '';
+  header.innerHTML = `
+    <span class="material-icons-outlined map-popup__icon map-popup__icon--${iconModifier}">${iconName}</span>
+    <strong class="map-popup__title">${titleHtml}</strong>
+    <button class="map-popup__minimize" aria-label="Minimize"${titleAttr}>&ndash;</button>
+  `;
+  popup.appendChild(header);
+
+  const subheader = document.createElement('div');
+  subheader.className = 'map-popup__subheader';
+  popup.appendChild(subheader);
+
+  return { popup, subheader };
+}
+
 /** The single id for the docked minimised tab. */
 const MAP_POPUP_TAB_ID = 'map-popup-tab';
 

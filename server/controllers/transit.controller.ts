@@ -485,32 +485,10 @@ export default class BusController extends Controller {
   // -------------------------------------------------------------------------
 
   private handleError(error: unknown, res: Response): void {
-    // Log the actual error for debugging
     console.error(
       `[Transit Controller ${new Date().toISOString()}] Error:`,
       error
     );
-
-    if (
-      error &&
-      typeof error === 'object' &&
-      'type' in error &&
-      'name' in error &&
-      'message' in error
-    ) {
-      const appError = error as responses.IAppError;
-      const status =
-        appError.type === 'ClientError'
-          ? appError.name === 'RouteNotFound' ||
-            appError.name === 'StopNotFound'
-            ? 404
-            : 400
-          : 500;
-      res.status(status).json(appError);
-      return;
-    }
-
-    // Handle generic Error instances
     if (error instanceof Error) {
       console.error(
         `[Transit Controller ${new Date().toISOString()}] Unexpected Error:`,
@@ -518,7 +496,18 @@ export default class BusController extends Controller {
         error.stack
       );
     }
-
+    // 404 override for transit-specific not-found errors
+    const appError = this.asAppError(error);
+    if (appError) {
+      const status =
+        appError.name === 'RouteNotFound' || appError.name === 'StopNotFound'
+          ? 404
+          : appError.type === 'ClientError'
+            ? 400
+            : 500;
+      res.status(status).json(appError);
+      return;
+    }
     const serverError: responses.IAppError = {
       type: 'ServerError',
       name: 'GetRequestFailure',
