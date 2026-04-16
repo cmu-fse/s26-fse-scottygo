@@ -140,7 +140,10 @@ export class TransitApiService {
       if (res.status === 200 && res.data.name === 'RoutesRetrieved') {
         return res.data.payload ?? [];
       }
-      console.error('[TransitApiService] filterRoutesByDateTime failed:', res.data);
+      console.error(
+        '[TransitApiService] filterRoutesByDateTime failed:',
+        res.data
+      );
       return [];
     } catch (err) {
       console.error('[TransitApiService] filterRoutesByDateTime error:', err);
@@ -169,10 +172,13 @@ export class TransitApiService {
   /** GET /transit/stops/:routeId?dir=DIRECTION — stops for a route. */
   async getStops(routeId: string, direction: string): Promise<IStop[]> {
     try {
-      const res = await axios.get(`/transit/stops/${routeId}?dir=${direction}`, {
-        headers: authHeaders(),
-        validateStatus: () => true
-      });
+      const res = await axios.get(
+        `/transit/stops/${routeId}?dir=${direction}`,
+        {
+          headers: authHeaders(),
+          validateStatus: () => true
+        }
+      );
       if (res.status === 200 && res.data.name === 'StopsRetrieved') {
         return res.data.payload ?? [];
       }
@@ -185,7 +191,10 @@ export class TransitApiService {
   }
 
   /** GET /transit/stops/:stopId/predictions — arrival predictions. */
-  async getPredictions(stopId: string, routeId?: string): Promise<IPrediction[]> {
+  async getPredictions(
+    stopId: string,
+    routeId?: string
+  ): Promise<IPrediction[]> {
     try {
       const res = await axios.get(`/transit/stops/${stopId}/predictions`, {
         params: routeId ? { routeId } : undefined,

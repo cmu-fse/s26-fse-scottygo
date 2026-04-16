@@ -18,7 +18,11 @@ export function createBusIcon(
   vehicle: IVehicle,
   zoom: number,
   routeColor: string
-): { url: string; anchor: { x: number; y: number }; size: { width: number; height: number } } {
+): {
+  url: string;
+  anchor: { x: number; y: number };
+  size: { width: number; height: number };
+} {
   // Detoured buses keep an amber override so they stand out on the map.
   const color = vehicle.isDetoured ? '#FFA500' : routeColor;
 

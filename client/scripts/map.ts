@@ -96,7 +96,6 @@ const directionsController = DirectionsController.getInstance();
 const routeRenderer = RouteRenderer.getInstance();
 const vehicleTracker = VehicleTracker.getInstance();
 
-
 function showSubscriptionToast(message: string): void {
   showToast(message);
 }
@@ -158,7 +157,9 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
   }
 
   const username = localStorage.getItem('username');
-  const userAccount = username ? await authService.getCurrentUserAccount(username) : null;
+  const userAccount = username
+    ? await authService.getCurrentUserAccount(username)
+    : null;
   const isAdminUser = userAccount?.privilegeLevel === 'Administrator';
 
   // Initialize map via provider abstraction

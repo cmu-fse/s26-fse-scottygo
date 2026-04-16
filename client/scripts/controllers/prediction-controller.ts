@@ -36,7 +36,8 @@ export class PredictionController {
   private getRouteColor: (routeId: string) => string = () => '#4285F4';
 
   /** Provided by FilterController — returns walk minutes to a stop, or null. */
-  private getWalkMinutes: (lat: number, lon: number) => number | null = () => null;
+  private getWalkMinutes: (lat: number, lon: number) => number | null = () =>
+    null;
 
   /** Currently minimised stop (for A3 restore). */
   private minimisedStop: IStop | null = null;
@@ -270,7 +271,13 @@ export class PredictionController {
         );
         minimizePopup(
           stop.stopName,
-          () => this.rebindStopPopupEvents(stop, predictions, selectedIndices, displayPredictions),
+          () =>
+            this.rebindStopPopupEvents(
+              stop,
+              predictions,
+              selectedIndices,
+              displayPredictions
+            ),
           undefined,
           routeColor
         );
@@ -386,7 +393,8 @@ export class PredictionController {
       li.dataset.arrival = String(p.predictedArrivalTime);
 
       const minsEl = li.querySelector('.map-popup__minutes');
-      if (minsEl) minsEl.textContent = this.formatCountdown(p.predictedArrivalTime);
+      if (minsEl)
+        minsEl.textContent = this.formatCountdown(p.predictedArrivalTime);
 
       const metaEl = li.querySelector('.map-popup__meta');
       if (metaEl) {
@@ -439,7 +447,13 @@ export class PredictionController {
         );
         minimizePopup(
           stop.stopName,
-          () => this.rebindStopPopupEvents(stop, predictions, selectedIndices, displayPredictions),
+          () =>
+            this.rebindStopPopupEvents(
+              stop,
+              predictions,
+              selectedIndices,
+              displayPredictions
+            ),
           undefined,
           routeColor
         );
@@ -447,7 +461,9 @@ export class PredictionController {
     }
 
     const items = popup.querySelectorAll('.map-popup__arrival--selectable');
-    const directionsBtn = popup.querySelector('.map-popup__directions-btn') as HTMLButtonElement | null;
+    const directionsBtn = popup.querySelector(
+      '.map-popup__directions-btn'
+    ) as HTMLButtonElement | null;
     items.forEach((li) => {
       const idx = parseInt((li as HTMLElement).dataset.predIndex ?? '-1', 10);
       if (idx < 0) return;
