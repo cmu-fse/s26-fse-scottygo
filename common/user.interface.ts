@@ -24,6 +24,7 @@ export type IPrivilegeLevel = 'Administrator' | 'Coordinator' | 'Member';
 export interface IUserAccount extends IUser {
   status: IAccountStatus;
   privilegeLevel: IPrivilegeLevel;
+  onboardingComplete: boolean;
 }
 
 // JWT token payload - uses immutable userId to avoid token invalidation on username change

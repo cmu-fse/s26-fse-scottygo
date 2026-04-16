@@ -56,6 +56,7 @@ export default class AccountController extends Controller {
       '/users/:username/password',
       this.updatePassword.bind(this)
     );
+    this.router.patch('/onboarding', this.completeOnboarding.bind(this));
   }
 
   /**
@@ -752,5 +753,38 @@ export default class AccountController extends Controller {
       message: 'An unexpected error occurred'
     };
     res.status(500).json(unexpectedError);
+  }
+
+  /**
+   * PATCH /account/onboarding
+   * Mark onboarding tutorial as complete for the authenticated user
+   */
+  public async completeOnboarding(
+    req: Request,
+    res: Response
+  ): Promise<void> {
+    try {
+      const tokenUser = (req as Request & { user: ITokenPayload }).user;
+      if (!tokenUser || !tokenUser.userId) {
+        const error: responses.IAppError = {
+          type: 'ClientError',
+          name: 'UnauthorizedRequest',
+          message: 'Unable to verify requesting user'
+        };
+        res.status(401).json(error);
+        return;
+      }
+
+      await User.markOnboardingComplete(tokenUser.userId);
+
+      const successRes: responses.ISuccess = {
+        name: 'OnboardingCompleted',
+        authorizedUser: tokenUser.username,
+        payload: null
+      };
+      res.status(200).json(successRes);
+    } catch (error: unknown) {
+      this.handleError(res, error);
+    }
   }
 }

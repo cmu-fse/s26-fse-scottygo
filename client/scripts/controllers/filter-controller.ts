@@ -13,12 +13,13 @@ import type {
   IDetour,
   IPrediction,
   INearbyStop,
-  INearbyStopsPayload
+  INearbyStopsPayload,
+  IRouteSchedule
 } from '../../../common/transit.interface';
 import type { ILatLng } from '../../../common/map.interface';
 import { MapStateManager } from '../state/map-state';
 import { RouteRenderer, type RouteData } from '../renderers/route-renderer';
-import { MAP_POPUP_ID, closeMapPopup } from '../utils/map-popup';
+import { MAP_POPUP_ID, dismissPopup, minimizePopup } from '../utils/map-popup';
 import { VehicleTracker } from '../trackers/vehicle-tracker';
 import { DirectionsController } from './directions-controller';
 import { URLSyncManager } from '../state/url-sync';
@@ -443,6 +444,9 @@ export class FilterController {
 
         // Render route geometry
         this.routeRenderer.renderRouteGeometry(routeId, geometry, color);
+
+        // Zoom map to fit the route
+        this.routeRenderer.fitToRouteData(geometry);
       }
 
       // Fetch and render stops for both directions (if both enabled)
@@ -969,7 +973,7 @@ export class FilterController {
    */
   private showStopPopup(stop: IStop, predictions: IPrediction[]): void {
     // Remove any existing map popup (stop or bus) first
-    closeMapPopup();
+    dismissPopup();
     this.stopPredictionPolling();
     // Clear minimised state since we're opening a new popup
     this.minimisedStop = null;
@@ -982,14 +986,13 @@ export class FilterController {
     popup.id = MAP_POPUP_ID;
     popup.className = 'map-popup';
 
-    // Header with close (×) and minimize (–) buttons
+    // Header with minimize (–) button only (no close)
     const header = document.createElement('div');
     header.className = 'map-popup__header';
     header.innerHTML = `
       <span class="material-icons-outlined map-popup__icon map-popup__icon--stop">place</span>
       <strong class="map-popup__title">${stop.stopName}</strong>
       <button class="map-popup__minimize" aria-label="Minimize" title="Minimize">&ndash;</button>
-      <button class="map-popup__close" aria-label="Close">&times;</button>
     `;
     popup.appendChild(header);
 
@@ -1094,23 +1097,23 @@ export class FilterController {
       container.appendChild(popup);
     }
 
-    // Close button handler (A2: deselect stop)
-    const closeBtn = popup.querySelector('.map-popup__close');
-    if (closeBtn) {
-      closeBtn.addEventListener('click', () => {
-        this.stopPredictionPolling();
-        closeMapPopup();
-      });
-    }
-
-    // Minimize button handler (A3)
+    // Minimize button handler — dock tab at bottom
     const minBtn = popup.querySelector('.map-popup__minimize');
     if (minBtn) {
       minBtn.addEventListener('click', () => {
         this.minimisedStop = stop;
         this.minimisedPredictions = predictions;
         this.stopPredictionPolling();
-        closeMapPopup();
+
+        const routeColor = this.routeColorCache.get(
+          this.stateManager.getState().selectedRouteId ?? ''
+        );
+        minimizePopup(
+          stop.stopName,
+          () => this.rebindStopPopupEvents(stop, predictions, selectedIndices, displayPredictions),
+          undefined,
+          routeColor
+        );
       });
     }
 
@@ -1354,6 +1357,238 @@ export class FilterController {
     return false;
   }
 
+  /**
+   * Re-bind event handlers on a restored stop popup (after minimize → restore).
+   * Called by the map-popup restore callback.
+   */
+  private rebindStopPopupEvents(
+    stop: IStop,
+    predictions: IPrediction[],
+    selectedIndices: Set<number>,
+    displayPredictions: IPrediction[]
+  ): void {
+    const popup = document.getElementById(MAP_POPUP_ID);
+    if (!popup) return;
+
+    // Re-bind minimize
+    const minBtn = popup.querySelector('.map-popup__minimize');
+    if (minBtn) {
+      minBtn.addEventListener('click', () => {
+        this.minimisedStop = stop;
+        this.minimisedPredictions = predictions;
+        this.stopPredictionPolling();
+        const routeColor = this.routeColorCache.get(
+          this.stateManager.getState().selectedRouteId ?? ''
+        );
+        minimizePopup(
+          stop.stopName,
+          () => this.rebindStopPopupEvents(stop, predictions, selectedIndices, displayPredictions),
+          undefined,
+          routeColor
+        );
+      });
+    }
+
+    // Re-bind prediction selection
+    const items = popup.querySelectorAll('.map-popup__arrival--selectable');
+    const directionsBtn = popup.querySelector('.map-popup__directions-btn') as HTMLButtonElement | null;
+    items.forEach((li) => {
+      const idx = parseInt((li as HTMLElement).dataset.predIndex ?? '-1', 10);
+      if (idx < 0) return;
+      li.addEventListener('click', () => {
+        if (selectedIndices.has(idx)) {
+          selectedIndices.delete(idx);
+          li.classList.remove('map-popup__arrival--selected');
+        } else {
+          selectedIndices.add(idx);
+          li.classList.add('map-popup__arrival--selected');
+        }
+        if (directionsBtn) {
+          this.updateDirectionsBtnLabel(directionsBtn, selectedIndices.size);
+        }
+      });
+    });
+
+    // Re-bind directions button
+    if (directionsBtn) {
+      directionsBtn.addEventListener('click', async () => {
+        const selectedPreds = displayPredictions.filter((_, i) =>
+          selectedIndices.has(i)
+        );
+        await this.directionsController.startDirections(stop, selectedPreds);
+        if (selectedPreds.length > 0) {
+          await this.renderSelectedBusRoutes(selectedPreds);
+        }
+      });
+    }
+
+    // Restart polling
+    this.startPredictionPolling(stop, selectedIndices, displayPredictions);
+  }
+
+  // -------------------------------------------------------------------
+  // Route Info Popup
+  // -------------------------------------------------------------------
+
+  /**
+   * Show the Route Info popup for the selected route.
+   * Fetches schedule, alerts, and detours from the backend.
+   */
+  async showRouteInfoPopup(routeId: string): Promise<void> {
+    // Dismiss any existing popup / docked tab
+    dismissPopup();
+
+    const state = this.stateManager.getState();
+    const route = state.availableRoutes.find((r) => r.id === routeId);
+    const routeName = route ? route.name : routeId;
+    const routeColor = route?.color || this.routeColorCache.get(routeId) || '#4285F4';
+
+    // Build popup shell immediately (shows loading state)
+    const popup = document.createElement('div');
+    popup.id = MAP_POPUP_ID;
+    popup.className = 'map-popup';
+
+    const header = document.createElement('div');
+    header.className = 'map-popup__header';
+    header.innerHTML = `
+      <span class="material-icons-outlined map-popup__icon map-popup__icon--route" style="color:${routeColor}">route</span>
+      <strong class="map-popup__title">${routeName}</strong>
+      <button class="map-popup__minimize" aria-label="Minimize">&minus;</button>
+    `;
+    popup.appendChild(header);
+
+    // Loading body
+    const body = document.createElement('div');
+    body.className = 'map-popup__body';
+    body.innerHTML = '<div class="map-popup__loading">Loading schedule&hellip;</div>';
+    popup.appendChild(body);
+
+    const container = document.querySelector('.map-container');
+    if (container) container.appendChild(popup);
+
+    // Bind minimize immediately
+    this.bindRouteInfoMinimize(popup, routeId, routeName, routeColor);
+
+    // Fetch schedule data
+    try {
+      const res: AxiosResponse = await axios.get(
+        `/transit/routes/${encodeURIComponent(routeId)}/schedule`,
+        {
+          headers: { Authorization: `Bearer ${this.token}` },
+          validateStatus: () => true
+        }
+      );
+
+      if (res.status !== 200 || res.data.name !== 'RouteScheduleRetrieved') {
+        body.innerHTML = '<div class="map-popup__empty">Schedule not available</div>';
+        return;
+      }
+
+      const schedule: IRouteSchedule = res.data.payload;
+      this.renderRouteInfoBody(body, schedule, routeColor);
+
+      // Re-bind minimize after body replaced
+      this.bindRouteInfoMinimize(popup, routeId, routeName, routeColor);
+    } catch (err) {
+      console.error('Error fetching route schedule:', err);
+      body.innerHTML = '<div class="map-popup__empty">Failed to load schedule</div>';
+    }
+  }
+
+  /**
+   * Render the route info popup body content.
+   */
+  private renderRouteInfoBody(
+    body: HTMLElement,
+    schedule: IRouteSchedule,
+    routeColor: string
+  ): void {
+    let html = '';
+
+    // Operating days
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    html += '<div class="route-info__section">';
+    html += '<div class="route-info__days">';
+    for (let d = 0; d < 7; d++) {
+      const active = schedule.operatingDays.includes(d);
+      html += `<span class="route-info__day${active ? ' route-info__day--active' : ''}" style="${active ? `background:${routeColor};color:#fff` : ''}">${dayNames[d]}</span>`;
+    }
+    html += '</div></div>';
+
+    // Direction schedules
+    if (schedule.directions.length > 0) {
+      html += '<div class="route-info__section">';
+      html += '<div class="route-info__label">Service Hours</div>';
+      for (const dir of schedule.directions) {
+        html += `<div class="route-info__hours">`;
+        html += `<span class="route-info__dir">${dir.direction}</span>`;
+        html += `<span class="route-info__times">${dir.firstTrip} &ndash; ${dir.lastTrip}</span>`;
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+
+    // Alerts
+    if (schedule.alerts.length > 0) {
+      html += '<div class="route-info__section route-info__section--alerts">';
+      html += '<div class="route-info__label"><span class="material-icons-outlined" style="font-size:16px;vertical-align:text-bottom">warning_amber</span> Alerts</div>';
+      for (const alert of schedule.alerts) {
+        html += `<div class="route-info__alert">${alert.headerText}</div>`;
+      }
+      html += '</div>';
+    }
+
+    // Detours
+    if (schedule.detours.length > 0) {
+      html += '<div class="route-info__section route-info__section--detours">';
+      html += '<div class="route-info__label"><span class="material-icons-outlined" style="font-size:16px;vertical-align:text-bottom">alt_route</span> Detours</div>';
+      for (const detour of schedule.detours) {
+        html += `<div class="route-info__detour">${detour.description}</div>`;
+      }
+      html += '</div>';
+    }
+
+    body.innerHTML = html;
+  }
+
+  /**
+   * Bind the minimize button on the route info popup.
+   */
+  private bindRouteInfoMinimize(
+    popup: HTMLElement,
+    routeId: string,
+    routeName: string,
+    routeColor: string
+  ): void {
+    const minBtn = popup.querySelector('.map-popup__minimize');
+    if (!minBtn) return;
+    // Remove old listeners by cloning
+    const fresh = minBtn.cloneNode(true);
+    minBtn.replaceWith(fresh);
+    fresh.addEventListener('click', () => {
+      minimizePopup(
+        routeName,
+        () => this.rebindRouteInfoPopupEvents(routeId, routeName, routeColor),
+        undefined,
+        routeColor
+      );
+    });
+  }
+
+  /**
+   * Re-bind event listeners on the route info popup after restoring from a docked tab.
+   */
+  private rebindRouteInfoPopupEvents(
+    routeId: string,
+    routeName: string,
+    routeColor: string
+  ): void {
+    const popup = document.getElementById(MAP_POPUP_ID);
+    if (!popup) return;
+
+    this.bindRouteInfoMinimize(popup, routeId, routeName, routeColor);
+  }
+
   // -------------------------------------------------------------------
   // Nearby Stops Discovery  (TUC4 — Discover Stops & Schedules)
   // -------------------------------------------------------------------
@@ -1486,7 +1721,7 @@ export class FilterController {
     this.routeRenderer.clearAllRoutes();
     this.vehicleTracker.stopPolling();
     this.stopPredictionPolling();
-    closeMapPopup();
+    dismissPopup();
 
     // Reset all filters to defaults
     this.stateManager.updateFilter('selectedRouteId', null);
@@ -1591,6 +1826,7 @@ export class FilterController {
     this.stopHealthPolling();
     this.vehicleTracker.stopPolling();
     this.routeRenderer.clearAllRoutes();
+    dismissPopup();
     this.stateManager.resetFilters();
     await this.initialize();
     this.urlSync.updateURL(this.stateManager.getState());

@@ -10,7 +10,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
 import { spawn } from 'child_process';
-import { IRoute, IPattern, IStop } from '../../common/transit.interface';
+import { IRoute, IPattern, IStop, IDirectionSchedule } from '../../common/transit.interface';
 import { IAppError } from '../../common/server.responses';
 
 const GTFS_URL = 'https://www.rideprt.org/developerresources/GTFS.zip';
@@ -502,6 +502,57 @@ class GTFSService {
     }
 
     return [...this.routeMap.values()].filter((r) => activeRouteIds.has(r.id));
+  }
+
+  /**
+   * Return the schedule summary for a specific route: operating days and
+   * first/last trip times per direction.
+   */
+  getRouteSchedule(routeId: string): {
+    operatingDays: number[];
+    directions: IDirectionSchedule[];
+  } | null {
+    this.assertGtfsLoaded();
+
+    const route = this.routeMap.get(routeId);
+    if (!route) return null;
+
+    // Collect all trips for this route
+    const directionRanges = new Map<string, { first: number; last: number }>();
+
+    for (const [tripId, rId] of this.tripRoute) {
+      if (rId !== routeId) continue;
+      const range = this.tripTimeRange.get(tripId);
+      if (!range) continue;
+      const dir = this.tripDirection.get(tripId) ?? 'UNKNOWN';
+
+      const existing = directionRanges.get(dir);
+      if (existing) {
+        existing.first = Math.min(existing.first, range.first);
+        existing.last = Math.max(existing.last, range.last);
+      } else {
+        directionRanges.set(dir, { first: range.first, last: range.last });
+      }
+    }
+
+    const directions: IDirectionSchedule[] = [];
+    for (const [dir, range] of directionRanges) {
+      const fmtTime = (mins: number): string => {
+        const h = Math.floor(mins / 60) % 24;
+        const m = mins % 60;
+        return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+      };
+      directions.push({
+        direction: dir,
+        firstTrip: fmtTime(range.first),
+        lastTrip: fmtTime(range.last)
+      });
+    }
+
+    return {
+      operatingDays: route.operatingDays,
+      directions
+    };
   }
 
   // ---------------------------------------------------------------------------

@@ -11,11 +11,13 @@ import tripUpdatesService from '../services/trip-updates.service';
 import memoryMonitorService from '../services/memory-monitor.service';
 import { TransitModel } from '../models/transit.model';
 import gtfsService from '../services/gtfs.service';
+import alertsService from '../services/alerts.service';
 import * as responses from '../../common/server.responses';
 import {
   IRoute,
   IVehicle,
-  INearbyStopsFilters
+  INearbyStopsFilters,
+  IRouteSchedule
 } from '../../common/transit.interface';
 
 /**
@@ -77,6 +79,10 @@ export default class BusController extends Controller {
       '/routes/available',
       this.filterRoutesByDateTime.bind(this)
     );
+    this.router.get(
+      '/routes/:routeId/schedule',
+      this.getRouteSchedule.bind(this)
+    );
     this.router.get('/routes/:id', this.getPatterns.bind(this));
     this.router.get('/vehicles/:routeId', this.getVehicles.bind(this));
     this.router.get(
@@ -84,6 +90,61 @@ export default class BusController extends Controller {
       this.getDetourGeometry.bind(this)
     );
     this.router.get('/detours/:routeId', this.getDetours.bind(this));
+  }
+
+  // GET /transit/routes/:routeId/schedule
+  private async getRouteSchedule(req: Request, res: Response): Promise<void> {
+    try {
+      const { routeId } = req.params;
+
+      const schedule = gtfsService.getRouteSchedule(routeId);
+      if (!schedule) {
+        const err: responses.IAppError = {
+          type: 'ClientError',
+          name: 'RouteNotFound',
+          message: `Route ${routeId} not found`
+        };
+        res.status(404).json(err);
+        return;
+      }
+
+      // Get route info
+      const routes = gtfsService.getRoutes();
+      const route = routes.find((r) => r.id === routeId);
+
+      // Get alerts filtered to this route
+      const allAlerts = alertsService.getAlerts();
+      const routeAlerts = allAlerts.filter((a) =>
+        a.routeIds.includes(routeId)
+      );
+
+      // Get detours for this route
+      const detours = await TransitModel.getDetours([routeId]);
+
+      const payload: IRouteSchedule = {
+        routeId,
+        routeName: route?.name ?? routeId,
+        system: route?.system ?? 'PRT',
+        operatingDays: schedule.operatingDays,
+        directions: schedule.directions,
+        alerts: routeAlerts,
+        detours
+      };
+
+      const success: responses.ISuccess = {
+        name: 'RouteScheduleRetrieved',
+        payload
+      };
+      res.status(200).json(success);
+    } catch (error) {
+      console.error('Error fetching route schedule:', error);
+      const err: responses.IAppError = {
+        type: 'ServerError',
+        name: 'GetRequestFailure',
+        message: 'Failed to retrieve route schedule'
+      };
+      res.status(500).json(err);
+    }
   }
 
   private registerStopRoutes(): void {

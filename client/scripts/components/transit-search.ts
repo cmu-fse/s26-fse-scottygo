@@ -74,7 +74,12 @@ export class TransitSearch extends HTMLElement {
     });
     this.searchInput?.addEventListener('focus', () => {
       const query = this.searchInput?.value.trim() ?? '';
-      if (query) void this.renderResults(query);
+      if (query) {
+        void this.renderResults(query);
+      } else {
+        // When search bar is focused with no query, show location search
+        this.dispatchEvent(new CustomEvent('searchFocusEmpty', { bubbles: true }));
+      }
     });
 
     this.clearBtn?.addEventListener('click', () => this.clearSearch());

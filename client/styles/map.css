@@ -122,6 +122,16 @@ body.dark .panel {
   color: white;
 }
 
+.circle-btn.danger {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.circle-btn.danger:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
 body.dark .circle-btn {
   background: var(--gray-800);
   color: var(--white);
@@ -130,6 +140,16 @@ body.dark .circle-btn {
 body.dark .circle-btn.primary {
   background: var(--primary);
   color: var(--white);
+}
+
+body.dark .circle-btn.danger {
+  background: var(--gray-800);
+  color: #9ca3af;
+}
+
+body.dark .circle-btn.danger:hover {
+  background: #451a1a;
+  color: #f87171;
 }
 
 .floating {
@@ -441,14 +461,20 @@ body.dark .control-panel {
   background: rgba(31, 41, 55, 0.95);
 }
 
-/* Route Bell Component — sits above the zoom panel, hidden until a route is selected */
+/* Route Bell Component — sits above the zoom panel */
 route-bell {
   position: absolute;
   right: 20px;
   /* 20px (zoom-panel bottom) + 3×48px (buttons) + 2×8px (gaps) + 8px (gap to bell) = 188px */
   bottom: 188px;
-  display: none;
+  display: block;
   z-index: 20;
+}
+
+route-bell.is-disabled .bell-btn {
+  opacity: 0.35;
+  pointer-events: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
 .bell-btn.bell-subscribed {
@@ -2785,4 +2811,664 @@ body.dark .route-pick-popup {
 
 .route-pick-badge:hover {
   filter: brightness(1.15);
+}
+
+/* ============================================
+   LOCATION SEARCH COMPONENT
+   ============================================ */
+
+location-search {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 520px;
+  width: calc(100% - 32px);
+  z-index: 35; /* Above search bar dropdown (z:30) but below modals */
+  pointer-events: none;
+}
+
+.location-search-dropdown {
+  position: relative;
+  top: 56px; /* Below search bar height (48px) + gap */
+  background: #fff;
+  border-radius: 16px;
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.18),
+    0 0 0 1px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+body.dark .location-search-dropdown {
+  background: #1f2937;
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.location-search-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.location-search-item:hover,
+.location-search-item:focus {
+  background: rgba(0, 0, 0, 0.04);
+  outline: none;
+}
+
+body.dark .location-search-item:hover,
+body.dark .location-search-item:focus {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.location-search-icon {
+  font-size: 22px;
+  color: #4285f4;
+  flex-shrink: 0;
+}
+
+.location-search-custom .location-search-icon {
+  color: #5f6368;
+}
+
+body.dark .location-search-icon {
+  color: #8ab4f8;
+}
+
+body.dark .location-search-custom .location-search-icon {
+  color: #9aa0a6;
+}
+
+.location-search-item-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.location-search-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #202124;
+}
+
+body.dark .location-search-label {
+  color: #e8eaed;
+}
+
+.location-search-sublabel {
+  font-size: 12px;
+  color: #5f6368;
+}
+
+body.dark .location-search-sublabel {
+  color: #9aa0a6;
+}
+
+.location-search-arrow {
+  margin-left: auto;
+  font-size: 20px;
+  color: #5f6368;
+}
+
+body.dark .location-search-arrow {
+  color: #9aa0a6;
+}
+
+.location-search-divider {
+  height: 1px;
+  background: rgba(0, 0, 0, 0.08);
+  margin: 0 16px;
+}
+
+body.dark .location-search-divider {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Places search mode */
+.location-search-places-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+.location-search-back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  color: #5f6368;
+  flex-shrink: 0;
+  padding: 0;
+  transition: background 0.15s ease;
+}
+
+.location-search-back-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+body.dark .location-search-back-btn {
+  color: #9aa0a6;
+}
+
+body.dark .location-search-back-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.location-search-places-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 14px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 8px;
+  color: #202124;
+  font-family:
+    'Inter',
+    -apple-system,
+    system-ui,
+    sans-serif;
+}
+
+body.dark .location-search-places-input {
+  background: rgba(255, 255, 255, 0.06);
+  color: #e8eaed;
+}
+
+.location-search-places-input::placeholder {
+  color: #5f6368;
+}
+
+body.dark .location-search-places-input::placeholder {
+  color: #9aa0a6;
+}
+
+/* Google Places Autocomplete dropdown styling overrides */
+.pac-container {
+  border-radius: 12px;
+  border: none;
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.18),
+    0 0 0 1px rgba(0, 0, 0, 0.04);
+  font-family:
+    'Inter',
+    -apple-system,
+    system-ui,
+    sans-serif;
+  z-index: 9999;
+}
+
+body.dark .pac-container {
+  background: #1f2937;
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+body.dark .pac-item {
+  border-top-color: rgba(255, 255, 255, 0.06);
+  color: #e8eaed;
+}
+
+body.dark .pac-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+body.dark .pac-item-query {
+  color: #e8eaed;
+}
+
+body.dark .pac-matched {
+  color: #8ab4f8;
+}
+
+/* ============================================
+   PLANNED LOCATION POPUP
+   ============================================ */
+
+.planned-location-popup {
+  position: absolute;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fff;
+  border-radius: 16px;
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(0, 0, 0, 0.04);
+  padding: 16px;
+  z-index: 50;
+  min-width: 240px;
+  max-width: 320px;
+  animation: planned-popup-in 0.2s ease-out;
+}
+
+@keyframes planned-popup-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+body.dark .planned-location-popup {
+  background: #1f2937;
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.planned-location-popup__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.planned-location-popup__icon {
+  font-size: 22px;
+  color: #c41230;
+}
+
+.planned-location-popup__label {
+  font-size: 15px;
+  font-weight: 600;
+  color: #202124;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+body.dark .planned-location-popup__label {
+  color: #e8eaed;
+}
+
+.planned-location-popup__desc {
+  font-size: 12px;
+  color: #5f6368;
+  margin: 4px 0 12px 30px;
+}
+
+body.dark .planned-location-popup__desc {
+  color: #9aa0a6;
+}
+
+.planned-location-popup__remove {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+  background: transparent;
+  color: #c41230;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  font-family:
+    'Inter',
+    -apple-system,
+    system-ui,
+    sans-serif;
+}
+
+.planned-location-popup__remove .material-icons-outlined {
+  font-size: 18px;
+}
+
+.planned-location-popup__remove:hover {
+  background: rgba(196, 18, 48, 0.06);
+}
+
+body.dark .planned-location-popup__remove {
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #f28b82;
+}
+
+body.dark .planned-location-popup__remove:hover {
+  background: rgba(242, 139, 130, 0.1);
+}
+
+/* ============================================
+   DOCKED POPUP TAB (minimised state)
+   ============================================ */
+
+.map-popup-tab {
+  position: absolute;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(12px);
+  border-radius: 24px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1f2937;
+  animation: mapPopupSlideUp 0.2s ease-out;
+  white-space: nowrap;
+  max-width: calc(100% - 64px);
+  overflow: hidden;
+}
+
+.map-popup-tab:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+.map-popup-tab__arrow {
+  font-size: 20px;
+  color: #6b7280;
+}
+
+.map-popup-tab__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  background: #4285f4;
+}
+
+.map-popup-tab__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+body.dark .map-popup-tab {
+  background: rgba(31, 41, 55, 0.97);
+  color: #f3f4f6;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+body.dark .map-popup-tab:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+body.dark .map-popup-tab__arrow {
+  color: #9ca3af;
+}
+
+/* ============================================
+   ROUTE INFO POPUP
+   ============================================ */
+
+.map-popup__loading,
+.map-popup__empty {
+  padding: 16px 0;
+  text-align: center;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+body.dark .map-popup__loading,
+body.dark .map-popup__empty {
+  color: #9ca3af;
+}
+
+.route-info__section {
+  padding: 8px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.route-info__section:last-child {
+  border-bottom: none;
+}
+
+body.dark .route-info__section {
+  border-bottom-color: #374151;
+}
+
+.route-info__days {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+}
+
+.route-info__day {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 28px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #9ca3af;
+  background: #f3f4f6;
+}
+
+body.dark .route-info__day {
+  background: #374151;
+  color: #6b7280;
+}
+
+.route-info__day--active {
+  color: #fff;
+}
+
+.route-info__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 6px;
+}
+
+body.dark .route-info__label {
+  color: #9ca3af;
+}
+
+.route-info__hours {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.route-info__dir {
+  font-size: 12px;
+  color: #6b7280;
+  text-transform: capitalize;
+}
+
+body.dark .route-info__dir {
+  color: #9ca3af;
+}
+
+.route-info__times {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.route-info__alert {
+  padding: 6px 0;
+  font-size: 13px;
+  color: #d97706;
+}
+
+body.dark .route-info__alert {
+  color: #fbbf24;
+}
+
+.route-info__detour {
+  padding: 6px 0;
+  font-size: 13px;
+  color: #6366f1;
+}
+
+body.dark .route-info__detour {
+  color: #a5b4fc;
+}
+
+/* ============================================
+   ONBOARDING TUTORIAL
+   ============================================ */
+
+/* Full-screen overlay — blocks all interaction */
+.tutorial-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9000;
+  pointer-events: all;
+  animation: tutorialFadeIn 0.3s ease;
+}
+
+.tutorial-overlay.tutorial-fade-out {
+  animation: tutorialFadeOut 0.3s ease forwards;
+}
+
+@keyframes tutorialFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes tutorialFadeOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* Spotlight cutout — sits above overlay, highlights the target */
+.tutorial-spotlight {
+  position: fixed;
+  z-index: 9001;
+  border-radius: 14px;
+  pointer-events: none;
+  transition: top 0.3s ease, left 0.3s ease, width 0.3s ease, height 0.3s ease;
+  background: transparent;
+  /* Punch through the overlay with a bright ring */
+  outline: 4000px solid rgba(0, 0, 0, 0.5);
+}
+
+/* Popup card */
+.tutorial-popup {
+  position: fixed;
+  z-index: 9002;
+  width: 280px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.06);
+  animation: tutorialPopupIn 0.25s ease;
+}
+
+@keyframes tutorialPopupIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.tutorial-popup__step {
+  font-size: 12px;
+  font-weight: 600;
+  color: #c41230;
+  margin: 0 0 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tutorial-popup__title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #111;
+  margin: 0 0 6px;
+}
+
+.tutorial-popup__desc {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #555;
+  margin: 0 0 16px;
+}
+
+.tutorial-popup__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tutorial-popup__ok {
+  color: #c41230;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  user-select: none;
+}
+
+.tutorial-popup__ok:hover {
+  opacity: 0.7;
+}
+
+.tutorial-popup__dismiss {
+  color: #999;
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 0.15s;
+  user-select: none;
+}
+
+.tutorial-popup__dismiss:hover {
+  color: #666;
+}
+
+/* ── Dark mode ── */
+
+body.dark .tutorial-popup {
+  background: rgba(31, 41, 55, 0.92);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35), 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+
+body.dark .tutorial-popup__step {
+  color: #e8485e;
+}
+
+body.dark .tutorial-popup__title {
+  color: #e0e0e0;
+}
+
+body.dark .tutorial-popup__desc {
+  color: #9ca3af;
+}
+
+body.dark .tutorial-popup__ok {
+  color: #e8485e;
+}
+
+body.dark .tutorial-popup__dismiss {
+  color: #6b7280;
+}
+
+body.dark .tutorial-popup__dismiss:hover {
+  color: #9ca3af;
 }

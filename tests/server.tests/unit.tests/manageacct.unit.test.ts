@@ -67,7 +67,8 @@ const adminAccount: IUserAccount = {
   email: 'admin@andrew.cmu.edu',
   agreed: true,
   status: 'Active',
-  privilegeLevel: 'Administrator'
+  privilegeLevel: 'Administrator',
+  onboardingComplete: false
 };
 
 const memberAccount: IUserAccount = {
@@ -76,7 +77,8 @@ const memberAccount: IUserAccount = {
   email: 'member@andrew.cmu.edu',
   agreed: true,
   status: 'Active',
-  privilegeLevel: 'Member'
+  privilegeLevel: 'Member',
+  onboardingComplete: false
 };
 
 const coordinatorAccount: IUserAccount = {
@@ -85,7 +87,8 @@ const coordinatorAccount: IUserAccount = {
   email: 'coord@andrew.cmu.edu',
   agreed: true,
   status: 'Active',
-  privilegeLevel: 'Coordinator'
+  privilegeLevel: 'Coordinator',
+  onboardingComplete: false
 };
 
 // ============================================================================
@@ -449,7 +452,8 @@ describe('Initial-Administrator Rule (R2)', () => {
       email: '',
       agreed: true,
       status: 'Active',
-      privilegeLevel: 'Administrator'
+      privilegeLevel: 'Administrator',
+      onboardingComplete: true
     };
 
     // Verify the default admin matches R2 Initial-Administrator Rule
@@ -632,7 +636,8 @@ describe('Active-Inactive Rule (R5)', () => {
       email: 'newuser@andrew.cmu.edu',
       agreed: true,
       status: 'Active',
-      privilegeLevel: 'Member'
+      privilegeLevel: 'Member',
+      onboardingComplete: false
     };
 
     const mockDb = createMockDb({

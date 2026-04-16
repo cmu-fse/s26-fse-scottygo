@@ -278,6 +278,14 @@ export class GoogleMapProvider implements IMapProvider {
   }
 
   /**
+   * Expose the underlying google.maps.Map instance for widgets that
+   * need direct SDK access (e.g. Places Autocomplete).
+   */
+  getNativeMap(): google.maps.Map {
+    return this.map;
+  }
+
+  /**
    * Dynamically loads the Google Maps JavaScript SDK into the page.
    * Resolves immediately if already loaded.
    */
@@ -288,7 +296,7 @@ export class GoogleMapProvider implements IMapProvider {
         return;
       }
       const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
       script.async = true;
       script.onload = () => resolve();
       script.onerror = () =>

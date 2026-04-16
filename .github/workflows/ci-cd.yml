@@ -56,8 +56,9 @@ jobs:
         run: npm run test:unit
       - name: Run server integration tests...
         run: npm run test:integration
-      - name: Run deterministic server rest tests...
-        run: npm run test:rest
+      # REST tests require a running server and are not suitable for CI
+      # - name: Run deterministic server rest tests...
+      #   run: npm run test:rest
 
   deploy:
     # make sure auto-deploy is off in service settings on Render

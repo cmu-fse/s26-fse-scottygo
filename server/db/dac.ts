@@ -79,6 +79,8 @@ export interface IDatabase {
 
   countAdministrators(): Promise<number>;
 
+  markOnboardingComplete(userId: string): Promise<boolean>;
+
   getAllUsernames(): Promise<string[]>;
 
   seedDefaultAdmin(): Promise<void>;

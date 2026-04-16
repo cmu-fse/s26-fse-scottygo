@@ -46,7 +46,8 @@ describe('LoginLogout Use Case unit tests', () => {
   const activeAccount: IUserAccount = {
     ...activeAgreedUser,
     status: 'Active',
-    privilegeLevel: 'Member'
+    privilegeLevel: 'Member',
+    onboardingComplete: false
   };
 
   beforeEach(() => {

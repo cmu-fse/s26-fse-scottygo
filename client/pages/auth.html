@@ -12,12 +12,13 @@
     <main class="content">
       <h1 class="logo">ScottyGo</h1>
       <div class="auth-card">
-        <form id="auth-form">
+        <!-- LOGIN VIEW -->
+        <form id="login-form" class="auth-view" data-view="login">
           <div class="form-group">
-            <label for="username">Username</label>
+            <label for="login-username">Username</label>
             <input
               type="text"
-              id="username"
+              id="login-username"
               name="username"
               class="form-input"
               placeholder="scotty"
@@ -25,25 +26,69 @@
           </div>
 
           <div class="form-group">
-            <label for="email">Email (only for registration)</label>
+            <label for="login-password">Password</label>
+            <input
+              type="password"
+              id="login-password"
+              name="password"
+              class="form-input"
+              placeholder="Your password"
+            />
+          </div>
+
+          <button type="submit" class="submit-btn" id="login-btn">Login</button>
+          <div class="form-divider">or</div>
+          <button type="button" class="switch-btn" id="show-register-btn">Create an account</button>
+        </form>
+
+        <!-- REGISTER VIEW -->
+        <form id="register-form" class="auth-view" data-view="register" hidden>
+          <div class="form-group">
+            <label for="reg-username">Username</label>
+            <input
+              type="text"
+              id="reg-username"
+              name="username"
+              class="form-input"
+              placeholder="scotty"
+            />
+            <span class="field-hint" id="reg-username-hint"></span>
+          </div>
+
+          <div class="form-group">
+            <label for="reg-email">Email</label>
             <input
               type="email"
-              id="email"
+              id="reg-email"
               name="email"
               class="form-input"
               placeholder="scotty@andrew.cmu.edu"
             />
+            <span class="field-hint" id="reg-email-hint"></span>
           </div>
 
           <div class="form-group">
-            <label for="password">Password</label>
+            <label for="reg-password">Password</label>
             <input
               type="password"
-              id="password"
+              id="reg-password"
               name="password"
               class="form-input"
-              placeholder="Str0ng*Passw0rd! 0f 4+ chArAct8rs!"
+              placeholder="Str0ng*Passw0rd!"
             />
+            <span class="field-hint" id="reg-password-hint"></span>
+          </div>
+
+          <div class="form-group">
+            <label for="reg-confirm-password">Confirm Password</label>
+            <input
+              type="password"
+              id="reg-confirm-password"
+              name="confirm-password"
+              class="form-input"
+              placeholder="Re-enter password"
+            />
+            <span class="field-hint" id="reg-confirm-hint"></span>
           </div>
 
           <div class="form-group checkbox-group">
@@ -61,10 +106,11 @@
             </div>
           </div>
 
-          <button type="submit" class="submit-btn" id="submit-btn"
-            >Login/Register</button
-          >
+          <button type="submit" class="submit-btn" id="register-btn" disabled>Register</button>
+          <div class="form-divider">or</div>
+          <button type="button" class="switch-btn" id="show-login-btn">&larr; Back to Login</button>
         </form>
+
         <p id="status" class="status" role="status" aria-live="polite"></p>
       </div>
     </main>
