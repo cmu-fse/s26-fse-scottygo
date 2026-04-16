@@ -4,6 +4,7 @@ import { Router, Response } from 'express';
 import { Server as SocketServer } from 'socket.io';
 import path from 'path';
 import type { ILogin } from '../../common/user.interface';
+import * as responses from '../../common/server.responses';
 
 abstract class Controller {
   // note the abstract keyword here
@@ -45,6 +46,34 @@ abstract class Controller {
 
   // each controller must define this method to set up its endpoints
   public abstract initializeRoutes(): void;
+
+  /**
+   * Uniform error handler for caught exceptions.
+   * Forwards known IAppError shapes directly; wraps unknown errors as ServerError.
+   */
+  protected handleAppError(
+    res: Response,
+    error: unknown,
+    fallbackMessage: string = 'An unexpected error occurred'
+  ): void {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'type' in error &&
+      'name' in error
+    ) {
+      const appError = error as responses.IAppError;
+      const statusCode = appError.type === 'ClientError' ? 400 : 500;
+      res.status(statusCode).json(appError);
+      return;
+    }
+    const unexpectedError: responses.IAppError = {
+      type: 'ServerError',
+      name: 'MongoDBError',
+      message: fallbackMessage
+    };
+    res.status(500).json(unexpectedError);
+  }
 }
 
 export default Controller;

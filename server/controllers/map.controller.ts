@@ -129,22 +129,7 @@ export default class MapController extends Controller {
       };
       return res.status(200).json(successRes);
     } catch (error: unknown) {
-      if (
-        error &&
-        typeof error === 'object' &&
-        'type' in error &&
-        'name' in error
-      ) {
-        const appError = error as responses.IAppError;
-        const statusCode = appError.type === 'ClientError' ? 400 : 500;
-        return res.status(statusCode).json(appError);
-      }
-      const unexpectedError: responses.IAppError = {
-        type: 'ServerError',
-        name: 'MongoDBError',
-        message: 'An unexpected error occurred in the database'
-      };
-      return res.status(500).json(unexpectedError);
+      return this.handleAppError(res, error, 'An unexpected error occurred in the database');
     }
   }
 

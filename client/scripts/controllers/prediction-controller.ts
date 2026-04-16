@@ -259,30 +259,7 @@ export class PredictionController {
       container.appendChild(popup);
     }
 
-    // Minimize button handler
-    const minBtn = popup.querySelector('.map-popup__minimize');
-    if (minBtn) {
-      minBtn.addEventListener('click', () => {
-        this.minimisedStop = stop;
-        this.minimisedPredictions = predictions;
-        this.stopPolling();
-        const routeColor = this.getRouteColor(
-          this.stateManager.getState().selectedRouteId ?? ''
-        );
-        minimizePopup(
-          stop.stopName,
-          () =>
-            this.rebindStopPopupEvents(
-              stop,
-              predictions,
-              selectedIndices,
-              displayPredictions
-            ),
-          undefined,
-          routeColor
-        );
-      });
-    }
+    this.bindMinimizeButton(popup, stop, predictions, selectedIndices, displayPredictions);
 
     // Directions button handler (TUC4 Step 5)
     directionsBtn.addEventListener('click', async () => {
@@ -427,6 +404,37 @@ export class PredictionController {
     }
   }
 
+  private bindMinimizeButton(
+    popup: Element,
+    stop: IStop,
+    predictions: IPrediction[],
+    selectedIndices: Set<number>,
+    displayPredictions: IPrediction[]
+  ): void {
+    const minBtn = popup.querySelector('.map-popup__minimize');
+    if (!minBtn) return;
+    minBtn.addEventListener('click', () => {
+      this.minimisedStop = stop;
+      this.minimisedPredictions = predictions;
+      this.stopPolling();
+      const routeColor = this.getRouteColor(
+        this.stateManager.getState().selectedRouteId ?? ''
+      );
+      minimizePopup(
+        stop.stopName,
+        () =>
+          this.rebindStopPopupEvents(
+            stop,
+            predictions,
+            selectedIndices,
+            displayPredictions
+          ),
+        undefined,
+        routeColor
+      );
+    });
+  }
+
   private rebindStopPopupEvents(
     stop: IStop,
     predictions: IPrediction[],
@@ -436,29 +444,7 @@ export class PredictionController {
     const popup = document.getElementById(MAP_POPUP_ID);
     if (!popup) return;
 
-    const minBtn = popup.querySelector('.map-popup__minimize');
-    if (minBtn) {
-      minBtn.addEventListener('click', () => {
-        this.minimisedStop = stop;
-        this.minimisedPredictions = predictions;
-        this.stopPolling();
-        const routeColor = this.getRouteColor(
-          this.stateManager.getState().selectedRouteId ?? ''
-        );
-        minimizePopup(
-          stop.stopName,
-          () =>
-            this.rebindStopPopupEvents(
-              stop,
-              predictions,
-              selectedIndices,
-              displayPredictions
-            ),
-          undefined,
-          routeColor
-        );
-      });
-    }
+    this.bindMinimizeButton(popup, stop, predictions, selectedIndices, displayPredictions);
 
     const items = popup.querySelectorAll('.map-popup__arrival--selectable');
     const directionsBtn = popup.querySelector(

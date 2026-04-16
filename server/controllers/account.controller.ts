@@ -176,6 +176,53 @@ export default class AccountController extends Controller {
     );
   }
 
+  /**
+   * Guard: respond 400 and return false when targetUsername is missing.
+   */
+  private requireTargetUsername(
+    targetUsername: string,
+    res: Response
+  ): boolean {
+    if (!targetUsername) {
+      this.sendClientError(res, 400, 'MissingUsername', 'Username is required');
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Guard: respond 403 and return false when requestingUser is not an Administrator.
+   */
+  private requireAdmin(
+    requestingUser: IUserAccount,
+    res: Response,
+    message: string
+  ): boolean {
+    if (requestingUser.privilegeLevel !== 'Administrator') {
+      this.sendClientError(res, 403, 'UnauthorizedRequest', message);
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Guard: respond 403 and return false unless requestingUser is an admin or owns the target account.
+   */
+  private requireAdminOrOwn(
+    requestingUser: IUserAccount,
+    targetUsername: string,
+    res: Response,
+    message: string
+  ): boolean {
+    const isAdmin = requestingUser.privilegeLevel === 'Administrator';
+    const isOwnAccount = this.isOwnAccount(requestingUser, targetUsername);
+    if (!isAdmin && !isOwnAccount) {
+      this.sendClientError(res, 403, 'UnauthorizedRequest', message);
+      return false;
+    }
+    return true;
+  }
+
   private async applyStatusTransitionSideEffects(
     updatedUser: IUserAccount,
     previousStatus: IAccountStatus,
@@ -242,16 +289,7 @@ export default class AccountController extends Controller {
       const requestingUser = await this.requireRequestingUser(req, res);
       if (!requestingUser) return;
 
-      // Only administrators can get all users
-      if (requestingUser.privilegeLevel !== 'Administrator') {
-        this.sendClientError(
-          res,
-          403,
-          'UnauthorizedRequest',
-          'Only administrators can view all users'
-        );
-        return;
-      }
+      if (!this.requireAdmin(requestingUser, res, 'Only administrators can view all users')) return;
 
       const usernames = await User.getAllUsernames();
       const successRes: responses.ISuccess = {
@@ -261,7 +299,7 @@ export default class AccountController extends Controller {
       };
       res.status(200).json(successRes);
     } catch (error: unknown) {
-      this.handleError(res, error);
+      this.handleAppError(res, error);
     }
   }
 
@@ -275,15 +313,7 @@ export default class AccountController extends Controller {
       const requestingUser = await this.requireRequestingUser(req, res);
       if (!requestingUser) return;
 
-      if (requestingUser.privilegeLevel !== 'Administrator') {
-        this.sendClientError(
-          res,
-          403,
-          'UnauthorizedRequest',
-          'Only administrators can search users'
-        );
-        return;
-      }
+      if (!this.requireAdmin(requestingUser, res, 'Only administrators can search users')) return;
 
       const q = (req.query.q as string | undefined)?.trim() ?? '';
       const context = new SearchContext<string[]>(new UserSearchStrategy());
@@ -300,7 +330,7 @@ export default class AccountController extends Controller {
       };
       res.status(200).json(successRes);
     } catch (error: unknown) {
-      this.handleError(res, error);
+      this.handleAppError(res, error);
     }
   }
 
@@ -310,34 +340,13 @@ export default class AccountController extends Controller {
    */
   public async getUserAccount(req: Request, res: Response): Promise<void> {
     const targetUsername = req.params.username;
-
-    if (!targetUsername) {
-      const error: responses.IAppError = {
-        type: 'ClientError',
-        name: 'MissingUsername',
-        message: 'Username is required'
-      };
-      res.status(400).json(error);
-      return;
-    }
+    if (!this.requireTargetUsername(targetUsername, res)) return;
 
     try {
       const requestingUser = await this.requireRequestingUser(req, res);
       if (!requestingUser) return;
 
-      // Authorization: Admins can view any user; Members can only view their own
-      const isAdmin = requestingUser.privilegeLevel === 'Administrator';
-      const isOwnAccount = this.isOwnAccount(requestingUser, targetUsername);
-
-      if (!isAdmin && !isOwnAccount) {
-        this.sendClientError(
-          res,
-          403,
-          'UnauthorizedRequest',
-          'You can only view your own account'
-        );
-        return;
-      }
+      if (!this.requireAdminOrOwn(requestingUser, targetUsername, res, 'You can only view your own account')) return;
 
       const userAccount = await User.getUserAccount(targetUsername);
       const successRes: responses.ISuccess = {
@@ -347,7 +356,7 @@ export default class AccountController extends Controller {
       };
       res.status(200).json(successRes);
     } catch (error: unknown) {
-      this.handleError(res, error);
+      this.handleAppError(res, error);
     }
   }
 
@@ -359,15 +368,7 @@ export default class AccountController extends Controller {
     const targetUsername = req.params.username;
     const { status } = req.body as { status: IAccountStatus };
 
-    if (!targetUsername) {
-      const error: responses.IAppError = {
-        type: 'ClientError',
-        name: 'MissingUsername',
-        message: 'Username is required'
-      };
-      res.status(400).json(error);
-      return;
-    }
+    if (!this.requireTargetUsername(targetUsername, res)) return;
 
     if (!status || !['Active', 'Inactive'].includes(status)) {
       const error: responses.IAppError = {
@@ -383,19 +384,7 @@ export default class AccountController extends Controller {
       const requestingUser = await this.requireRequestingUser(req, res);
       if (!requestingUser) return;
 
-      const isAdmin = requestingUser.privilegeLevel === 'Administrator';
-      const isOwnAccount = this.isOwnAccount(requestingUser, targetUsername);
-
-      // Authorization: Admins can change any; Members can only change their own
-      if (!isAdmin && !isOwnAccount) {
-        this.sendClientError(
-          res,
-          403,
-          'UnauthorizedRequest',
-          'You can only change your own account status'
-        );
-        return;
-      }
+      if (!this.requireAdminOrOwn(requestingUser, targetUsername, res, 'You can only change your own account status')) return;
 
       // Get target user for email notification
       const targetUser = await User.getUserAccount(targetUsername);
@@ -419,7 +408,7 @@ export default class AccountController extends Controller {
       };
       res.status(200).json(successRes);
     } catch (error: unknown) {
-      this.handleError(res, error);
+      this.handleAppError(res, error);
     }
   }
 
@@ -456,15 +445,7 @@ export default class AccountController extends Controller {
     const targetUsername = req.params.username;
     const { privilegeLevel } = req.body as { privilegeLevel: IPrivilegeLevel };
 
-    if (!targetUsername) {
-      const error: responses.IAppError = {
-        type: 'ClientError',
-        name: 'MissingUsername',
-        message: 'Username is required'
-      };
-      res.status(400).json(error);
-      return;
-    }
+    if (!this.requireTargetUsername(targetUsername, res)) return;
 
     if (
       !privilegeLevel ||
@@ -484,16 +465,7 @@ export default class AccountController extends Controller {
       const requestingUser = await this.requireRequestingUser(req, res);
       if (!requestingUser) return;
 
-      // Authorization: Only Administrators can change privilege levels
-      if (requestingUser.privilegeLevel !== 'Administrator') {
-        this.sendClientError(
-          res,
-          403,
-          'UnauthorizedRequest',
-          'Only administrators can change privilege levels'
-        );
-        return;
-      }
+      if (!this.requireAdmin(requestingUser, res, 'Only administrators can change privilege levels')) return;
 
       // R1 check is now in User.updatePrivilege (model layer)
       const updatedUser = await User.updatePrivilege(
@@ -511,7 +483,7 @@ export default class AccountController extends Controller {
       };
       res.status(200).json(successRes);
     } catch (error: unknown) {
-      this.handleError(res, error);
+      this.handleAppError(res, error);
     }
   }
 
@@ -523,23 +495,10 @@ export default class AccountController extends Controller {
     const targetUsername = req.params.username;
     const { newUsername } = req.body as { newUsername: string };
 
-    if (!targetUsername) {
-      const error: responses.IAppError = {
-        type: 'ClientError',
-        name: 'MissingUsername',
-        message: 'Username is required'
-      };
-      res.status(400).json(error);
-      return;
-    }
+    if (!this.requireTargetUsername(targetUsername, res)) return;
 
     if (!newUsername) {
-      const error: responses.IAppError = {
-        type: 'ClientError',
-        name: 'MissingUsername',
-        message: 'New username is required'
-      };
-      res.status(400).json(error);
+      this.sendClientError(res, 400, 'MissingUsername', 'New username is required');
       return;
     }
 
@@ -548,15 +507,8 @@ export default class AccountController extends Controller {
       if (!requestingUser) return;
 
       // Authorization: Members only (own account). Administrators cannot change usernames.
-      const isOwnAccount = this.isOwnAccount(requestingUser, targetUsername);
-
-      if (!isOwnAccount) {
-        this.sendClientError(
-          res,
-          403,
-          'UnauthorizedRequest',
-          'You can only change your own username'
-        );
+      if (!this.isOwnAccount(requestingUser, targetUsername)) {
+        this.sendClientError(res, 403, 'UnauthorizedRequest', 'You can only change your own username');
         return;
       }
 
@@ -575,7 +527,7 @@ export default class AccountController extends Controller {
       };
       res.status(200).json(successRes);
     } catch (error: unknown) {
-      this.handleError(res, error);
+      this.handleAppError(res, error);
     }
   }
 
@@ -587,23 +539,10 @@ export default class AccountController extends Controller {
     const targetUsername = req.params.username;
     const { email } = req.body as { email: string };
 
-    if (!targetUsername) {
-      const error: responses.IAppError = {
-        type: 'ClientError',
-        name: 'MissingUsername',
-        message: 'Username is required'
-      };
-      res.status(400).json(error);
-      return;
-    }
+    if (!this.requireTargetUsername(targetUsername, res)) return;
 
     if (!email) {
-      const error: responses.IAppError = {
-        type: 'ClientError',
-        name: 'MissingEmail',
-        message: 'Email is required'
-      };
-      res.status(400).json(error);
+      this.sendClientError(res, 400, 'MissingEmail', 'Email is required');
       return;
     }
 
@@ -612,15 +551,8 @@ export default class AccountController extends Controller {
       if (!requestingUser) return;
 
       // Authorization: Members only (own account)
-      const isOwnAccount = this.isOwnAccount(requestingUser, targetUsername);
-
-      if (!isOwnAccount) {
-        this.sendClientError(
-          res,
-          403,
-          'UnauthorizedRequest',
-          'You can only change your own email'
-        );
+      if (!this.isOwnAccount(requestingUser, targetUsername)) {
+        this.sendClientError(res, 403, 'UnauthorizedRequest', 'You can only change your own email');
         return;
       }
 
@@ -636,7 +568,7 @@ export default class AccountController extends Controller {
       };
       res.status(200).json(successRes);
     } catch (error: unknown) {
-      this.handleError(res, error);
+      this.handleAppError(res, error);
     }
   }
 
@@ -648,23 +580,10 @@ export default class AccountController extends Controller {
     const targetUsername = req.params.username;
     const { newPassword } = req.body as { newPassword: string };
 
-    if (!targetUsername) {
-      const error: responses.IAppError = {
-        type: 'ClientError',
-        name: 'MissingUsername',
-        message: 'Username is required'
-      };
-      res.status(400).json(error);
-      return;
-    }
+    if (!this.requireTargetUsername(targetUsername, res)) return;
 
     if (!newPassword) {
-      const error: responses.IAppError = {
-        type: 'ClientError',
-        name: 'MissingPassword',
-        message: 'New password is required'
-      };
-      res.status(400).json(error);
+      this.sendClientError(res, 400, 'MissingPassword', 'New password is required');
       return;
     }
 
@@ -672,19 +591,7 @@ export default class AccountController extends Controller {
       const requestingUser = await this.requireRequestingUser(req, res);
       if (!requestingUser) return;
 
-      const isAdmin = requestingUser.privilegeLevel === 'Administrator';
-      const isOwnAccount = this.isOwnAccount(requestingUser, targetUsername);
-
-      // Authorization: Admins can change any; Members can only change their own
-      if (!isAdmin && !isOwnAccount) {
-        this.sendClientError(
-          res,
-          403,
-          'UnauthorizedRequest',
-          'You can only change your own password'
-        );
-        return;
-      }
+      if (!this.requireAdminOrOwn(requestingUser, targetUsername, res, 'You can only change your own password')) return;
 
       const updatedUser = await User.updatePassword(
         targetUsername,
@@ -701,7 +608,7 @@ export default class AccountController extends Controller {
       };
       res.status(200).json(successRes);
     } catch (error: unknown) {
-      this.handleError(res, error);
+      this.handleAppError(res, error);
     }
   }
 
@@ -711,30 +618,6 @@ export default class AccountController extends Controller {
    */
   public accountPage(req: Request, res: Response): void {
     this.sendPage(res, 'account.html');
-  }
-
-  /**
-   * Common error handler for controller methods
-   */
-  private handleError(res: Response, error: unknown): void {
-    if (
-      error &&
-      typeof error === 'object' &&
-      'type' in error &&
-      'name' in error
-    ) {
-      const appError = error as responses.IAppError;
-      const statusCode = appError.type === 'ClientError' ? 400 : 500;
-      res.status(statusCode).json(appError);
-      return;
-    }
-
-    const unexpectedError: responses.IAppError = {
-      type: 'ServerError',
-      name: 'MongoDBError',
-      message: 'An unexpected error occurred'
-    };
-    res.status(500).json(unexpectedError);
   }
 
   /**
@@ -763,7 +646,7 @@ export default class AccountController extends Controller {
       };
       res.status(200).json(successRes);
     } catch (error: unknown) {
-      this.handleError(res, error);
+      this.handleAppError(res, error);
     }
   }
 }

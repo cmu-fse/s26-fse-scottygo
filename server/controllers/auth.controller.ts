@@ -28,32 +28,6 @@ function clientError(
   return { type: 'ClientError', name, message };
 }
 
-/**
- * Handle unknown caught errors uniformly.
- * Returns the appropriate HTTP status and IAppError body.
- */
-function handleCatchError(
-  res: Response,
-  error: unknown,
-  fallbackMessage: string
-) {
-  if (
-    error &&
-    typeof error === 'object' &&
-    'type' in error &&
-    'name' in error
-  ) {
-    const appError = error as responses.IAppError;
-    const statusCode = appError.type === 'ClientError' ? 400 : 500;
-    return res.status(statusCode).json(appError);
-  }
-  const unexpectedError: responses.IAppError = {
-    type: 'ServerError',
-    name: 'MongoDBError',
-    message: fallbackMessage
-  };
-  return res.status(500).json(unexpectedError);
-}
 
 /**
  * Validate that username and password are present in the given values.
@@ -138,7 +112,7 @@ export default class AuthController extends Controller {
         payload: sanitizedUser
       });
     } catch (error: unknown) {
-      return handleCatchError(
+      return this.handleAppError(
         res,
         error,
         'An unexpected error occurred during registration'
@@ -217,7 +191,7 @@ export default class AuthController extends Controller {
       };
       return res.status(200).json(successRes);
     } catch (error: unknown) {
-      return handleCatchError(
+      return this.handleAppError(
         res,
         error,
         'An unexpected error occurred during login'
@@ -251,7 +225,7 @@ export default class AuthController extends Controller {
       };
       return res.status(200).json(successRes);
     } catch (error: unknown) {
-      return handleCatchError(
+      return this.handleAppError(
         res,
         error,
         'An unexpected error occurred in the database'

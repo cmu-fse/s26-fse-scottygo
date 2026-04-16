@@ -1262,41 +1262,42 @@ export class FilterController {
   }
 
   /**
+   * Build a generic labelled section for the route-info popup.
+   */
+  private buildRouteInfoSection(
+    sectionModifier: string,
+    iconName: string,
+    label: string,
+    itemsHtml: string[]
+  ): string {
+    return [
+      `<div class="route-info__section route-info__section--${sectionModifier}">`,
+      `<div class="route-info__label"><span class="material-icons-outlined" style="font-size:16px;vertical-align:text-bottom">${iconName}</span> ${label}</div>`,
+      ...itemsHtml,
+      '</div>'
+    ].join('');
+  }
+
+  /**
    * Build active-alert section for the route-info popup.
    */
   private buildRouteInfoAlertsSection(schedule: IRouteSchedule): string {
-    const alertMarkup = schedule.alerts
-      .map(
-        (alert) =>
-          `<div class="route-info__alert">${this.escapeHtml(alert.headerText)}</div>`
-      )
-      .join('');
-
-    return [
-      '<div class="route-info__section route-info__section--alerts">',
-      '<div class="route-info__label"><span class="material-icons-outlined" style="font-size:16px;vertical-align:text-bottom">warning_amber</span> Alerts</div>',
-      alertMarkup,
-      '</div>'
-    ].join('');
+    const items = schedule.alerts.map(
+      (alert) =>
+        `<div class="route-info__alert">${this.escapeHtml(alert.headerText)}</div>`
+    );
+    return this.buildRouteInfoSection('alerts', 'warning_amber', 'Alerts', items);
   }
 
   /**
    * Build active-detour section for the route-info popup.
    */
   private buildRouteInfoDetoursSection(schedule: IRouteSchedule): string {
-    const detourMarkup = schedule.detours
-      .map(
-        (detour) =>
-          `<div class="route-info__detour">${this.escapeHtml(detour.description)}</div>`
-      )
-      .join('');
-
-    return [
-      '<div class="route-info__section route-info__section--detours">',
-      '<div class="route-info__label"><span class="material-icons-outlined" style="font-size:16px;vertical-align:text-bottom">alt_route</span> Detours</div>',
-      detourMarkup,
-      '</div>'
-    ].join('');
+    const items = schedule.detours.map(
+      (detour) =>
+        `<div class="route-info__detour">${this.escapeHtml(detour.description)}</div>`
+    );
+    return this.buildRouteInfoSection('detours', 'alt_route', 'Detours', items);
   }
 
   /**

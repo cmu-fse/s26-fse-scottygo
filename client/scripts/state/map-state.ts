@@ -48,24 +48,24 @@ export class MapStateManager {
 
     // Initialize with default state (Rule R2: PRT ON, CMU OFF)
     this.state = {
-      selectedRouteId: null,
-      selectedDate: null,
-      selectedTime: null,
-      selectedSystems: {
-        prt: true,
-        cmu: false
-      },
-      selectedDirections: {
-        inbound: true,
-        outbound: true
-      },
+      ...this.defaultFilterValues(),
       availableRoutes: [],
-      filteredRoutes: [],
-      activeVehicles: [],
       currentLocation: null,
       plannedLocation: saved?.location ?? null,
       plannedLocationLabel: saved?.label ?? null,
       gpsPermissionGranted: false
+    };
+  }
+
+  private defaultFilterValues() {
+    return {
+      selectedRouteId: null,
+      selectedDate: null,
+      selectedTime: null,
+      selectedSystems: { prt: true, cmu: false },
+      selectedDirections: { inbound: true, outbound: true },
+      filteredRoutes: [],
+      activeVehicles: []
     };
   }
 
@@ -147,20 +147,8 @@ export class MapStateManager {
    */
   resetFilters(): void {
     this.state = {
-      selectedRouteId: null,
-      selectedDate: null,
-      selectedTime: null,
-      selectedSystems: {
-        prt: true,
-        cmu: false
-      },
-      selectedDirections: {
-        inbound: true,
-        outbound: true
-      },
+      ...this.defaultFilterValues(),
       availableRoutes: this.state.availableRoutes, // Keep available routes
-      filteredRoutes: [],
-      activeVehicles: [],
       currentLocation: this.state.currentLocation, // Preserve location state
       plannedLocation: this.state.plannedLocation,
       plannedLocationLabel: this.state.plannedLocationLabel,
