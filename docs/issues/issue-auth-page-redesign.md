@@ -20,24 +20,9 @@ The current auth page combines login and registration into a single form with a 
 
 Split the auth page into two switchable views within the same page (no navigation, just DOM toggling).
 
-**Login View** contains:
-| Element              | Details                                     |
-|----------------------|---------------------------------------------|
-| Username field       | Text input                                  |
-| Password field       | Password input                              |
-| Login button         | Primary submit — calls `POST /auth/tokens/:username` |
-| Register button      | Secondary — switches to Register view       |
+**Login View** contains: | Element | Details | |----------------------|---------------------------------------------| | Username field | Text input | | Password field | Password input | | Login button | Primary submit — calls `POST /auth/tokens/:username` | | Register button | Secondary — switches to Register view |
 
-**Register View** contains:
-| Element              | Details                                     |
-|----------------------|---------------------------------------------|
-| Username field       | Text input with inline validation           |
-| Email field          | Email input with inline validation          |
-| Password field       | Password input with inline validation       |
-| Confirm Password     | Password input — must match Password field  |
-| ToS checkbox + link  | Same Terms of Service modal flow as today   |
-| Register button      | Primary submit — calls `POST /auth/users`   |
-| Back to Login button | Secondary — switches back to Login view     |
+**Register View** contains: | Element | Details | |----------------------|---------------------------------------------| | Username field | Text input with inline validation | | Email field | Email input with inline validation | | Password field | Password input with inline validation | | Confirm Password | Password input — must match Password field | | ToS checkbox + link | Same Terms of Service modal flow as today | | Register button | Primary submit — calls `POST /auth/users` | | Back to Login button | Secondary — switches back to Login view |
 
 ### Section 2: Real-Time Inline Validation (Register View)
 
@@ -46,6 +31,7 @@ Validation is performed **server-side** by calling a new backend endpoint. The c
 **New backend endpoint**: `POST /auth/validate`
 
 Request body:
+
 ```json
 { "field": "username" | "email" | "password", "value": "string" }
 ```
@@ -63,12 +49,14 @@ The endpoint calls the existing `validateUsernameFormat()`, `validateEmailFormat
 **Password**: Backend validates all strength rules. Display: `✓ Strong password` or `✗ <server message>`
 
 **Confirm Password** (client-side only):
+
 - Must match the Password field exactly
 - Display: `✓ Passwords match` or `✗ Passwords do not match`
 
 ### Section 3: Preserved Flows
 
 All existing backend flows must remain unchanged:
+
 - Login → success → redirect to home
 - Login → `UnauthorizedRequest` (ToS not agreed) → show Terms modal → PATCH agreement → redirect
 - Login → `InactiveAccount` → show error, no ToS modal
@@ -79,7 +67,7 @@ All existing backend flows must remain unchanged:
 ## Files to Modify
 
 | File | Changes |
-|------|---------|
+| --- | --- |
 | `client/pages/auth.html` | Restructure form into two view containers; add confirm-password field; add validation message elements |
 | `client/scripts/auth.ts` | Add view-switching logic; add debounced validation calls to `POST /auth/validate`; wire up separate Login/Register submit flows; keep all modal + agreement logic |
 | `client/styles/auth.css` | Style the two views, validation messages (valid/invalid states), view transition |

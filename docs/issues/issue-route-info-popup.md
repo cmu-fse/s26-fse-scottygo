@@ -31,7 +31,7 @@ Remove the calendar-picker and time-picker filter panels from the map page. Inst
 ### Files involved (to be removed/modified)
 
 | File | What to remove |
-|------|---------------|
+| --- | --- |
 | `client/scripts/components/calendar-picker.ts` | Entire component (delete or deprecate) |
 | `client/scripts/components/time-picker.ts` | Entire component (delete or deprecate) |
 | `client/scripts/components/map-controls.ts` | Calendar and time filter buttons |
@@ -113,7 +113,9 @@ GET /transit/routes/:routeId/schedule
       "id": "alert-123",
       "headerText": "Detour on Forbes Ave",
       "descriptionText": "Due to construction...",
-      "activePeriods": [{ "start": "2026-04-10T00:00:00Z", "end": "2026-04-20T00:00:00Z" }]
+      "activePeriods": [
+        { "start": "2026-04-10T00:00:00Z", "end": "2026-04-20T00:00:00Z" }
+      ]
     }
   ],
   "detours": [
@@ -176,7 +178,7 @@ div.map-popup-tab
 The popup (and its docked tab, if minimized) is **automatically removed** when:
 
 | Trigger | Behavior |
-|---------|----------|
+| --- | --- |
 | User de-selects the current route | Route info popup dismissed |
 | User selects a **different** route | Route info popup replaced with new route's info |
 | User clicks a **different** stop marker | Stop popup replaced with new stop's predictions |
@@ -229,16 +231,16 @@ async function fetchRouteSchedule(routeId: string): Promise<IRouteSchedule> {
 // common/transit.interface.ts
 
 export interface IDirectionSchedule {
-  direction: string;          // "INBOUND" | "OUTBOUND"
-  firstTrip: string;          // "HH:MM" (24h or display format)
-  lastTrip: string;           // "HH:MM"
+  direction: string; // "INBOUND" | "OUTBOUND"
+  firstTrip: string; // "HH:MM" (24h or display format)
+  lastTrip: string; // "HH:MM"
 }
 
 export interface IRouteSchedule {
   routeId: string;
   routeName: string;
   system: 'PRT' | 'CMU';
-  operatingDays: number[];    // 0-6 (Sun-Sat)
+  operatingDays: number[]; // 0-6 (Sun-Sat)
   directions: IDirectionSchedule[];
   alerts: IServiceAlert[];
   detours: IDetour[];
@@ -250,10 +252,12 @@ export interface IRouteSchedule {
 ## Acceptance Criteria
 
 ### Calendar/Time Removal
+
 - [ ] Calendar-picker and time-picker panels are removed from the map page
 - [ ] Calendar and time buttons are removed from map-controls toolbar
 
 ### Route Info Popup
+
 - [ ] Selecting a route shows a Route Info popup with schedule, alerts, and detours
 - [ ] Schedule section displays operating days as visual day pills (active days highlighted)
 - [ ] Schedule section shows first/last trip times per direction
@@ -263,6 +267,7 @@ export interface IRouteSchedule {
 - [ ] CMU Shuttle routes show schedule info from TripShot data (or display "See CMU shuttle schedule" fallback)
 
 ### Unified Popup Behavior (Route, Stop, Bus)
+
 - [ ] Close (×) button is removed from all three popup types
 - [ ] Minimize (–) button collapses the popup into a docked tab at the bottom of the map
 - [ ] Docked tab shows an up-arrow icon and a contextual label (route name / stop name / bus ID)
@@ -274,6 +279,7 @@ export interface IRouteSchedule {
 - [ ] Minimize/restore uses a smooth CSS slide animation
 
 ### General
+
 - [ ] All popups support dark mode (`body.dark` class)
 - [ ] No regression in route selection, nearby stops, directions, or vehicle tracking
 

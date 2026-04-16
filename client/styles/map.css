@@ -3347,13 +3347,21 @@ body.dark .route-info__detour {
 }
 
 @keyframes tutorialFadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes tutorialFadeOut {
-  from { opacity: 1; }
-  to   { opacity: 0; }
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
 }
 
 /* Spotlight cutout — sits above overlay, highlights the target */
@@ -3362,7 +3370,11 @@ body.dark .route-info__detour {
   z-index: 9001;
   border-radius: 14px;
   pointer-events: none;
-  transition: top 0.3s ease, left 0.3s ease, width 0.3s ease, height 0.3s ease;
+  transition:
+    top 0.3s ease,
+    left 0.3s ease,
+    width 0.3s ease,
+    height 0.3s ease;
   background: transparent;
   /* Punch through the overlay with a bright ring */
   outline: 4000px solid rgba(0, 0, 0, 0.5);
@@ -3378,13 +3390,21 @@ body.dark .route-info__detour {
   -webkit-backdrop-filter: blur(12px);
   border-radius: 20px;
   padding: 20px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.12),
+    0 1px 4px rgba(0, 0, 0, 0.06);
   animation: tutorialPopupIn 0.25s ease;
 }
 
 @keyframes tutorialPopupIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .tutorial-popup__step {
@@ -3446,7 +3466,9 @@ body.dark .route-info__detour {
 
 body.dark .tutorial-popup {
   background: rgba(31, 41, 55, 0.92);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35), 0 1px 4px rgba(0, 0, 0, 0.15);
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.35),
+    0 1px 4px rgba(0, 0, 0, 0.15);
 }
 
 body.dark .tutorial-popup__step {

@@ -187,7 +187,9 @@ export class DirectionsController {
     this.lastDirectionsTap = now;
 
     if (!this.mapProvider || !this.getDirectionsOrigin()) {
-      console.warn('[DirectionsController] No map provider or location for directions');
+      console.warn(
+        '[DirectionsController] No map provider or location for directions'
+      );
       return;
     }
 

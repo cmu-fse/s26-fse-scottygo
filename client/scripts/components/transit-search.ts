@@ -78,7 +78,9 @@ export class TransitSearch extends HTMLElement {
         void this.renderResults(query);
       } else {
         // When search bar is focused with no query, show location search
-        this.dispatchEvent(new CustomEvent('searchFocusEmpty', { bubbles: true }));
+        this.dispatchEvent(
+          new CustomEvent('searchFocusEmpty', { bubbles: true })
+        );
       }
     });
 

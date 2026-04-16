@@ -1110,7 +1110,13 @@ export class FilterController {
         );
         minimizePopup(
           stop.stopName,
-          () => this.rebindStopPopupEvents(stop, predictions, selectedIndices, displayPredictions),
+          () =>
+            this.rebindStopPopupEvents(
+              stop,
+              predictions,
+              selectedIndices,
+              displayPredictions
+            ),
           undefined,
           routeColor
         );
@@ -1382,7 +1388,13 @@ export class FilterController {
         );
         minimizePopup(
           stop.stopName,
-          () => this.rebindStopPopupEvents(stop, predictions, selectedIndices, displayPredictions),
+          () =>
+            this.rebindStopPopupEvents(
+              stop,
+              predictions,
+              selectedIndices,
+              displayPredictions
+            ),
           undefined,
           routeColor
         );
@@ -1391,7 +1403,9 @@ export class FilterController {
 
     // Re-bind prediction selection
     const items = popup.querySelectorAll('.map-popup__arrival--selectable');
-    const directionsBtn = popup.querySelector('.map-popup__directions-btn') as HTMLButtonElement | null;
+    const directionsBtn = popup.querySelector(
+      '.map-popup__directions-btn'
+    ) as HTMLButtonElement | null;
     items.forEach((li) => {
       const idx = parseInt((li as HTMLElement).dataset.predIndex ?? '-1', 10);
       if (idx < 0) return;
@@ -1441,7 +1455,8 @@ export class FilterController {
     const state = this.stateManager.getState();
     const route = state.availableRoutes.find((r) => r.id === routeId);
     const routeName = route ? route.name : routeId;
-    const routeColor = route?.color || this.routeColorCache.get(routeId) || '#4285F4';
+    const routeColor =
+      route?.color || this.routeColorCache.get(routeId) || '#4285F4';
 
     // Build popup shell immediately (shows loading state)
     const popup = document.createElement('div');
@@ -1460,7 +1475,8 @@ export class FilterController {
     // Loading body
     const body = document.createElement('div');
     body.className = 'map-popup__body';
-    body.innerHTML = '<div class="map-popup__loading">Loading schedule&hellip;</div>';
+    body.innerHTML =
+      '<div class="map-popup__loading">Loading schedule&hellip;</div>';
     popup.appendChild(body);
 
     const container = document.querySelector('.map-container');
@@ -1480,7 +1496,8 @@ export class FilterController {
       );
 
       if (res.status !== 200 || res.data.name !== 'RouteScheduleRetrieved') {
-        body.innerHTML = '<div class="map-popup__empty">Schedule not available</div>';
+        body.innerHTML =
+          '<div class="map-popup__empty">Schedule not available</div>';
         return;
       }
 
@@ -1491,7 +1508,8 @@ export class FilterController {
       this.bindRouteInfoMinimize(popup, routeId, routeName, routeColor);
     } catch (err) {
       console.error('Error fetching route schedule:', err);
-      body.innerHTML = '<div class="map-popup__empty">Failed to load schedule</div>';
+      body.innerHTML =
+        '<div class="map-popup__empty">Failed to load schedule</div>';
     }
   }
 
@@ -1531,7 +1549,8 @@ export class FilterController {
     // Alerts
     if (schedule.alerts.length > 0) {
       html += '<div class="route-info__section route-info__section--alerts">';
-      html += '<div class="route-info__label"><span class="material-icons-outlined" style="font-size:16px;vertical-align:text-bottom">warning_amber</span> Alerts</div>';
+      html +=
+        '<div class="route-info__label"><span class="material-icons-outlined" style="font-size:16px;vertical-align:text-bottom">warning_amber</span> Alerts</div>';
       for (const alert of schedule.alerts) {
         html += `<div class="route-info__alert">${alert.headerText}</div>`;
       }
@@ -1541,7 +1560,8 @@ export class FilterController {
     // Detours
     if (schedule.detours.length > 0) {
       html += '<div class="route-info__section route-info__section--detours">';
-      html += '<div class="route-info__label"><span class="material-icons-outlined" style="font-size:16px;vertical-align:text-bottom">alt_route</span> Detours</div>';
+      html +=
+        '<div class="route-info__label"><span class="material-icons-outlined" style="font-size:16px;vertical-align:text-bottom">alt_route</span> Detours</div>';
       for (const detour of schedule.detours) {
         html += `<div class="route-info__detour">${detour.description}</div>`;
       }

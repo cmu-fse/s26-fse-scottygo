@@ -759,10 +759,7 @@ export default class AccountController extends Controller {
    * PATCH /account/onboarding
    * Mark onboarding tutorial as complete for the authenticated user
    */
-  public async completeOnboarding(
-    req: Request,
-    res: Response
-  ): Promise<void> {
+  public async completeOnboarding(req: Request, res: Response): Promise<void> {
     try {
       const tokenUser = (req as Request & { user: ITokenPayload }).user;
       if (!tokenUser || !tokenUser.userId) {
