@@ -119,30 +119,15 @@ export default class NotificationController extends Controller {
   private async submitReport(req: Request, res: Response): Promise<void> {
     try {
       const user = (req as Request & { user: ITokenPayload }).user;
-      const {
-        vid,
-        routeId,
-        crowdedness,
-        prioritySeating,
-        condition,
-        comment,
-        lat,
-        lon
-      } = req.body;
+      const { vid, routeId, crowdedness, prioritySeating, condition, comment, lat, lon } = req.body;
       const requestingUser = await User.getUserAccountById(user.userId);
       const isAdmin = requestingUser.privilegeLevel === 'Administrator';
 
-      const result = await NotificationModel.submitReport(user.userId, {
-        vid,
-        routeId,
-        crowdedness,
-        prioritySeating,
-        condition,
-        comment,
-        lat,
-        lon,
+      const reportData = {
+        vid, routeId, crowdedness, prioritySeating, condition, comment, lat, lon,
         bypassProximityCheck: isAdmin
-      });
+      };
+      const result = await NotificationModel.submitReport(user.userId, reportData);
 
       // R4: If a notification was created, publish via Socket.io to the route's room
       if (result.notification) {

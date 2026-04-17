@@ -115,79 +115,100 @@ class AlertsService {
       const feed = transit_realtime.FeedMessage.decode(new Uint8Array(buffer));
 
       const newAlerts: IServiceAlert[] = [];
-
       for (const entity of feed.entity) {
-        if (!entity.alert) continue;
-
-        const alert = entity.alert;
-
-        const headerText = alert.headerText?.translation?.[0]?.text ?? '';
-        const descriptionText =
-          alert.descriptionText?.translation?.[0]?.text ?? '';
-
-        const routeIds: string[] = [];
-        if (alert.informedEntity) {
-          for (const ie of alert.informedEntity) {
-            if (ie.routeId) {
-              routeIds.push(ie.routeId);
-            }
-          }
-        }
-
-        const activePeriods: { start: string; end: string }[] = [];
-        if (alert.activePeriod) {
-          for (const ap of alert.activePeriod) {
-            activePeriods.push({
-              start: ap.start
-                ? new Date(Number(ap.start) * 1000).toISOString()
-                : '',
-              end: ap.end ? new Date(Number(ap.end) * 1000).toISOString() : ''
-            });
-          }
-        }
-
-        newAlerts.push({
-          id: entity.id,
-          headerText,
-          descriptionText,
-          routeIds,
-          activePeriods
-        });
+        const decoded = this.decodeAlertEntity(entity);
+        if (decoded) newAlerts.push(decoded);
       }
 
-      // Check if alerts changed
-      const changed =
-        JSON.stringify(newAlerts) !== JSON.stringify(this.previousAlerts);
-
-      this.previousAlerts = this.alerts;
-      this.alerts = newAlerts;
-      this.healthy = true;
-      this.lastError = null;
-
-      if (changed && this.onAlertsChanged) {
-        this.onAlertsChanged(newAlerts);
-      }
-
-      if (!this.isStopping) {
-        console.log(`${tag()} Fetched ${newAlerts.length} service alerts`);
-      }
+      this.applyFetchedAlerts(newAlerts);
     } catch (err) {
-      const isAbortError = err instanceof Error && err.name === 'AbortError';
-
-      if (this.isStopping || isAbortError) {
-        return;
-      }
-
-      this.healthy = false;
-      this.lastError =
-        err instanceof Error ? err.message : 'Unknown error fetching alerts';
-      console.error(`${tag()} Failed to fetch alerts:`, this.lastError);
+      this.handleFetchError(err);
     } finally {
       if (this.fetchAbortController === abortController) {
         this.fetchAbortController = null;
       }
       this.fetchInProgress = false;
     }
+  }
+
+  private decodeAlertEntity(
+    entity: transit_realtime.IFeedEntity
+  ): IServiceAlert | null {
+    if (!entity.alert) return null;
+
+    const alert = entity.alert;
+
+    const headerText = alert.headerText?.translation?.[0]?.text ?? '';
+    const descriptionText =
+      alert.descriptionText?.translation?.[0]?.text ?? '';
+
+    return {
+      id: entity.id,
+      headerText,
+      descriptionText,
+      routeIds: this.decodeRouteIds(alert),
+      activePeriods: this.decodeActivePeriods(alert)
+    };
+  }
+
+  private decodeRouteIds(alert: transit_realtime.IAlert): string[] {
+    const routeIds: string[] = [];
+    if (alert.informedEntity) {
+      for (const ie of alert.informedEntity) {
+        if (ie.routeId) {
+          routeIds.push(ie.routeId);
+        }
+      }
+    }
+    return routeIds;
+  }
+
+  private decodeActivePeriods(
+    alert: transit_realtime.IAlert
+  ): { start: string; end: string }[] {
+    const activePeriods: { start: string; end: string }[] = [];
+    if (alert.activePeriod) {
+      for (const ap of alert.activePeriod) {
+        activePeriods.push({
+          start: ap.start
+            ? new Date(Number(ap.start) * 1000).toISOString()
+            : '',
+          end: ap.end ? new Date(Number(ap.end) * 1000).toISOString() : ''
+        });
+      }
+    }
+    return activePeriods;
+  }
+
+  private applyFetchedAlerts(newAlerts: IServiceAlert[]): void {
+    const changed =
+      JSON.stringify(newAlerts) !== JSON.stringify(this.previousAlerts);
+
+    this.previousAlerts = this.alerts;
+    this.alerts = newAlerts;
+    this.healthy = true;
+    this.lastError = null;
+
+    if (changed && this.onAlertsChanged) {
+      this.onAlertsChanged(newAlerts);
+    }
+
+    if (!this.isStopping) {
+      console.log(`${tag()} Fetched ${newAlerts.length} service alerts`);
+    }
+  }
+
+  private handleFetchError(err: unknown): void {
+    const isAbortError = err instanceof Error && err.name === 'AbortError';
+
+    if (this.isStopping || isAbortError) {
+      return;
+    }
+
+    this.healthy = false;
+    this.lastError =
+      err instanceof Error ? err.message : 'Unknown error fetching alerts';
+    console.error(`${tag()} Failed to fetch alerts:`, this.lastError);
   }
 }
 

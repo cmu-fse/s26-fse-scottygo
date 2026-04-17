@@ -1,6 +1,10 @@
 // controller superclass for behavior common to all controllers
 
+<<<<<<< Sigrid-Refactoring-4-CR
 import { Router, Response, Request, NextFunction } from 'express';
+=======
+import { Router, Request, Response, NextFunction } from 'express';
+>>>>>>> main
 import { Server as SocketServer } from 'socket.io';
 import path from 'path';
 import jwt from 'jsonwebtoken';
@@ -39,6 +43,42 @@ abstract class Controller {
         password: 'obfuscated'
       }
     };
+  }
+
+  /**
+   * Middleware to authenticate JWT token from the Authorization header.
+   * Attaches the decoded token payload to `req.user` for downstream handlers.
+   */
+  protected async authenticateToken(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+      const error: responses.IAppError = {
+        type: 'ClientError',
+        name: 'MissingToken',
+        message: 'Authentication token is required'
+      };
+      res.status(401).json(error);
+      return;
+    }
+
+    try {
+      const decoded = jwt.verify(token, secretKey) as ITokenPayload;
+      (req as Request & { user: ITokenPayload }).user = decoded;
+      next();
+    } catch {
+      const error: responses.IAppError = {
+        type: 'ClientError',
+        name: 'InvalidToken',
+        message: 'Invalid or expired token'
+      };
+      res.status(401).json(error);
+    }
   }
 
   constructor(path: string) {
