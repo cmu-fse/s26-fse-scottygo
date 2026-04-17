@@ -158,3 +158,30 @@ Outcome:
 | `client/scripts/map.ts` | Further reduce entrypoint method size via extraction. |
 | `client/scripts/trackers/vehicle-tracker.ts` | Further split popup and rendering concerns. |
 | `client/scripts/controllers/filter-controller.ts` | Continue decomposition of nearby-stop and filter application flows. |
+
+## Branch Summary Table (Sigrid-Refactoring-4-CR)
+
+| Item | File | Category | Severity | Description |
+| --- | --- | --- | --- | --- |
+| 1 | `server/controllers/controller.ts` | Duplication | HIGH | Centralized JWT auth middleware (`authenticateToken`) and token access helper (`getTokenPayload`) to remove copy-paste controller auth logic. |
+| 2 | `server/controllers/map.controller.ts` | Duplication | HIGH | Replaced route-level custom JWT middleware with shared base middleware; retained `authorize` as a compatibility alias that delegates to shared auth. |
+| 3 | `server/controllers/account.controller.ts` | Duplication | HIGH | Removed controller-local JWT implementation and standardized account endpoint authorization through shared guard helpers (`requireAdminUser`, `requireAdminOrOwnUser`, `requireOwnUser`). |
+| 4 | `server/controllers/notification.controller.ts` | Duplication | HIGH | Removed controller-local JWT implementation and reused base controller middleware for all protected notification routes. |
+| 5 | `server/controllers/account.controller.ts` | Unit Interfacing | MEDIUM | Removed generic local response wrappers (`sendSuccess`, `sendClientError`) and standardized success/error construction around base `success(...)` and `clientError(...)` helpers. |
+| 6 | `server/controllers/account.controller.ts` | Unit Size | HIGH | Extracted repeated request validation and authorization flows into focused helpers and simplified endpoint orchestration (`getAllUsers`, `searchUsers`, `getUserAccount`, `update*`). |
+| 7 | `server/controllers/controller.ts` | Unit Interfacing | MEDIUM | Added reusable response/auth primitives to base class to narrow per-controller surface area and improve consistency. |
+| 8 | `server/search/search-strategy.ts` | Unit Size | HIGH | Moved shared search tokenization/normalization and notification text matching out of strategy class into dedicated utility module. |
+| 9 | `server/search/search.utils.ts` | Unit Size | HIGH | Introduced shared search helpers (`filterStopWords`, `toSearchTokens`, `matchesAllQueryTokens`, `matchesNotificationText`) and compacted stop-word declaration to reduce file bloat. |
+| 10 | `server/services/tripshot-livestatus.service.ts` | Unit Size | HIGH | Decomposed scheduled-time parsing into focused helper methods (`parseClockTime`, `getEasternRideDateString`, `getEasternClockParts`, `normalizeDayBoundaryOffsetSeconds`). |
+| 11 | `server/services/tripshot-livestatus.service.ts` | Duplication | HIGH | Centralized repeated prediction map insertion into `appendPrediction(...)` and reused it across scheduled/live prediction paths. |
+| 12 | `server/views/memory-dashboard.ts` | Unit Size | HIGH | Removed large inline style/script blocks and converted template to composition of extracted style/script modules. |
+| 13 | `server/views/memory-dashboard.styles.ts` | Unit Size | MEDIUM | Extracted dashboard CSS into a dedicated module to isolate presentation changes from template structure. |
+| 14 | `server/views/memory-dashboard.script.ts` | Unit Size | HIGH | Replaced monolithic script string with composition of smaller script parts to reduce single-unit size. |
+| 15 | `server/views/memory-dashboard.script.part1.ts` | Unit Size | MEDIUM | Added focused script segment for setup, chart rendering, and detail list behavior. |
+| 16 | `server/views/memory-dashboard.script.part2.ts` | Unit Size | MEDIUM | Added focused script segment for metrics drilldown, hover interactions, and metric card rendering. |
+| 17 | `server/views/memory-dashboard.script.part3.ts` | Unit Size | MEDIUM | Added focused script segment for reload/polling/export lifecycle and event wiring. |
+| 18 | `client/scripts/components/map-controls.ts` | Unit Size | MEDIUM | Split large `connectedCallback()` into `renderControls()` and `bindControlEvents()` to reduce method size and improve readability. |
+| 19 | `client/scripts/trackers/vehicle-tracker.ts` | Duplication | HIGH | Removed duplicated bus-popup event wiring by consolidating popup action binding paths. |
+| 20 | `client/scripts/controllers/prediction-controller.ts` | Unit Size | HIGH | Extracted and organized prediction polling and popup lifecycle logic into a dedicated controller boundary. |
+| 21 | `client/scripts/utils/map-popup.ts` | Duplication | HIGH | Removed repeated minimize-state capture logic by introducing shared `cachePopupState(...)` used by both minimize flows. |
+| 22 | `docs/Sigrid/Sigrid Refactoring 4.md` | Documentation Quality | MEDIUM | Normalized and expanded documentation with mini-pass notes, peer-review follow-up, and branch-wide summary inventory. |
