@@ -10,9 +10,7 @@ import {
 } from '../../common/user.interface';
 import { User } from '../models/user.model';
 import Controller from './controller';
-import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
-import { JWT_KEY as secretKey } from '../env';
+import { Request, Response } from 'express';
 import * as responses from '../../common/server.responses';
 import EmailService from '../services/email.service';
 import { SearchContext, UserSearchStrategy } from '../search/search-strategy';
@@ -57,42 +55,6 @@ export default class AccountController extends Controller {
       this.updatePassword.bind(this)
     );
     this.router.patch('/onboarding', this.completeOnboarding.bind(this));
-  }
-
-  /**
-   * Middleware to authenticate JWT token
-   */
-  private async authenticateToken(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
-
-    if (!token) {
-      const error: responses.IAppError = {
-        type: 'ClientError',
-        name: 'MissingToken',
-        message: 'Authentication token is required'
-      };
-      res.status(401).json(error);
-      return;
-    }
-
-    try {
-      const decoded = jwt.verify(token, secretKey) as ITokenPayload;
-      // Attach user info to request for downstream handlers
-      (req as Request & { user: ITokenPayload }).user = decoded;
-      next();
-    } catch {
-      const error: responses.IAppError = {
-        type: 'ClientError',
-        name: 'InvalidToken',
-        message: 'Invalid or expired token'
-      };
-      res.status(401).json(error);
-    }
   }
 
   /**

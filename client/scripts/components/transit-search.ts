@@ -20,40 +20,7 @@ export class TransitSearch extends HTMLElement {
   private dropdown: HTMLElement | null = null;
 
   connectedCallback(): void {
-    this.innerHTML = `
-      <div class="search-bar">
-        <div class="search-wrapper">
-          <div class="search-box">
-            <span class="material-icons-outlined search-icon">search</span>
-            <input
-              type="text"
-              id="transit-search-input"
-              placeholder="Search routes or stops"
-              autocomplete="off"
-              aria-label="Search routes or stops"
-              aria-autocomplete="list"
-              aria-controls="search-dropdown"
-            />
-            <button
-              class="search-clear-btn"
-              id="search-clear-btn"
-              aria-label="Clear search"
-            >
-              <span class="material-icons-outlined">close</span>
-            </button>
-          </div>
-          <div
-            class="search-dropdown"
-            id="search-dropdown"
-            role="listbox"
-            hidden
-          ></div>
-        </div>
-        <button class="layers-btn" id="layers-btn" title="Toggle Layers">
-          <span class="material-icons-outlined">layers</span>
-        </button>
-      </div>
-    `;
+    this.innerHTML = this.buildTemplate();
 
     this.searchInput = this.querySelector(
       '#transit-search-input'
@@ -62,49 +29,9 @@ export class TransitSearch extends HTMLElement {
       '#search-clear-btn'
     ) as HTMLButtonElement;
     this.dropdown = this.querySelector('#search-dropdown') as HTMLElement;
-    const layersBtn = this.querySelector('#layers-btn') as HTMLButtonElement;
 
-    this.searchInput?.addEventListener('input', () => this.handleInput());
-    this.searchInput?.addEventListener('keydown', (e: KeyboardEvent) => {
-      if (e.key !== 'Enter') return;
-      e.preventDefault();
-      const query = this.searchInput?.value.trim() ?? '';
-      if (!query) return;
-      void this.renderResults(query);
-    });
-    this.searchInput?.addEventListener('focus', () => {
-      const query = this.searchInput?.value.trim() ?? '';
-      if (query) {
-        void this.renderResults(query);
-      } else {
-        // When search bar is focused with no query, show location search
-        this.dispatchEvent(
-          new CustomEvent('searchFocusEmpty', { bubbles: true })
-        );
-      }
-    });
-
-    this.clearBtn?.addEventListener('click', () => this.clearSearch());
-
-    layersBtn?.addEventListener('click', () => {
-      this.dispatchEvent(new CustomEvent('toggleLayers', { bubbles: true }));
-    });
-
-    // Close dropdown on outside click
-    document.addEventListener('click', (e) => {
-      if (!this.contains(e.target as Node)) this.hideDropdown();
-    });
-
-    // Subscribe to route updates from state manager (for stop badge colors)
-    const stateManager = MapStateManager.getInstance();
-    this.unsubscribe = stateManager.subscribe((state) => {
-      this.routes = state.availableRoutes;
-      this.routeMap = new Map(this.routes.map((r) => [r.id, r]));
-    });
-
-    const initialState = stateManager.getState();
-    this.routes = initialState.availableRoutes;
-    this.routeMap = new Map(this.routes.map((r) => [r.id, r]));
+    this.attachSearchEvents();
+    this.subscribeToState();
   }
 
   disconnectedCallback(): void {
@@ -171,41 +98,47 @@ export class TransitSearch extends HTMLElement {
       return;
     }
 
-    const routeItems = matchedRoutes
-      .map((r) => {
-        // PRT GTFS uses internal numeric route_id; route.name is the
-        // user-facing route number (route_short_name) in that case.
-        // When route_id is alphanumeric (e.g. "61D") it IS the route
-        // identifier and route.name holds the description (e.g. "Murray").
-        const isInternalId = /^\d+$/.test(r.id);
-        let label: string;
-        if (isInternalId) {
-          label = r.name; // e.g. "11" instead of "1- 11"
-        } else if (r.id === r.name) {
-          label = r.id; // avoid "61D- 61D"
-        } else {
-          label = `${r.id}- ${r.name}`; // e.g. "61D- Murray"
-        }
-        return `
+    const routeItems = matchedRoutes.map((r) => this.buildRouteItemHTML(r)).join('');
+    const stopItems = matchedStops.map((s) => this.buildStopItemHTML(s)).join('');
+
+    this.dropdown.innerHTML = routeItems + stopItems;
+    this.showDropdown();
+
+    this.attachResultListeners(matchedStops);
+  }
+
+  private buildRouteItemHTML(r: IRoute): string {
+    // PRT GTFS uses internal numeric route_id; route.name is the
+    // user-facing route number (route_short_name) in that case.
+    // When route_id is alphanumeric (e.g. "61D") it IS the route
+    // identifier and route.name holds the description (e.g. "Murray").
+    const isInternalId = /^\d+$/.test(r.id);
+    let label: string;
+    if (isInternalId) {
+      label = r.name;
+    } else if (r.id === r.name) {
+      label = r.id;
+    } else {
+      label = `${r.id}- ${r.name}`;
+    }
+    return `
         <div class="search-result-item search-result-route" data-route-id="${r.id}" role="option" tabindex="0">
           <span class="material-icons-outlined search-result-icon">directions_bus</span>
           <span class="search-result-name">${label}</span>
         </div>`;
+  }
+
+  private buildStopItemHTML(s: IStop): string {
+    const badges = (s.routes ?? [])
+      .map((routeId: string) => {
+        const route = this.routeMap.get(routeId);
+        const color = route?.color ?? '#888888';
+        const textColor = this.getTextColor(color);
+        return `<span class="route-badge" style="background:${color};color:${textColor}">${routeId}</span>`;
       })
       .join('');
 
-    const stopItems = matchedStops
-      .map((s) => {
-        const badges = (s.routes ?? [])
-          .map((routeId: string) => {
-            const route = this.routeMap.get(routeId);
-            const color = route?.color ?? '#888888';
-            const textColor = this.getTextColor(color);
-            return `<span class="route-badge" style="background:${color};color:${textColor}">${routeId}</span>`;
-          })
-          .join('');
-
-        return `
+    return `
           <div class="search-result-item search-result-stop" data-stop-id="${s.stopId}" role="option" tabindex="0">
             <span class="material-icons-outlined search-result-icon">place</span>
             <div class="search-result-content">
@@ -213,11 +146,10 @@ export class TransitSearch extends HTMLElement {
               ${badges ? `<div class="search-result-badges">${badges}</div>` : ''}
             </div>
           </div>`;
-      })
-      .join('');
+  }
 
-    this.dropdown.innerHTML = routeItems + stopItems;
-    this.showDropdown();
+  private attachResultListeners(matchedStops: IStop[]): void {
+    if (!this.dropdown) return;
 
     const stopById = new Map(matchedStops.map((stop) => [stop.stopId, stop]));
 
@@ -271,6 +203,88 @@ export class TransitSearch extends HTMLElement {
       new CustomEvent('search', { detail: { query: '' }, bubbles: true })
     );
     this.searchInput?.focus();
+  }
+
+  private buildTemplate(): string {
+    return `
+      <div class="search-bar">
+        <div class="search-wrapper">
+          <div class="search-box">
+            <span class="material-icons-outlined search-icon">search</span>
+            <input
+              type="text"
+              id="transit-search-input"
+              placeholder="Search routes or stops"
+              autocomplete="off"
+              aria-label="Search routes or stops"
+              aria-autocomplete="list"
+              aria-controls="search-dropdown"
+            />
+            <button
+              class="search-clear-btn"
+              id="search-clear-btn"
+              aria-label="Clear search"
+            >
+              <span class="material-icons-outlined">close</span>
+            </button>
+          </div>
+          <div
+            class="search-dropdown"
+            id="search-dropdown"
+            role="listbox"
+            hidden
+          ></div>
+        </div>
+        <button class="layers-btn" id="layers-btn" title="Toggle Layers">
+          <span class="material-icons-outlined">layers</span>
+        </button>
+      </div>
+    `;
+  }
+
+  private attachSearchEvents(): void {
+    const layersBtn = this.querySelector('#layers-btn') as HTMLButtonElement;
+
+    this.searchInput?.addEventListener('input', () => this.handleInput());
+    this.searchInput?.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const query = this.searchInput?.value.trim() ?? '';
+      if (!query) return;
+      void this.renderResults(query);
+    });
+    this.searchInput?.addEventListener('focus', () => {
+      const query = this.searchInput?.value.trim() ?? '';
+      if (query) {
+        void this.renderResults(query);
+      } else {
+        this.dispatchEvent(
+          new CustomEvent('searchFocusEmpty', { bubbles: true })
+        );
+      }
+    });
+
+    this.clearBtn?.addEventListener('click', () => this.clearSearch());
+
+    layersBtn?.addEventListener('click', () => {
+      this.dispatchEvent(new CustomEvent('toggleLayers', { bubbles: true }));
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!this.contains(e.target as Node)) this.hideDropdown();
+    });
+  }
+
+  private subscribeToState(): void {
+    const stateManager = MapStateManager.getInstance();
+    this.unsubscribe = stateManager.subscribe((state) => {
+      this.routes = state.availableRoutes;
+      this.routeMap = new Map(this.routes.map((r) => [r.id, r]));
+    });
+
+    const initialState = stateManager.getState();
+    this.routes = initialState.availableRoutes;
+    this.routeMap = new Map(this.routes.map((r) => [r.id, r]));
   }
 
   private showDropdown(): void {
