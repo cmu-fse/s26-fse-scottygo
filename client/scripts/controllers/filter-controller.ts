@@ -724,16 +724,23 @@ export class FilterController {
 
   /**
    * Return directions that are both available for the route and enabled in the toggle.
+   * Routes that only expose one direction (e.g. CMU loop shuttles with OUTBOUND only)
+   * are exempt from the toggle — their sole direction is always included so the
+   * inbound/outbound filter never hides a route that has no concept of direction.
    */
   private getEnabledDirections(
     selectedDirections: { inbound: boolean; outbound: boolean },
     routeDirections: string[]
   ): string[] {
+    const hasInbound = routeDirections.includes('INBOUND');
+    const hasOutbound = routeDirections.includes('OUTBOUND');
+    const isBidirectional = hasInbound && hasOutbound;
+
     const directions: string[] = [];
-    if (selectedDirections.inbound && routeDirections.includes('INBOUND')) {
+    if (hasInbound && (isBidirectional ? selectedDirections.inbound : true)) {
       directions.push('INBOUND');
     }
-    if (selectedDirections.outbound && routeDirections.includes('OUTBOUND')) {
+    if (hasOutbound && (isBidirectional ? selectedDirections.outbound : true)) {
       directions.push('OUTBOUND');
     }
     return directions;
@@ -741,18 +748,23 @@ export class FilterController {
 
   /**
    * Show or hide polylines for each direction based on toggle state.
+   * Single-direction routes (e.g. CMU loop shuttles) are always shown —
+   * the inbound/outbound toggle only applies to bidirectional routes.
    */
   private updateDirectionVisibility(
     routeId: string,
     routeDirections: string[],
     selectedDirections: { inbound: boolean; outbound: boolean }
   ): void {
+    const isBidirectional =
+      routeDirections.includes('INBOUND') &&
+      routeDirections.includes('OUTBOUND');
+
     for (const dir of ['INBOUND', 'OUTBOUND'] as const) {
       if (!routeDirections.includes(dir)) continue;
       const enabled =
-        dir === 'INBOUND'
-          ? selectedDirections.inbound
-          : selectedDirections.outbound;
+        !isBidirectional ||
+        (dir === 'INBOUND' ? selectedDirections.inbound : selectedDirections.outbound);
       if (enabled) {
         this.routeRenderer.showDirectionPolylines(routeId, dir);
       } else {
@@ -846,6 +858,8 @@ export class FilterController {
         state.selectedDirections,
         directions
       );
+
+      this.vehicleTracker.refreshDirectionVisibility();
 
       this.syncURLWithCurrentState();
     } catch (error) {
@@ -1398,11 +1412,15 @@ export class FilterController {
 
   /**
    * Clear stale nearby markers before (re-)rendering so system-filter changes don't stack.
+   * Also restores routes that were hidden by the previous nearby-stops pass, so that if the
+   * new location yields no stops (e.g. outside Pittsburgh) all routes become visible again.
    */
   private clearRenderedNearbyStopsIfActive(): void {
     if (!this.nearbyStopsActive) return;
 
+    const routes = this.getCurrentState().availableRoutes;
     this.clearNearbyMarkersForRouteIds(this.nearbyRouteIds);
+    this.restoreRoutesHiddenByNearbyStops(routes);
     this.resetNearbyStopsTracking();
   }
 

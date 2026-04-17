@@ -6,11 +6,13 @@ import {
   IPattern,
   IStop,
   IVehicle,
-  IPrediction
+  IPrediction,
+  IDirectionSchedule
 } from '../../common/transit.interface';
 import {
   CMU_ROUTE_METADATA,
   CMURouteMetadata,
+  CMUScheduleWindow,
   extractRouteIndex,
   findCmuRouteIdByTripshotRouteId
 } from './tripshot-metadata';
@@ -33,7 +35,7 @@ class TripshotService {
         color: metadata.color,
         directions: ['OUTBOUND'], // CMU shuttles typically run as loops
         activeStatus: true,
-        operatingDays: [0, 1, 2, 3, 4, 5, 6] // Operates all days (varies by route)
+        operatingDays: metadata.operatingDays
       });
     }
 
@@ -173,6 +175,74 @@ class TripshotService {
         return cmuRouteId ? { ...p, routeId: cmuRouteId } : p;
       })
       .sort((a, b) => a.predictedArrivalTime - b.predictedArrivalTime);
+  }
+
+  /**
+   * Return the schedule summary (operating days + first/last trip per
+   * direction) for a CMU shuttle route.
+   *
+   * Routes with a known timetable in CMU_ROUTE_METADATA use that static data
+   * directly so the popup is always correct regardless of the current day or
+   * liveStatus feed availability.  Routes without static schedule data (e.g.
+   * NightSafe, CCL) fall back to the TripShot liveStatus feed.
+   *
+   * @param routeId - Format: "CMU-{index}" (e.g., "CMU-1")
+   */
+  getRouteSchedule(routeId: string): {
+    operatingDays: number[];
+    directions: IDirectionSchedule[];
+  } | null {
+    const { metadata } = extractRouteIndex(routeId);
+
+    // --- Static timetable path (preferred) ---
+    if (metadata.schedule && metadata.schedule.length > 0) {
+      const directions: IDirectionSchedule[] = metadata.schedule.map(
+        (window: CMUScheduleWindow) => ({
+          direction: this.formatDayRangeLabel(window.days),
+          firstTrip: window.firstTrip,
+          lastTrip: window.lastTrip
+        })
+      );
+      return { operatingDays: metadata.operatingDays, directions };
+    }
+
+    // --- liveStatus fallback (NightSafe, CCL, etc.) ---
+    const liveSchedule = tripshotLiveStatusService.getScheduleByTsRouteId(
+      metadata.routeId
+    );
+    if (!liveSchedule) {
+      return null;
+    }
+    return {
+      operatingDays: metadata.operatingDays,
+      directions: [
+        {
+          direction: 'OUTBOUND',
+          firstTrip: liveSchedule.firstTrip,
+          lastTrip: liveSchedule.lastTrip
+        }
+      ]
+    };
+  }
+
+  /**
+   * Convert an array of weekday indices (0=Sun…6=Sat) into a compact label
+   * suitable for the route-info popup, e.g. [1,2,3,4,5] → "Mon–Fri".
+   */
+  private formatDayRangeLabel(days: number[]): string {
+    const SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    if (days.length === 7) return 'Mon–Sun';
+    if (
+      days.length === 5 &&
+      days.every((d, i) => d === i + 1)
+    )
+      return 'Mon–Fri';
+    if (days.length === 2 && days.includes(0) && days.includes(6))
+      return 'Sat–Sun';
+    if (days.length === 3 && days.includes(4) && days.includes(5) && days.includes(6))
+      return 'Thu–Sat';
+    // Generic: list abbreviated day names
+    return days.map((d) => SHORT[d]).join(', ');
   }
 
   /**

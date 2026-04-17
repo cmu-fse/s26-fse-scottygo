@@ -412,6 +412,14 @@ class GTFSService {
     return this.patternMap.get(routeId) ?? [];
   }
 
+  /**
+   * Return the direction ('INBOUND' or 'OUTBOUND') for a given GTFS trip_id,
+   * or undefined when the trip is not found in the loaded GTFS data.
+   */
+  getTripDirection(tripId: string): string | undefined {
+    return this.tripDirection.get(tripId);
+  }
+
   /** Return all stops for a route from static GTFS data. */
   getStops(routeId: string): IStop[] {
     return this.routeStops.get(routeId) ?? [];

@@ -273,11 +273,14 @@ document.addEventListener('DOMContentLoaded', async function (e: Event) {
       }
     });
 
-    // After initialization, if a route was restored from URL, apply route filter to render stops
+    // After initialization, if a route was restored from URL, apply route filter
+    // to render stops/polylines and show the route info popup (same as a fresh
+    // route selection — keeps the popup tab visible after a page refresh).
     const restoredState = mapStateManager.getState();
     if (restoredState.selectedRouteId) {
       console.log('Restoring route from URL:', restoredState.selectedRouteId);
       await filterController.applyRouteFilter(restoredState.selectedRouteId);
+      await filterController.showRouteInfoPopup(restoredState.selectedRouteId);
     }
 
     // Request user location for centering map
@@ -514,6 +517,7 @@ const registerFilterPanelToggleEvents = (): void => {
     ) as IRouteSelectorElement;
     if (routeSelector) routeSelector.clearSelection();
     await filterController.restoreDefaultState(getEffectiveLocation());
+    urlSyncManager.clearURL();
   });
 };
 
@@ -824,23 +828,31 @@ function requestUserLocation(): void {
 
           if (isInPittsburghArea(lat, lng)) {
             userLocation = { lat, lng };
-            mapProvider.setCenter({ lat, lng });
-            mapProvider.setZoom(15);
-            addUserLocationMarker(lat, lng);
 
-            const locationIndicator =
-              document.querySelector<LocationIndicator>('location-indicator');
-            if (
-              locationIndicator &&
-              typeof locationIndicator.show === 'function'
-            ) {
-              locationIndicator.show(lat, lng);
+            // If the user has a custom planned location (mocked location),
+            // don't override the map center, blue dot, or nearby stops —
+            // those were already set correctly by restorePlannedLocationMarker().
+            if (!mapStateManager.hasCustomPlannedLocation()) {
+              mapProvider.setCenter({ lat, lng });
+              mapProvider.setZoom(15);
+              addUserLocationMarker(lat, lng);
+
+              const locationIndicator =
+                document.querySelector<LocationIndicator>('location-indicator');
+              if (
+                locationIndicator &&
+                typeof locationIndicator.show === 'function'
+              ) {
+                locationIndicator.show(lat, lng);
+              }
+              console.log('Centered map on user location');
+
+              // TUC4 Step 2: Show nearby stops within 1km of user location
+              filterController.setUserLocation({ lat, lng });
+              filterController.showNearbyStops({ lat, lng });
+            } else {
+              console.log('Custom planned location active — GPS blue dot suppressed on load');
             }
-            console.log('Centered map on user location');
-
-            // TUC4 Step 2: Show nearby stops within 1km of user location
-            filterController.setUserLocation({ lat, lng });
-            filterController.showNearbyStops({ lat, lng });
           } else {
             showModal(
               'Location Out of Bounds',
@@ -855,7 +867,8 @@ function requestUserLocation(): void {
           userLocation = { lat, lng };
           if (userLocationMarker) {
             userLocationMarker.setPosition({ lat, lng });
-          } else {
+          } else if (!mapStateManager.hasCustomPlannedLocation()) {
+            // Only create the blue dot if no mocked location is active
             addUserLocationMarker(lat, lng);
           }
           // Keep filter controller in sync for walk-time estimates
@@ -983,6 +996,10 @@ function hideUserLocationMarker(): void {
 function showUserLocationMarker(): void {
   if (userLocationMarker) {
     userLocationMarker.setVisible(true);
+  } else if (userLocation) {
+    // Marker was never created (e.g. page loaded with a mocked location active).
+    // Create it now that the mocked location has been cleared.
+    addUserLocationMarker(userLocation.lat, userLocation.lng);
   }
 }
 

@@ -22,6 +22,7 @@ export interface IVehicle {
   isDetoured: boolean;
   delay?: number;
   tripId?: string; // GTFS trip_id (from GTFS-RT)
+  direction?: string; // 'INBOUND' | 'OUTBOUND' — populated for PRT, absent for CMU loops
   currentStatus?: 'INCOMING_AT' | 'STOPPED_AT' | 'IN_TRANSIT_TO'; // Vehicle stop status
   currentStopSequence?: number; // Stop sequence number
   currentStopId?: string; // Stop ID the status refers to

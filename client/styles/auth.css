@@ -270,6 +270,11 @@ body {
   background: #fafafa;
 }
 
+.terms-box ol {
+  padding-left: 20px;
+  margin: 0;
+}
+
 .terms-note {
   font-size: 12px;
   margin-top: 8px;

@@ -177,6 +177,7 @@ jest.mock('../../../server/services/gtfs.service', () => ({
     getPatterns: jest.fn(),
     getStops: jest.fn(),
     getStopsByDirection: jest.fn(),
+    getTripDirection: jest.fn(),
     filterRoutesByDate: jest.fn(),
     filterRoutesByDateTime: jest.fn()
   }
@@ -337,6 +338,10 @@ beforeAll(async () => {
       return [];
     }
   );
+  mockGtfs.getTripDirection.mockImplementation((tripId: string) => {
+    if (tripId === 'trip-001') return 'INBOUND';
+    return undefined;
+  });
 
   const db = new MongoDB(TEST_DB_URL);
   app = new App(

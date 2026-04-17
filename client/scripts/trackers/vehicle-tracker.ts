@@ -247,11 +247,41 @@ export class VehicleTracker {
   }
 
   /**
+   * Return true when a vehicle should be visible given the current direction
+   * toggle state.  Vehicles without a direction (CMU loops, or unknown) are
+   * always shown.
+   */
+  private isVehicleVisible(
+    vehicle: IVehicle,
+    selectedDirections: { inbound: boolean; outbound: boolean }
+  ): boolean {
+    if (!vehicle.direction) return true;
+    if (vehicle.direction === 'INBOUND') return selectedDirections.inbound;
+    if (vehicle.direction === 'OUTBOUND') return selectedDirections.outbound;
+    return true;
+  }
+
+  /**
+   * Re-apply direction visibility to all currently-tracked vehicle markers.
+   * Called when the inbound/outbound toggle changes so buses show/hide
+   * immediately without waiting for the next polling tick.
+   */
+  refreshDirectionVisibility(): void {
+    const { selectedDirections } = this.stateManager.getState();
+    this.vehicleMarkers.forEach((marker, vid) => {
+      const vehicle = this.vehicleData.get(vid);
+      if (!vehicle) return;
+      marker.setVisible(this.isVehicleVisible(vehicle, selectedDirections));
+    });
+  }
+
+  /**
    * Render vehicle markers on map
    */
   private renderVehicles(vehicles: IVehicle[]): void {
     if (!this.mapProvider) return;
 
+    const { selectedDirections } = this.stateManager.getState();
     const currentVehicleIds = new Set<string>();
 
     vehicles.forEach((vehicle) => {
@@ -259,6 +289,8 @@ export class VehicleTracker {
 
       // Always update the stored data so popup shows fresh info
       this.vehicleData.set(vehicle.vid, vehicle);
+
+      const visible = this.isVehicleVisible(vehicle, selectedDirections);
 
       if (this.vehicleMarkers.has(vehicle.vid)) {
         // Smoothly animate existing marker to new position
@@ -272,6 +304,7 @@ export class VehicleTracker {
             this.routeColorMap.get(vehicle.routeId) || this.currentRouteColor
           )
         );
+        marker.setVisible(visible);
       } else {
         // Create new marker
         const busIcon = createBusIcon(
@@ -286,6 +319,8 @@ export class VehicleTracker {
           iconAnchor: busIcon.anchor,
           iconSize: busIcon.size
         });
+
+        marker.setVisible(visible);
 
         // Attach click handler for info popup
         marker.onClick(() => this.showVehiclePopup(vehicle.vid));

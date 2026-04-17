@@ -118,6 +118,13 @@ export class URLSyncManager {
   }
 
   /**
+   * Clear the URL back to the bare path (remove hash entirely)
+   */
+  clearURL(): void {
+    history.replaceState(null, '', window.location.pathname);
+  }
+
+  /**
    * Restore state from URL (called on page load or hash change)
    */
   restoreStateFromURL(): Partial<IMapState> {

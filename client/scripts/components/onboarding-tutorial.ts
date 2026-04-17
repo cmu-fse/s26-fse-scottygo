@@ -51,6 +51,13 @@ const TUTORIAL_STEPS: ITutorialStep[] = [
     position: 'right'
   },
   {
+    targetSelector: '#menu-icon',
+    title: 'Menu',
+    description:
+      'Open the menu to access your subscribed routes, notifications, manage your account, or log out.',
+    position: 'bottom'
+  },
+  {
     targetSelector: 'route-bell',
     title: 'Route Notifications',
     description:
