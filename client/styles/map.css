@@ -3293,6 +3293,12 @@ body.dark .route-info__label {
   padding: 4px 0;
 }
 
+.route-info__dir-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .route-info__dir {
   font-size: 12px;
   color: #6b7280;
@@ -3301,6 +3307,16 @@ body.dark .route-info__label {
 
 body.dark .route-info__dir {
   color: #9ca3af;
+}
+
+.route-info__headsign {
+  font-size: 11px;
+  color: #9ca3af;
+  font-style: italic;
+}
+
+body.dark .route-info__headsign {
+  color: #6b7280;
 }
 
 .route-info__times {

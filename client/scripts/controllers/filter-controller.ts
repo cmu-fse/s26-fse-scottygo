@@ -1260,9 +1260,16 @@ export class FilterController {
         const direction = this.escapeHtml(directionSchedule.direction);
         const firstTrip = this.escapeHtml(directionSchedule.firstTrip);
         const lastTrip = this.escapeHtml(directionSchedule.lastTrip);
+        const rawHeadsign = directionSchedule.headsign ?? '';
+        const destination = rawHeadsign
+          .replace(new RegExp(`^${directionSchedule.direction}-`, 'i'), '')
+          .trim();
+        const headsign = destination
+          ? `<span class="route-info__headsign">${this.escapeHtml(destination)}</span>`
+          : '';
         return [
           '<div class="route-info__hours">',
-          `<span class="route-info__dir">${direction}</span>`,
+          `<div class="route-info__dir-row"><span class="route-info__dir">${direction}</span>${headsign}</div>`,
           `<span class="route-info__times">${firstTrip} &ndash; ${lastTrip}</span>`,
           '</div>'
         ].join('');

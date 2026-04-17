@@ -178,6 +178,7 @@ export interface IDirectionSchedule {
   direction: string; // "INBOUND" | "OUTBOUND"
   firstTrip: string; // "HH:MM" format
   lastTrip: string; // "HH:MM" format
+  headsign?: string; // representative trip headsign (destination text)
 }
 
 export interface IRouteSchedule {
