@@ -19,8 +19,13 @@ export class MapControls extends HTMLElement {
         <button class="circle-btn" id="direction-filter-btn" title="Direction Filter">
           <span class="material-icons-outlined">sync_alt</span>
         </button>
-        <button class="circle-btn danger" id="clear-filters-btn" title="Clear All Filters">
-          <span class="material-icons-outlined">filter_list_off</span>
+        <button
+          class="circle-btn danger"
+          id="clear-filters-btn"
+          title="Clear All Filters"
+          aria-label="Clear all filters"
+        >
+          <span class="material-icons-outlined" aria-hidden="true">filter_alt_off</span>
         </button>
       </div>
     `;

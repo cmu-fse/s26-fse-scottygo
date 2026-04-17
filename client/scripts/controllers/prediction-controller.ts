@@ -33,7 +33,12 @@ import { RouteRenderer } from '../renderers/route-renderer';
 import { VehicleTracker } from '../trackers/vehicle-tracker';
 import { DirectionsController } from './directions-controller';
 import { transitApiService } from '../services/transit-api.service';
-import { MAP_POPUP_ID, createMapPopup, dismissPopup, minimizePopup } from '../utils/map-popup';
+import {
+  MAP_POPUP_ID,
+  createMapPopup,
+  dismissPopup,
+  minimizePopup
+} from '../utils/map-popup';
 
 export class PredictionController {
   private static instance: PredictionController;
@@ -166,13 +171,20 @@ export class PredictionController {
       displayPredictions: predictions.slice(0, 8)
     };
 
-    const { popup, subheader } = createMapPopup('stop', 'place', stop.stopName, 'Minimize');
+    const { popup, subheader } = createMapPopup(
+      'stop',
+      'place',
+      stop.stopName,
+      'Minimize'
+    );
 
     const isUuidStopId =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
         stop.stopId
       );
-    subheader.textContent = isUuidStopId ? 'CMU Shuttle Stop' : `Stop #${stop.stopId}`;
+    subheader.textContent = isUuidStopId
+      ? 'CMU Shuttle Stop'
+      : `Stop #${stop.stopId}`;
 
     // Walking time estimate (TUC4 Step 4, R4: 1km ≈ 15 min)
     const walkMin = this.getWalkMinutes(stop.lat, stop.lon);
@@ -242,7 +254,14 @@ export class PredictionController {
     const list = document.createElement('ul');
     list.className = 'map-popup__list';
     for (let i = 0; i < displayPredictions.length; i++) {
-      list.appendChild(this.buildArrivalRow(displayPredictions[i], i, selectedIndices, directionsBtn));
+      list.appendChild(
+        this.buildArrivalRow(
+          displayPredictions[i],
+          i,
+          selectedIndices,
+          directionsBtn
+        )
+      );
     }
     nodes.push(list);
     return nodes;

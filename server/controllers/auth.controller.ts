@@ -28,7 +28,6 @@ function clientError(
   return { type: 'ClientError', name, message };
 }
 
-
 /**
  * Validate that username and password are present in the given values.
  * Returns an IAppError if validation fails, or null if valid.
@@ -65,7 +64,10 @@ export default class AuthController extends Controller {
    * Sends a 400 response and returns null on failure.
    */
   private parseCredentials(req: Request, res: Response): ILogin | null {
-    const credentialError = validateCredentials(req.params.username, req.body.password);
+    const credentialError = validateCredentials(
+      req.params.username,
+      req.body.password
+    );
     if (credentialError) {
       res.status(400).json(credentialError);
       return null;

@@ -166,6 +166,57 @@ export function filterStopWords(query: string): string | null {
   return meaningful.length > 0 ? meaningful.join(' ') : null;
 }
 
+const TOKEN_ALIAS_MAP: Record<string, string> = {
+  avenue: 'ave',
+  ave: 'ave',
+  street: 'st',
+  st: 'st',
+  drive: 'dr',
+  dr: 'dr',
+  road: 'rd',
+  rd: 'rd',
+  boulevard: 'blvd',
+  blvd: 'blvd',
+  lane: 'ln',
+  ln: 'ln',
+  place: 'pl',
+  pl: 'pl',
+  court: 'ct',
+  ct: 'ct'
+};
+
+function normalizeToken(rawToken: string): string {
+  const cleaned = rawToken.replace(/[^a-z0-9]/g, '');
+  if (!cleaned) return '';
+  return TOKEN_ALIAS_MAP[cleaned] ?? cleaned;
+}
+
+function toSearchTokens(value: string): string[] {
+  return value
+    .toLowerCase()
+    .replace(/[+&/]/g, ' and ')
+    .split(/\s+/)
+    .map(normalizeToken)
+    .filter((token) => token.length > 0 && !STOP_WORDS.has(token));
+}
+
+function matchesAllQueryTokens(
+  queryTokens: string[],
+  candidateText: string
+): boolean {
+  if (queryTokens.length === 0) return false;
+
+  const candidateTokens = toSearchTokens(candidateText);
+  if (candidateTokens.length === 0) return false;
+
+  const uniqueQueryTokens = [...new Set(queryTokens)];
+  return uniqueQueryTokens.every((queryToken) =>
+    candidateTokens.some((candidateToken) =>
+      candidateToken.includes(queryToken)
+    )
+  );
+}
+
 // ── Strategy Interface ────────────────────────────────────────────────────────
 
 /**
@@ -266,9 +317,8 @@ export class RouteSearchStrategy implements ISearchStrategy<IRoute[]> {
  */
 export class TransitSearchStrategy implements ISearchStrategy<ITransitSearchResult> {
   async search(query: string): Promise<ITransitSearchResult> {
-    const filtered = filterStopWords(query);
-    if (filtered === null) return { routes: [], stops: [] };
-    const lower = filtered;
+    const queryTokens = toSearchTokens(query);
+    if (queryTokens.length === 0) return { routes: [], stops: [] };
 
     const [allRoutes, allStops] = await Promise.all([
       TransitModel.getRoutes(),
@@ -276,18 +326,12 @@ export class TransitSearchStrategy implements ISearchStrategy<ITransitSearchResu
     ]);
 
     const routes = allRoutes
-      .filter(
-        (r) =>
-          r.id.toLowerCase().includes(lower) ||
-          r.name.toLowerCase().includes(lower)
-      )
+      .filter((r) => matchesAllQueryTokens(queryTokens, `${r.id} ${r.name}`))
       .slice(0, 5);
 
     const stops = allStops
-      .filter(
-        (s) =>
-          s.stopName.toLowerCase().includes(lower) ||
-          s.stopId.toLowerCase().includes(lower)
+      .filter((s) =>
+        matchesAllQueryTokens(queryTokens, `${s.stopName} ${s.stopId}`)
       )
       .slice(0, 5);
 

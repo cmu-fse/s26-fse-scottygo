@@ -72,9 +72,7 @@ export const CMU_ROUTE_METADATA: Record<number, CMURouteMetadata> = {
     color: '#FF6B35',
     routeId: 'AF900FBF-8D7B-4F7C-B8BD-D0FE1453BC19',
     operatingDays: [1, 2, 3, 4, 5], // Mon–Fri
-    schedule: [
-      { days: [1, 2, 3, 4, 5], firstTrip: '08:30', lastTrip: '18:00' }
-    ]
+    schedule: [{ days: [1, 2, 3, 4, 5], firstTrip: '08:30', lastTrip: '18:00' }]
   },
   5: {
     name: 'Bakery Square (Short)',
@@ -82,9 +80,7 @@ export const CMU_ROUTE_METADATA: Record<number, CMURouteMetadata> = {
     color: '#FFA630',
     routeId: '07C26A10-420F-4324-8F36-C91BC1630E9F',
     operatingDays: [1, 2, 3, 4, 5], // Mon–Fri
-    schedule: [
-      { days: [1, 2, 3, 4, 5], firstTrip: '08:30', lastTrip: '18:00' }
-    ]
+    schedule: [{ days: [1, 2, 3, 4, 5], firstTrip: '08:30', lastTrip: '18:00' }]
   },
   6: {
     name: 'C Route- Squirrel Hill',
@@ -92,9 +88,7 @@ export const CMU_ROUTE_METADATA: Record<number, CMURouteMetadata> = {
     color: '#2ECC71',
     routeId: 'A9E22E1E-A366-4FE4-973C-871EB78E2349',
     operatingDays: [1, 2, 3, 4, 5], // Mon–Fri
-    schedule: [
-      { days: [1, 2, 3, 4, 5], firstTrip: '07:00', lastTrip: '21:15' }
-    ]
+    schedule: [{ days: [1, 2, 3, 4, 5], firstTrip: '07:00', lastTrip: '21:15' }]
   },
   7: {
     // No timetable published on cmu.edu/transportation — falls back to liveStatus
