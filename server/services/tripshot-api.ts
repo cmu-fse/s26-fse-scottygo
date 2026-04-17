@@ -150,6 +150,8 @@ export type TsStopState =
         stopId: string;
         viaIdx: number;
         scheduledAt: string;
+        /** Full ISO UTC timestamp equivalent of scheduledAt — present in liveStatus feed. */
+        scheduledDepartureTime?: string;
       };
     }
   | {

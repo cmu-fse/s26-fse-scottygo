@@ -465,8 +465,8 @@ body.dark .control-panel {
 route-bell {
   position: absolute;
   right: 20px;
-  /* 20px (zoom-panel bottom) + 3×48px (buttons) + 2×8px (gaps) + 8px (gap to bell) = 188px */
-  bottom: 188px;
+  /* 36px (zoom-panel bottom) + 3×48px (buttons) + 2×8px (gaps) + 8px (gap to bell) = 204px */
+  bottom: 204px;
   display: block;
   z-index: 20;
 }
@@ -491,7 +491,7 @@ body.dark .bell-btn.bell-subscribed {
 .zoom-panel {
   position: absolute;
   right: 20px;
-  bottom: 20px;
+  bottom: 36px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1420,12 +1420,12 @@ body.dark .route-btn:hover {
 
   .zoom-panel {
     right: 16px;
-    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(32px + env(safe-area-inset-bottom, 0px));
   }
 
   route-bell {
     right: 16px;
-    bottom: calc(184px + env(safe-area-inset-bottom, 0px)); /* 16 + 160 + 8 */
+    bottom: calc(200px + env(safe-area-inset-bottom, 0px)); /* 32 + 160 + 8 */
   }
 
   .dark-btn {
@@ -2447,6 +2447,28 @@ body.dark .map-popup__minimize:hover {
   color: #f3f4f6;
 }
 
+.map-popup__close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 0 2px;
+}
+
+.map-popup__close:hover {
+  color: #1f2937;
+}
+
+body.dark .map-popup__close {
+  color: #9ca3af;
+}
+
+body.dark .map-popup__close:hover {
+  color: #f3f4f6;
+}
+
 /* ============================================
    STOP POPUP – WALKING TIME (TUC4 R4)
    ============================================ */
@@ -3150,12 +3172,19 @@ body.dark .planned-location-popup__remove:hover {
    DOCKED POPUP TAB (minimised state)
    ============================================ */
 
-.map-popup-tab {
+#map-popup-tabs {
   position: absolute;
   bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   left: 50%;
   transform: translateX(-50%);
   z-index: 500;
+  display: flex;
+  gap: 8px;
+  pointer-events: none;
+  max-width: calc(100% - 32px);
+}
+
+.map-popup-tab {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -3170,8 +3199,8 @@ body.dark .planned-location-popup__remove:hover {
   color: #1f2937;
   animation: mapPopupSlideUp 0.2s ease-out;
   white-space: nowrap;
-  max-width: calc(100% - 64px);
   overflow: hidden;
+  pointer-events: auto;
 }
 
 .map-popup-tab:hover {
@@ -3213,6 +3242,16 @@ body.dark .map-popup-tab:hover {
 
 body.dark .map-popup-tab__arrow {
   color: #9ca3af;
+}
+
+@media (max-width: 480px) {
+  .map-popup-tab .map-popup-tab__label {
+    display: none;
+  }
+  /* When there's no badge (stop/bus tab), keep the arrow visible */
+  .map-popup-tab {
+    padding: 8px 12px;
+  }
 }
 
 /* ============================================
@@ -3293,6 +3332,12 @@ body.dark .route-info__label {
   padding: 4px 0;
 }
 
+.route-info__dir-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .route-info__dir {
   font-size: 12px;
   color: #6b7280;
@@ -3301,6 +3346,16 @@ body.dark .route-info__label {
 
 body.dark .route-info__dir {
   color: #9ca3af;
+}
+
+.route-info__headsign {
+  font-size: 11px;
+  color: #9ca3af;
+  font-style: italic;
+}
+
+body.dark .route-info__headsign {
+  color: #6b7280;
 }
 
 .route-info__times {

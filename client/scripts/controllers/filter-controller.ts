@@ -23,7 +23,13 @@ import {
   type ISelectedTime
 } from '../state/map-state';
 import { RouteRenderer, type RouteData } from '../renderers/route-renderer';
-import { MAP_POPUP_ID, dismissPopup, minimizePopup } from '../utils/map-popup';
+import {
+  MAP_POPUP_ID,
+  dismissPopup,
+  minimizePopup,
+  prepareForNewPopup,
+  registerActivePopup
+} from '../utils/map-popup';
 import { VehicleTracker } from '../trackers/vehicle-tracker';
 import { DirectionsController } from './directions-controller';
 import { PredictionController } from './prediction-controller';
@@ -1047,8 +1053,7 @@ export class FilterController {
    * Fetches schedule, alerts, and detours from the backend.
    */
   async showRouteInfoPopup(routeId: string): Promise<void> {
-    // Dismiss any existing popup / docked tab
-    dismissPopup();
+    prepareForNewPopup('route');
 
     const { routeName, routeColor } = this.getRouteInfoContext(routeId);
     const { popup, body } = this.createRouteInfoPopupShell(
@@ -1124,9 +1129,15 @@ export class FilterController {
     minimizeButton.setAttribute('aria-label', 'Minimize');
     minimizeButton.innerHTML = '&minus;';
 
+    const closeButton = document.createElement('button');
+    closeButton.className = 'map-popup__close';
+    closeButton.setAttribute('aria-label', 'Close');
+    closeButton.innerHTML = '&times;';
+
     header.appendChild(icon);
     header.appendChild(title);
     header.appendChild(minimizeButton);
+    header.appendChild(closeButton);
 
     return header;
   }
@@ -1260,9 +1271,16 @@ export class FilterController {
         const direction = this.escapeHtml(directionSchedule.direction);
         const firstTrip = this.escapeHtml(directionSchedule.firstTrip);
         const lastTrip = this.escapeHtml(directionSchedule.lastTrip);
+        const rawHeadsign = directionSchedule.headsign ?? '';
+        const destination = rawHeadsign
+          .replace(new RegExp(`^${directionSchedule.direction}-`, 'i'), '')
+          .trim();
+        const headsign = destination
+          ? `<span class="route-info__headsign">${this.escapeHtml(destination)}</span>`
+          : '';
         return [
           '<div class="route-info__hours">',
-          `<span class="route-info__dir">${direction}</span>`,
+          `<div class="route-info__dir-row"><span class="route-info__dir">${direction}</span>${headsign}</div>`,
           `<span class="route-info__times">${firstTrip} &ndash; ${lastTrip}</span>`,
           '</div>'
         ].join('');
@@ -1347,14 +1365,19 @@ export class FilterController {
     // Remove old listeners by cloning
     const fresh = minBtn.cloneNode(true);
     minBtn.replaceWith(fresh);
+    const onRestore = () =>
+      this.rebindRouteInfoPopupEvents(routeId, routeName, routeColor);
     fresh.addEventListener('click', () => {
-      minimizePopup(
-        routeName,
-        () => this.rebindRouteInfoPopupEvents(routeId, routeName, routeColor),
-        undefined,
-        routeColor
-      );
+      minimizePopup('route', routeName, onRestore, undefined, routeColor);
     });
+    registerActivePopup('route', routeName, onRestore, undefined, routeColor);
+
+    const closeBtn = popup.querySelector('.map-popup__close');
+    if (closeBtn) {
+      const freshClose = closeBtn.cloneNode(true);
+      closeBtn.replaceWith(freshClose);
+      freshClose.addEventListener('click', () => dismissPopup('route'));
+    }
   }
 
   /**

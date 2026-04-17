@@ -37,7 +37,9 @@ import {
   MAP_POPUP_ID,
   createMapPopup,
   dismissPopup,
-  minimizePopup
+  minimizePopup,
+  prepareForNewPopup,
+  registerActivePopup
 } from '../utils/map-popup';
 
 export class PredictionController {
@@ -160,7 +162,7 @@ export class PredictionController {
   }
 
   private showStopPopup(stop: IStop, predictions: IPrediction[]): void {
-    dismissPopup();
+    prepareForNewPopup('stop');
     this.stopPolling();
     this.minimisedStop = null;
 
@@ -290,7 +292,7 @@ export class PredictionController {
     const meta = document.createElement('span');
     meta.className = 'map-popup__meta';
     const parts: string[] = [];
-    if (p.vid) parts.push(`Bus ${p.vid}`);
+    if (p.vid) parts.push(p.vid === 'Scheduled' ? 'Scheduled' : `Bus ${p.vid}`);
     if (p.isDelayed) parts.push('Delayed');
     meta.textContent = parts.join(' · ');
 
@@ -415,7 +417,7 @@ export class PredictionController {
       const metaEl = li.querySelector('.map-popup__meta');
       if (metaEl) {
         const parts: string[] = [];
-        if (p.vid) parts.push(`Bus ${p.vid}`);
+        if (p.vid) parts.push(p.vid === 'Scheduled' ? 'Scheduled' : `Bus ${p.vid}`);
         if (p.isDelayed) parts.push('Delayed');
         metaEl.textContent = parts.join(' · ');
       }
@@ -446,20 +448,25 @@ export class PredictionController {
   private bindMinimizeButton(popup: Element, ctx: StopPopupContext): void {
     const minBtn = popup.querySelector('.map-popup__minimize');
     if (!minBtn) return;
+    const routeColor = this.getRouteColor(
+      this.stateManager.getState().selectedRouteId ?? ''
+    );
+    const onRestore = () => this.rebindStopPopupEvents(ctx);
     minBtn.addEventListener('click', () => {
       this.minimisedStop = ctx.stop;
       this.minimisedPredictions = ctx.predictions;
       this.stopPolling();
-      const routeColor = this.getRouteColor(
-        this.stateManager.getState().selectedRouteId ?? ''
-      );
-      minimizePopup(
-        ctx.stop.stopName,
-        () => this.rebindStopPopupEvents(ctx),
-        undefined,
-        routeColor
-      );
+      minimizePopup('stop', ctx.stop.stopName, onRestore, undefined, routeColor);
     });
+    registerActivePopup('stop', ctx.stop.stopName, onRestore, undefined, routeColor);
+
+    const closeBtn = popup.querySelector('.map-popup__close');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        this.stopPolling();
+        dismissPopup('stop');
+      });
+    }
   }
 
   private rebindStopPopupEvents(ctx: StopPopupContext): void {

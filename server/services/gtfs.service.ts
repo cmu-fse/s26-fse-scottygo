@@ -74,6 +74,8 @@ class GTFSService {
   private tripRoute = new Map<string, string>(); // tripId → routeId
   // First and last departure minute (from midnight) per trip — used for time-based route filtering
   private tripTimeRange = new Map<string, { first: number; last: number }>();
+  // "routeId:DIRECTION" → representative headsign text for that direction
+  private routeDirectionHeadsign = new Map<string, string>();
 
   // ---------------------------------------------------------------------------
   // load() and its decomposed stages
@@ -220,20 +222,24 @@ class GTFSService {
     >[]) {
       this.tripService.set(t.trip_id, t.service_id);
       this.tripRoute.set(t.trip_id, t.route_id);
-      this.tripDirection.set(
-        t.trip_id,
-        t.direction_id === '0' ? 'OUTBOUND' : 'INBOUND'
-      );
+      const tripDir = t.direction_id === '0' ? 'OUTBOUND' : 'INBOUND';
+      this.tripDirection.set(t.trip_id, tripDir);
+
+      if (t.trip_headsign) {
+        const dirKey = `${t.route_id}:${tripDir}`;
+        if (!this.routeDirectionHeadsign.has(dirKey)) {
+          this.routeDirectionHeadsign.set(dirKey, t.trip_headsign);
+        }
+      }
 
       const patternKey = `${t.route_id}:${t.shape_id}`;
       if (t.shape_id && !seenPatterns.has(patternKey)) {
         seenPatterns.add(patternKey);
         const path = shapePoints.get(t.shape_id) ?? [];
-        const direction = t.direction_id === '0' ? 'OUTBOUND' : 'INBOUND';
         if (!this.patternMap.has(t.route_id)) {
           this.patternMap.set(t.route_id, []);
         }
-        this.patternMap.get(t.route_id)!.push({ direction, path });
+        this.patternMap.get(t.route_id)!.push({ direction: tripDir, path });
       }
     }
   }
@@ -555,10 +561,12 @@ class GTFSService {
         const m = mins % 60;
         return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
       };
+      const headsign = this.routeDirectionHeadsign.get(`${routeId}:${dir}`);
       directions.push({
         direction: dir,
         firstTrip: fmtTime(range.first),
-        lastTrip: fmtTime(range.last)
+        lastTrip: fmtTime(range.last),
+        ...(headsign ? { headsign } : {})
       });
     }
 

@@ -31,7 +31,9 @@ import {
   createMapPopup,
   closeMapPopup,
   dismissPopup,
-  minimizePopup
+  minimizePopup,
+  prepareForNewPopup,
+  registerActivePopup
 } from '../utils/map-popup';
 import { getRouteTitle } from '../utils/route-display';
 import { showToast } from '../utils/toast';
@@ -440,8 +442,7 @@ export class VehicleTracker {
     const vehicle = this.vehicleData.get(vid);
     if (!vehicle) return;
 
-    // Remove any existing map popup (stop or bus) and docked tab
-    dismissPopup();
+    prepareForNewPopup('bus');
     this.openPopupVehicleId = vid;
 
     const { popup, subheader } = createMapPopup(
@@ -526,6 +527,13 @@ export class VehicleTracker {
     }
 
     this.bindVehiclePopupActionButtons(popup, vid, vehicle);
+    registerActivePopup(
+      'bus',
+      `Bus ${vehicle.vid}`,
+      () => this.rebindVehiclePopupEvents(vid),
+      undefined,
+      this.getSelectedRouteColor()
+    );
 
     this.startPopupUpdatedTicker();
     this.refreshOpenPopupUpdatedTime();
@@ -622,12 +630,9 @@ export class VehicleTracker {
 
   private handlePopupMinimize(vid: string, vehicle: IVehicle): void {
     this.stopPopupUpdatedTicker();
-    minimizePopup(
-      `Bus ${vehicle.vid}`,
-      () => this.rebindVehiclePopupEvents(vid),
-      undefined,
-      this.getSelectedRouteColor()
-    );
+    const label = `Bus ${vehicle.vid}`;
+    const routeColor = this.getSelectedRouteColor();
+    minimizePopup('bus', label, () => this.rebindVehiclePopupEvents(vid), undefined, routeColor);
   }
 
   private handlePopupReport(vid: string, fallbackVehicle: IVehicle): void {
@@ -681,6 +686,14 @@ export class VehicleTracker {
     if (minimizeBtn) {
       minimizeBtn.addEventListener('click', () => {
         this.handlePopupMinimize(vid, vehicle);
+      });
+    }
+
+    const closeBtn = popup.querySelector('.map-popup__close');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        this.stopPopupUpdatedTicker();
+        dismissPopup('bus');
       });
     }
 
