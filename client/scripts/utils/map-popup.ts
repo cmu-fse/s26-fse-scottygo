@@ -125,18 +125,7 @@ function _minimizeActive(
   type: PopupType,
   params: Omit<SlotState, 'html' | 'scrollTop'>
 ): void {
-  const popup = document.getElementById(MAP_POPUP_ID);
-  const scrollTop = popup?.querySelector('.map-popup__list')?.scrollTop ?? 0;
-  const html = popup?.innerHTML ?? '';
-
-  slotCache.set(type, {
-    html,
-    scrollTop,
-    onRestore: params.onRestore,
-    label: params.label,
-    badgeText: params.badgeText,
-    badgeColor: params.badgeColor
-  });
+  cachePopupState(type, params);
 
   closeMapPopup();
   _createTab(type, params.label, params.badgeText, params.badgeColor);
@@ -160,11 +149,12 @@ export function minimizePopup(
   badgeText?: string,
   badgeColor?: string
 ): void {
-  const popup = document.getElementById(MAP_POPUP_ID);
-  const scrollTop = popup?.querySelector('.map-popup__list')?.scrollTop ?? 0;
-  const html = popup?.innerHTML ?? '';
-
-  slotCache.set(type, { html, scrollTop, onRestore, label, badgeText, badgeColor });
+  cachePopupState(type, {
+    onRestore,
+    label,
+    badgeText,
+    badgeColor
+  });
 
   closeMapPopup();
   removeTabForType(type);
@@ -177,6 +167,24 @@ export function minimizePopup(
 }
 
 const TAB_ORDER: PopupType[] = ['route', 'stop', 'bus'];
+
+function cachePopupState(
+  type: PopupType,
+  params: Omit<SlotState, 'html' | 'scrollTop'>
+): void {
+  const popup = document.getElementById(MAP_POPUP_ID);
+  const scrollTop = popup?.querySelector('.map-popup__list')?.scrollTop ?? 0;
+  const html = popup?.innerHTML ?? '';
+
+  slotCache.set(type, {
+    html,
+    scrollTop,
+    onRestore: params.onRestore,
+    label: params.label,
+    badgeText: params.badgeText,
+    badgeColor: params.badgeColor
+  });
+}
 
 function _createTab(
   type: PopupType,
@@ -207,7 +215,9 @@ function _createTab(
   // Insert in stable order (route → stop → bus) rather than appending
   const typeRank = TAB_ORDER.indexOf(type);
   const after = Array.from(container.children).find((el) => {
-    const rank = TAB_ORDER.indexOf((el as HTMLElement).dataset.type as PopupType);
+    const rank = TAB_ORDER.indexOf(
+      (el as HTMLElement).dataset.type as PopupType
+    );
     return rank > typeRank;
   });
   if (after) {
@@ -306,7 +316,9 @@ export function dismissPopup(type?: PopupType): void {
 function removeTabForType(type: PopupType): void {
   const container = document.getElementById('map-popup-tabs');
   if (!container) return;
-  const tab = container.querySelector<HTMLElement>(`.map-popup-tab[data-type="${type}"]`);
+  const tab = container.querySelector<HTMLElement>(
+    `.map-popup-tab[data-type="${type}"]`
+  );
   if (tab) tab.remove();
   // Remove container if now empty
   if (!container.hasChildNodes()) container.remove();

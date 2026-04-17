@@ -1,6 +1,10 @@
 // controller superclass for behavior common to all controllers
 
+<<<<<<< Sigrid-Refactoring-4-CR
+import { Router, Response, Request, NextFunction } from 'express';
+=======
 import { Router, Request, Response, NextFunction } from 'express';
+>>>>>>> main
 import { Server as SocketServer } from 'socket.io';
 import path from 'path';
 import jwt from 'jsonwebtoken';
@@ -99,6 +103,58 @@ abstract class Controller {
       return error as responses.IAppError;
     }
     return null;
+  }
+
+  protected clientError(
+    name: responses.ClientErrorName,
+    message: string
+  ): responses.IAppError {
+    return { type: 'ClientError', name, message };
+  }
+
+  protected success(
+    name: responses.SuccessName,
+    payload: responses.IPayload,
+    message?: string,
+    metadata?: Record<string, unknown>
+  ): responses.ISuccess {
+    const response: responses.ISuccess = { name, payload };
+    if (message) response.message = message;
+    if (metadata) response.metadata = metadata;
+    return response;
+  }
+
+  /**
+   * Shared JWT middleware used by controllers that protect API routes.
+   * Attaches decoded token payload to req.user for downstream handlers.
+   */
+  protected authenticateToken(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): void {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+      res
+        .status(401)
+        .json(this.clientError('MissingToken', 'Token is required'));
+      return;
+    }
+
+    try {
+      const decoded = jwt.verify(token, secretKey) as ITokenPayload;
+      (req as Request & { user: ITokenPayload }).user = decoded;
+      next();
+    } catch {
+      res
+        .status(401)
+        .json(this.clientError('InvalidToken', 'Invalid or expired token'));
+    }
+  }
+
+  protected getTokenPayload(req: Request): ITokenPayload | null {
+    const tokenPayload = (req as Request & { user?: ITokenPayload }).user;
+    return tokenPayload ?? null;
   }
 
   /**

@@ -24,6 +24,12 @@ import gtfsService from '../services/gtfs.service';
 import tripshotService from '../services/tripshot.service';
 import alertsService from '../services/alerts.service';
 import notificationSourcesService from '../services/notification-sources.service';
+import {
+  filterStopWords,
+  toSearchTokens,
+  matchesAllQueryTokens,
+  matchesNotificationText
+} from './search.utils';
 import type {
   IRoute,
   INotification,
@@ -32,191 +38,7 @@ import type {
 } from '../../common/transit.interface';
 import type { ISearchSuggestion } from '../../common/socket.interface';
 
-// ── Stop Word List (R2) ───────────────────────────────────────────────────────
-
-const STOP_WORDS = new Set([
-  'a',
-  'able',
-  'about',
-  'across',
-  'after',
-  'all',
-  'almost',
-  'also',
-  'am',
-  'among',
-  'an',
-  'and',
-  'any',
-  'are',
-  'as',
-  'at',
-  'be',
-  'because',
-  'been',
-  'but',
-  'by',
-  'can',
-  'cannot',
-  'could',
-  'dear',
-  'did',
-  'do',
-  'does',
-  'either',
-  'else',
-  'ever',
-  'every',
-  'for',
-  'from',
-  'get',
-  'got',
-  'had',
-  'has',
-  'have',
-  'he',
-  'her',
-  'hers',
-  'him',
-  'his',
-  'how',
-  'however',
-  'i',
-  'if',
-  'in',
-  'into',
-  'is',
-  'it',
-  'its',
-  'just',
-  'least',
-  'let',
-  'like',
-  'likely',
-  'may',
-  'me',
-  'might',
-  'most',
-  'must',
-  'my',
-  'neither',
-  'no',
-  'nor',
-  'not',
-  'of',
-  'off',
-  'often',
-  'on',
-  'only',
-  'or',
-  'other',
-  'our',
-  'own',
-  'rather',
-  'said',
-  'say',
-  'says',
-  'she',
-  'should',
-  'since',
-  'so',
-  'some',
-  'than',
-  'that',
-  'the',
-  'their',
-  'them',
-  'then',
-  'there',
-  'these',
-  'they',
-  'this',
-  'tis',
-  'to',
-  'too',
-  'twas',
-  'us',
-  'wants',
-  'was',
-  'we',
-  'were',
-  'what',
-  'when',
-  'where',
-  'which',
-  'while',
-  'who',
-  'whom',
-  'why',
-  'will',
-  'with',
-  'would',
-  'yet',
-  'you',
-  'your'
-]);
-
-/**
- * Removes stop words from a raw query string (R2).
- * Returns the meaningful tokens joined as a string,
- * or null if every token is a stop word (triggers empty-result short-circuit).
- */
-export function filterStopWords(query: string): string | null {
-  const tokens = query.toLowerCase().split(/\s+/).filter(Boolean);
-  const meaningful = tokens.filter((t) => !STOP_WORDS.has(t));
-  return meaningful.length > 0 ? meaningful.join(' ') : null;
-}
-
-const TOKEN_ALIAS_MAP: Record<string, string> = {
-  avenue: 'ave',
-  ave: 'ave',
-  street: 'st',
-  st: 'st',
-  drive: 'dr',
-  dr: 'dr',
-  road: 'rd',
-  rd: 'rd',
-  boulevard: 'blvd',
-  blvd: 'blvd',
-  lane: 'ln',
-  ln: 'ln',
-  place: 'pl',
-  pl: 'pl',
-  court: 'ct',
-  ct: 'ct'
-};
-
-function normalizeToken(rawToken: string): string {
-  const cleaned = rawToken.replace(/[^a-z0-9]/g, '');
-  if (!cleaned) return '';
-  return TOKEN_ALIAS_MAP[cleaned] ?? cleaned;
-}
-
-function toSearchTokens(value: string): string[] {
-  return value
-    .toLowerCase()
-    .replace(/[+&/]/g, ' and ')
-    .split(/\s+/)
-    .map(normalizeToken)
-    .filter((token) => token.length > 0 && !STOP_WORDS.has(token));
-}
-
-function matchesAllQueryTokens(
-  queryTokens: string[],
-  candidateText: string
-): boolean {
-  if (queryTokens.length === 0) return false;
-
-  const candidateTokens = toSearchTokens(candidateText);
-  if (candidateTokens.length === 0) return false;
-
-  const uniqueQueryTokens = [...new Set(queryTokens)];
-  return uniqueQueryTokens.every((queryToken) =>
-    candidateTokens.some((candidateToken) =>
-      candidateToken.includes(queryToken)
-    )
-  );
-}
+export { filterStopWords } from './search.utils';
 
 // ── Strategy Interface ────────────────────────────────────────────────────────
 
@@ -543,11 +365,8 @@ export class NotificationAutocompleteStrategy implements ISearchStrategy<
     // 3. User-submitted notifications that match the query — labelled with
     //    route + bus so clicking them triggers a reliable route/bus search
     //    rather than a fragile free-text search on the message.
-    const matchingNotifs = notifications.filter(
-      (n) =>
-        n.vid.toLowerCase().includes(lower) ||
-        n.routeId.toLowerCase().includes(lower) ||
-        n.message.toLowerCase().includes(lower)
+    const matchingNotifs = notifications.filter((n) =>
+      matchesNotificationText(n, lower)
     );
 
     const notifSuggestions: ISearchSuggestion[] = matchingNotifs
@@ -592,15 +411,4 @@ export class NotificationAutocompleteStrategy implements ISearchStrategy<
     }
     return result;
   }
-}
-
-function matchesNotificationText(
-  notification: INotification,
-  lowerQuery: string
-): boolean {
-  return (
-    notification.message.toLowerCase().includes(lowerQuery) ||
-    notification.routeId.toLowerCase().includes(lowerQuery) ||
-    notification.vid.toLowerCase().includes(lowerQuery)
-  );
 }
