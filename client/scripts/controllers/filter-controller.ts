@@ -1412,11 +1412,15 @@ export class FilterController {
 
   /**
    * Clear stale nearby markers before (re-)rendering so system-filter changes don't stack.
+   * Also restores routes that were hidden by the previous nearby-stops pass, so that if the
+   * new location yields no stops (e.g. outside Pittsburgh) all routes become visible again.
    */
   private clearRenderedNearbyStopsIfActive(): void {
     if (!this.nearbyStopsActive) return;
 
+    const routes = this.getCurrentState().availableRoutes;
     this.clearNearbyMarkersForRouteIds(this.nearbyRouteIds);
+    this.restoreRoutesHiddenByNearbyStops(routes);
     this.resetNearbyStopsTracking();
   }
 
