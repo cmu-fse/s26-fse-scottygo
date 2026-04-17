@@ -21,6 +21,7 @@ import { TransitModel } from '../models/transit.model';
 import { User } from '../models/user.model';
 import { NotificationModel } from '../models/notification.model';
 import gtfsService from '../services/gtfs.service';
+import tripshotService from '../services/tripshot.service';
 import alertsService from '../services/alerts.service';
 import notificationSourcesService from '../services/notification-sources.service';
 import type {
@@ -320,10 +321,24 @@ export class TransitSearchStrategy implements ISearchStrategy<ITransitSearchResu
     const queryTokens = toSearchTokens(query);
     if (queryTokens.length === 0) return { routes: [], stops: [] };
 
-    const [allRoutes, allStops] = await Promise.all([
+    const [prtRoutes, prtStops, cmuRoutes] = await Promise.all([
       TransitModel.getRoutes(),
-      Promise.resolve(gtfsService.getAllStops())
+      Promise.resolve(gtfsService.getAllStops()),
+      tripshotService.getRoutes()
     ]);
+
+    const cmuStopsNested = await Promise.all(
+      cmuRoutes.map((r) => tripshotService.getStops(r.id))
+    );
+    const seenStopIds = new Set<string>();
+    const cmuStops = cmuStopsNested.flat().filter((s) => {
+      if (seenStopIds.has(s.stopId)) return false;
+      seenStopIds.add(s.stopId);
+      return true;
+    });
+
+    const allRoutes = [...prtRoutes, ...cmuRoutes];
+    const allStops = [...prtStops, ...cmuStops];
 
     const routes = allRoutes
       .filter((r) => matchesAllQueryTokens(queryTokens, `${r.id} ${r.name}`))
