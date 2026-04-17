@@ -139,8 +139,7 @@ class AlertsService {
     const alert = entity.alert;
 
     const headerText = alert.headerText?.translation?.[0]?.text ?? '';
-    const descriptionText =
-      alert.descriptionText?.translation?.[0]?.text ?? '';
+    const descriptionText = alert.descriptionText?.translation?.[0]?.text ?? '';
 
     return {
       id: entity.id,

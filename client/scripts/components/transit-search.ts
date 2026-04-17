@@ -89,8 +89,12 @@ export class TransitSearch extends HTMLElement {
       return;
     }
 
-    const routeItems = matchedRoutes.map((r) => this.buildRouteItemHTML(r)).join('');
-    const stopItems = matchedStops.map((s) => this.buildStopItemHTML(s)).join('');
+    const routeItems = matchedRoutes
+      .map((r) => this.buildRouteItemHTML(r))
+      .join('');
+    const stopItems = matchedStops
+      .map((s) => this.buildStopItemHTML(s))
+      .join('');
 
     this.dropdown.innerHTML = routeItems + stopItems;
     this.showDropdown();
