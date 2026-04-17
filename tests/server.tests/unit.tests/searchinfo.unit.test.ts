@@ -40,6 +40,14 @@ jest.mock('../../../server/services/gtfs.service', () => ({
   }
 }));
 
+jest.mock('../../../server/services/tripshot.service', () => ({
+  __esModule: true,
+  default: {
+    getRoutes: jest.fn().mockResolvedValue([]),
+    getStops: jest.fn().mockResolvedValue([])
+  }
+}));
+
 jest.mock('../../../server/services/alerts.service', () => ({
   __esModule: true,
   default: {

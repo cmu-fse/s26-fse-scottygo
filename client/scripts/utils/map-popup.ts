@@ -1,16 +1,40 @@
 /**
  * Shared map-popup utilities — unified minimize / restore / dismiss lifecycle.
  *
- * All popup types (stop, bus, route-info) share one DOM slot so only one
- * popup OR docked tab can exist at a time.
+ * Each popup type ('route' | 'stop' | 'bus') maintains its own cache slot so
+ * multiple minimized tabs can coexist at the bottom of the map simultaneously.
+ * Only one full popup is visible at a time; opening a new type auto-minimizes
+ * the current one rather than dismissing it.
  */
+
+export type PopupType = 'route' | 'stop' | 'bus';
 
 /** The single id used for every map overlay popup. */
 export const MAP_POPUP_ID = 'map-popup';
 
+interface SlotState {
+  html: string;
+  scrollTop: number;
+  onRestore: (() => void) | null;
+  label: string;
+  badgeText?: string;
+  badgeColor?: string;
+}
+
+// Per-type cached state (used for tabs and restore)
+const slotCache = new Map<PopupType, SlotState>();
+
+// Which type's full popup is currently shown
+let activeType: PopupType | null = null;
+
+// Minimize params for the currently active popup (for auto-minimize)
+let activeParams: Omit<SlotState, 'html' | 'scrollTop'> | null = null;
+
+// ── Popup Shell ─────────────────────────────────────────────────────
+
 /**
  * Create a bare popup shell with a header row.
- * Returns { popup, header, subheader } ready to be populated by the caller.
+ * Returns { popup, subheader } ready to be populated by the caller.
  *
  * @param iconModifier  BEM modifier for the icon span, e.g. 'stop' or 'bus'
  * @param iconName      Material icon name, e.g. 'place' or 'directions_bus'
@@ -34,6 +58,7 @@ export function createMapPopup(
     <span class="material-icons-outlined map-popup__icon map-popup__icon--${iconModifier}">${iconName}</span>
     <strong class="map-popup__title">${titleHtml}</strong>
     <button class="map-popup__minimize" aria-label="Minimize"${titleAttr}>&ndash;</button>
+    <button class="map-popup__close" aria-label="Close">&times;</button>
   `;
   popup.appendChild(header);
 
@@ -44,72 +69,127 @@ export function createMapPopup(
   return { popup, subheader };
 }
 
-/** The single id for the docked minimised tab. */
-const MAP_POPUP_TAB_ID = 'map-popup-tab';
-
-/** Cached popup state for restore. */
-let cachedPopupHTML: string | null = null;
-let cachedScrollTop = 0;
-let cachedOnRestore: (() => void) | null = null;
-
-// ── Close / Dismiss ─────────────────────────────────────────────────
+// ── Active Popup Registration ────────────────────────────────────────
 
 /**
- * Remove the currently-visible map popup (stop, bus, or route), if any.
+ * Register the currently-shown popup so the utility knows how to
+ * auto-minimize it if a different popup type is opened.
+ * Call this after showing the popup and binding its minimize button.
  */
-export function closeMapPopup(): void {
-  const existing = document.getElementById(MAP_POPUP_ID);
-  if (existing) existing.remove();
-}
-
-/**
- * Fully dismiss both the popup and any docked tab, clearing cached state.
- */
-export function dismissPopup(): void {
-  closeMapPopup();
-  removeDockTab();
-  cachedPopupHTML = null;
-  cachedScrollTop = 0;
-  cachedOnRestore = null;
-}
-
-// ── Minimise → Docked Tab ───────────────────────────────────────────
-
-/**
- * Minimize the current popup into a small docked tab at the bottom.
- * @param label  Short text summarising the popup (e.g. stop name, bus id)
- * @param badgeText  Optional badge text (route id)
- * @param badgeColor Optional badge background colour (route colour)
- * @param onRestore  Callback invoked when the user clicks the tab to restore
- */
-export function minimizePopup(
+export function registerActivePopup(
+  type: PopupType,
   label: string,
   onRestore: () => void,
   badgeText?: string,
   badgeColor?: string
 ): void {
-  // Cache current popup contents
-  const popup = document.getElementById(MAP_POPUP_ID);
-  if (popup) {
-    const scrollableList = popup.querySelector('.map-popup__list');
-    cachedScrollTop = scrollableList ? scrollableList.scrollTop : 0;
-    cachedPopupHTML = popup.innerHTML;
+  activeType = type;
+  activeParams = { label, onRestore, badgeText, badgeColor };
+}
+
+/**
+ * Call at the start of each popup-show function instead of dismissPopup().
+ * - Same type: dismisses existing popup/tab for that type (clean replacement).
+ * - Different type: auto-minimizes the active popup to a tab, leaving it
+ *   accessible while the new popup opens.
+ */
+export function prepareForNewPopup(incomingType: PopupType): void {
+  if (!activeType) {
+    // No popup active — just ensure no stale same-type tab exists
+    removeTabForType(incomingType);
+    slotCache.delete(incomingType);
+    return;
   }
-  cachedOnRestore = onRestore;
 
-  // Remove full popup
+  if (activeType === incomingType) {
+    // Replacing the same type: full dismiss of that slot
+    closeMapPopup();
+    removeTabForType(incomingType);
+    slotCache.delete(incomingType);
+    activeType = null;
+    activeParams = null;
+  } else {
+    // Different type: auto-minimize current popup so its tab is preserved
+    if (activeParams) {
+      _minimizeActive(activeType, activeParams);
+    } else {
+      closeMapPopup();
+    }
+    activeType = null;
+    activeParams = null;
+  }
+}
+
+/** Internal: minimize the active popup to a tab without changing activeType/Params. */
+function _minimizeActive(
+  type: PopupType,
+  params: Omit<SlotState, 'html' | 'scrollTop'>
+): void {
+  const popup = document.getElementById(MAP_POPUP_ID);
+  const scrollTop = popup?.querySelector('.map-popup__list')?.scrollTop ?? 0;
+  const html = popup?.innerHTML ?? '';
+
+  slotCache.set(type, {
+    html,
+    scrollTop,
+    onRestore: params.onRestore,
+    label: params.label,
+    badgeText: params.badgeText,
+    badgeColor: params.badgeColor
+  });
+
   closeMapPopup();
+  _createTab(type, params.label, params.badgeText, params.badgeColor);
+}
 
-  // Remove any existing tab
-  removeDockTab();
+// ── Minimize → Docked Tab ───────────────────────────────────────────
 
-  // Build the docked tab
-  const container = document.querySelector('.map-container');
+/**
+ * Minimize the current popup into a small docked tab at the bottom.
+ *
+ * @param type       Popup type owning this tab slot
+ * @param label      Short text summarising the popup (e.g. stop name)
+ * @param onRestore  Callback invoked when the user clicks the tab to restore
+ * @param badgeText  Optional badge text (route id)
+ * @param badgeColor Optional badge background colour (route colour)
+ */
+export function minimizePopup(
+  type: PopupType,
+  label: string,
+  onRestore: () => void,
+  badgeText?: string,
+  badgeColor?: string
+): void {
+  const popup = document.getElementById(MAP_POPUP_ID);
+  const scrollTop = popup?.querySelector('.map-popup__list')?.scrollTop ?? 0;
+  const html = popup?.innerHTML ?? '';
+
+  slotCache.set(type, { html, scrollTop, onRestore, label, badgeText, badgeColor });
+
+  closeMapPopup();
+  removeTabForType(type);
+  _createTab(type, label, badgeText, badgeColor);
+
+  if (activeType === type) {
+    activeType = null;
+    activeParams = null;
+  }
+}
+
+const TAB_ORDER: PopupType[] = ['route', 'stop', 'bus'];
+
+function _createTab(
+  type: PopupType,
+  label: string,
+  badgeText?: string,
+  badgeColor?: string
+): void {
+  const container = getOrCreateTabContainer();
   if (!container) return;
 
   const tab = document.createElement('div');
-  tab.id = MAP_POPUP_TAB_ID;
   tab.className = 'map-popup-tab';
+  tab.dataset.type = type;
 
   let inner =
     '<span class="material-icons-outlined map-popup-tab__arrow">expand_less</span>';
@@ -121,21 +201,44 @@ export function minimizePopup(
   tab.innerHTML = inner;
 
   tab.addEventListener('click', () => {
-    restorePopup();
+    restorePopup(type);
   });
 
-  container.appendChild(tab);
+  // Insert in stable order (route → stop → bus) rather than appending
+  const typeRank = TAB_ORDER.indexOf(type);
+  const after = Array.from(container.children).find((el) => {
+    const rank = TAB_ORDER.indexOf((el as HTMLElement).dataset.type as PopupType);
+    return rank > typeRank;
+  });
+  if (after) {
+    container.insertBefore(tab, after);
+  } else {
+    container.appendChild(tab);
+  }
 }
 
 // ── Restore from Tab ────────────────────────────────────────────────
 
 /**
- * Restore the popup from the docked tab using cached HTML.
+ * Restore a minimized popup from its docked tab.
+ * If a different popup type is currently shown, it is auto-minimized first.
  */
-export function restorePopup(): void {
-  removeDockTab();
+export function restorePopup(type: PopupType): void {
+  // Auto-minimize the currently active popup if it's a different type
+  if (activeType && activeType !== type && activeParams) {
+    _minimizeActive(activeType, activeParams);
+    activeType = null;
+    activeParams = null;
+  } else if (activeType && activeType !== type) {
+    closeMapPopup();
+    activeType = null;
+    activeParams = null;
+  }
 
-  if (!cachedPopupHTML) return;
+  removeTabForType(type);
+
+  const cached = slotCache.get(type);
+  if (!cached) return;
 
   const container = document.querySelector('.map-container');
   if (!container) return;
@@ -143,34 +246,94 @@ export function restorePopup(): void {
   const popup = document.createElement('div');
   popup.id = MAP_POPUP_ID;
   popup.className = 'map-popup';
-  popup.innerHTML = cachedPopupHTML;
+  popup.innerHTML = cached.html;
   container.appendChild(popup);
 
-  // Restore scroll position
   const scrollableList = popup.querySelector('.map-popup__list');
   if (scrollableList) {
-    scrollableList.scrollTop = cachedScrollTop;
+    scrollableList.scrollTop = cached.scrollTop;
   }
 
-  // Re-bind event handlers via the onRestore callback
-  if (cachedOnRestore) {
-    cachedOnRestore();
+  if (cached.onRestore) {
+    cached.onRestore();
   }
 
-  cachedPopupHTML = null;
-  cachedScrollTop = 0;
+  slotCache.delete(type);
+  activeType = type;
+  activeParams = {
+    label: cached.label,
+    onRestore: cached.onRestore ?? undefined,
+    badgeText: cached.badgeText,
+    badgeColor: cached.badgeColor
+  } as Omit<SlotState, 'html' | 'scrollTop'>;
+}
+
+// ── Close / Dismiss ─────────────────────────────────────────────────
+
+/**
+ * Remove the currently-visible map popup, if any.
+ */
+export function closeMapPopup(): void {
+  const existing = document.getElementById(MAP_POPUP_ID);
+  if (existing) existing.remove();
+}
+
+/**
+ * Fully dismiss a specific popup type (popup + tab + cached state).
+ * Called with no argument to dismiss everything (navigation, route reset).
+ */
+export function dismissPopup(type?: PopupType): void {
+  if (type) {
+    if (activeType === type) {
+      closeMapPopup();
+      activeType = null;
+      activeParams = null;
+    }
+    removeTabForType(type);
+    slotCache.delete(type);
+  } else {
+    // Dismiss all
+    closeMapPopup();
+    removeAllTabs();
+    slotCache.clear();
+    activeType = null;
+    activeParams = null;
+  }
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
-function removeDockTab(): void {
-  const tab = document.getElementById(MAP_POPUP_TAB_ID);
+function removeTabForType(type: PopupType): void {
+  const container = document.getElementById('map-popup-tabs');
+  if (!container) return;
+  const tab = container.querySelector<HTMLElement>(`.map-popup-tab[data-type="${type}"]`);
   if (tab) tab.remove();
+  // Remove container if now empty
+  if (!container.hasChildNodes()) container.remove();
+}
+
+function removeAllTabs(): void {
+  const container = document.getElementById('map-popup-tabs');
+  if (container) container.remove();
+}
+
+function getOrCreateTabContainer(): HTMLElement | null {
+  const existing = document.getElementById('map-popup-tabs');
+  if (existing) return existing;
+
+  const mapContainer = document.querySelector('.map-container');
+  if (!mapContainer) return null;
+
+  const container = document.createElement('div');
+  container.id = 'map-popup-tabs';
+  mapContainer.appendChild(container);
+  return container;
 }
 
 /**
- * Returns true if there is a minimised popup tab currently visible.
+ * Returns true if there is at least one minimised popup tab currently visible.
  */
 export function hasMinimisedTab(): boolean {
-  return !!document.getElementById(MAP_POPUP_TAB_ID);
+  const container = document.getElementById('map-popup-tabs');
+  return !!container && container.hasChildNodes();
 }
