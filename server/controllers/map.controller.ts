@@ -1,12 +1,11 @@
 // Controller serving the map page where the user lands after login
 // Note that controllers don't access the DB direcly, only through the models
 
-import { IUser, ILogin } from '../../common/user.interface';
+import { IUser } from '../../common/user.interface';
 import { User } from '../models/user.model';
 import Controller from './controller';
-import { NextFunction, Request, Response } from 'express';
-import jwt from 'jsonwebtoken';
-import { JWT_KEY as secretKey, GOOGLE_MAPS_KEY } from '../env';
+import { Request, Response } from 'express';
+import { GOOGLE_MAPS_KEY } from '../env';
 import {
   RouteSearchStrategy,
   TransitSearchStrategy,
@@ -39,12 +38,12 @@ export default class MapController extends Controller {
     this.router.get('/', this.mapPage.bind(this));
     this.router.get(
       '/users/:username',
-      this.authorize.bind(this),
+      this.authenticateToken.bind(this),
       this.getUser.bind(this)
     );
     this.router.get(
       '/config',
-      this.authorize.bind(this),
+      this.authenticateToken.bind(this),
       this.getMapConfig.bind(this)
     );
 
@@ -52,12 +51,12 @@ export default class MapController extends Controller {
     // Auth middleware is applied inline so the page route above stays open.
     this.router.get(
       '/routes/search',
-      this.authorize.bind(this),
+      this.authenticateToken.bind(this),
       this.searchRoutes.bind(this)
     );
     this.router.get(
       '/search',
-      this.authorize.bind(this),
+      this.authenticateToken.bind(this),
       this.searchTransit.bind(this)
     );
   }
@@ -66,34 +65,13 @@ export default class MapController extends Controller {
     this.sendPage(res, 'map.html');
   }
 
-  // Check if the user is logged in by validating token
-  private async authorize(
+  // Backward-compatible alias used in existing unit tests.
+  public async authorize(
     req: Request,
     res: Response,
-    next: NextFunction
+    next: (error?: unknown) => void
   ): Promise<void> {
-    // Extracts token from header's authorization field ("Bearer <token>")
-    const token = req.headers.authorization?.split(' ')[1];
-
-    // Handle missing token
-    if (!token) {
-      res
-        .status(401)
-        .json(this.clientError('MissingToken', 'Token is required'));
-      return;
-    }
-
-    // Verify and decode token with secretKey
-    try {
-      const decodedToken: ILogin = jwt.verify(token, secretKey) as ILogin;
-      const userOnToken = decodedToken.username; // Extract username from decoded token
-      req.body.userOnToken = userOnToken; // Attach username to request object
-      next(); // Continue to next middleware
-    } catch (error) {
-      // Handle JWT verification error (invalid token)
-      res.status(401).json(this.clientError('InvalidToken', 'Invalid token'));
-      return;
-    }
+    this.authenticateToken(req, res, next);
   }
 
   // Get a User by username

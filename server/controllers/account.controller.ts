@@ -10,9 +10,7 @@ import {
 } from '../../common/user.interface';
 import { User } from '../models/user.model';
 import Controller from './controller';
-import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
-import { JWT_KEY as secretKey } from '../env';
+import { Request, Response } from 'express';
 import * as responses from '../../common/server.responses';
 import EmailService from '../services/email.service';
 import { SearchContext, UserSearchStrategy } from '../search/search-strategy';
@@ -60,42 +58,6 @@ export default class AccountController extends Controller {
   }
 
   /**
-   * Middleware to authenticate JWT token
-   */
-  private async authenticateToken(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
-
-    if (!token) {
-      const error: responses.IAppError = {
-        type: 'ClientError',
-        name: 'MissingToken',
-        message: 'Authentication token is required'
-      };
-      res.status(401).json(error);
-      return;
-    }
-
-    try {
-      const decoded = jwt.verify(token, secretKey) as ITokenPayload;
-      // Attach user info to request for downstream handlers
-      (req as Request & { user: ITokenPayload }).user = decoded;
-      next();
-    } catch {
-      const error: responses.IAppError = {
-        type: 'ClientError',
-        name: 'InvalidToken',
-        message: 'Invalid or expired token'
-      };
-      res.status(401).json(error);
-    }
-  }
-
-  /**
    * Get the requesting user's account info from token
    */
   private async getRequestingUserAccount(
@@ -135,46 +97,35 @@ export default class AccountController extends Controller {
       .emit('accountUpdated', this.obfuscatePassword(account));
   }
 
-  private sendClientError(
+  private sendAccountSuccess(
     res: Response,
-    status: number,
-    name: responses.ClientErrorName,
-    message: string
-  ): void {
-    res.status(status).json(this.clientError(name, message));
-  }
-
-  private sendSuccess(
-    res: Response,
-    status: number,
-    name: responses.SuccessName,
-    payload: responses.IPayload,
-    options?: {
-      authorizedUser?: string;
-      message?: string;
-      metadata?: Record<string, unknown>;
+    config: {
+      status: number;
+      name: responses.SuccessName;
+      account: IUserAccount;
+      authorizedUser: string;
     }
   ): void {
     const success = this.success(
-      name,
-      payload,
-      options?.message,
-      options?.metadata
+      config.name,
+      this.obfuscatePassword(config.account)
     );
-    if (options?.authorizedUser) {
-      success.authorizedUser = options.authorizedUser;
-    }
-    res.status(status).json(success);
+    success.authorizedUser = config.authorizedUser;
+    res.status(config.status).json(success);
   }
 
   private requireOwnAccount(
     requestingUser: IUserAccount,
-    targetUsername: string,
-    res: Response,
-    message: string
+    config: {
+      targetUsername: string;
+      res: Response;
+      message: string;
+    }
   ): boolean {
-    if (!this.isOwnAccount(requestingUser, targetUsername)) {
-      this.sendClientError(res, 403, 'UnauthorizedRequest', message);
+    if (!this.isOwnAccount(requestingUser, config.targetUsername)) {
+      config.res
+        .status(403)
+        .json(this.clientError('UnauthorizedRequest', config.message));
       return false;
     }
     return true;
@@ -190,17 +141,19 @@ export default class AccountController extends Controller {
     );
   }
 
-  private requireTextField(
-    value: unknown,
-    res: Response,
-    name: responses.ClientErrorName,
-    message: string
-  ): value is string {
-    if (typeof value !== 'string' || value.trim() === '') {
-      this.sendClientError(res, 400, name, message);
-      return false;
+  private getRequiredTextField(config: {
+    value: unknown;
+    res: Response;
+    name: responses.ClientErrorName;
+    message: string;
+  }): string | null {
+    if (typeof config.value !== 'string' || config.value.trim() === '') {
+      config.res
+        .status(400)
+        .json(this.clientError(config.name, config.message));
+      return null;
     }
-    return true;
+    return config.value;
   }
 
   private async requireRequestingUser(
@@ -209,12 +162,55 @@ export default class AccountController extends Controller {
   ): Promise<IUserAccount | null> {
     const requestingUser = await this.getRequestingUserAccount(req);
     if (!requestingUser) {
-      this.sendClientError(
-        res,
-        401,
-        'UnauthorizedRequest',
-        'Unable to verify requesting user'
-      );
+      res
+        .status(401)
+        .json(
+          this.clientError(
+            'UnauthorizedRequest',
+            'Unable to verify requesting user'
+          )
+        );
+      return null;
+    }
+    return requestingUser;
+  }
+
+  private async requireAdminUser(
+    req: Request,
+    res: Response,
+    message: string
+  ): Promise<IUserAccount | null> {
+    const requestingUser = await this.requireRequestingUser(req, res);
+    if (!requestingUser) return null;
+    if (!this.requireAdmin(requestingUser, res, message)) return null;
+    return requestingUser;
+  }
+
+  private async requireAdminOrOwnUser(
+    req: Request,
+    res: Response,
+    targetUsername: string,
+    message: string
+  ): Promise<IUserAccount | null> {
+    const requestingUser = await this.requireRequestingUser(req, res);
+    if (!requestingUser) return null;
+    if (!this.requireAdminOrOwn(requestingUser, targetUsername, res, message)) {
+      return null;
+    }
+    return requestingUser;
+  }
+
+  private async requireOwnUser(
+    req: Request,
+    res: Response,
+    targetUsername: string,
+    message: string
+  ): Promise<IUserAccount | null> {
+    const requestingUser = await this.requireRequestingUser(req, res);
+    if (!requestingUser) return null;
+    if (
+      !this.requireOwnAccount(requestingUser, { targetUsername, res, message })
+    ) {
       return null;
     }
     return requestingUser;
@@ -238,7 +234,9 @@ export default class AccountController extends Controller {
     res: Response
   ): boolean {
     if (!targetUsername) {
-      this.sendClientError(res, 400, 'MissingUsername', 'Username is required');
+      res
+        .status(400)
+        .json(this.clientError('MissingUsername', 'Username is required'));
       return false;
     }
     return true;
@@ -253,7 +251,7 @@ export default class AccountController extends Controller {
     message: string
   ): boolean {
     if (requestingUser.privilegeLevel !== 'Administrator') {
-      this.sendClientError(res, 403, 'UnauthorizedRequest', message);
+      res.status(403).json(this.clientError('UnauthorizedRequest', message));
       return false;
     }
     return true;
@@ -271,7 +269,7 @@ export default class AccountController extends Controller {
     const isAdmin = requestingUser.privilegeLevel === 'Administrator';
     const isOwnAccount = this.isOwnAccount(requestingUser, targetUsername);
     if (!isAdmin && !isOwnAccount) {
-      this.sendClientError(res, 403, 'UnauthorizedRequest', message);
+      res.status(403).json(this.clientError('UnauthorizedRequest', message));
       return false;
     }
     return true;
@@ -340,22 +338,17 @@ export default class AccountController extends Controller {
    */
   public async getAllUsers(req: Request, res: Response): Promise<void> {
     try {
-      const requestingUser = await this.requireRequestingUser(req, res);
+      const requestingUser = await this.requireAdminUser(
+        req,
+        res,
+        'Only administrators can view all users'
+      );
       if (!requestingUser) return;
 
-      if (
-        !this.requireAdmin(
-          requestingUser,
-          res,
-          'Only administrators can view all users'
-        )
-      )
-        return;
-
       const usernames = await User.getAllUsernames();
-      this.sendSuccess(res, 200, 'UsersRetrieved', usernames, {
-        authorizedUser: requestingUser.credentials.username
-      });
+      const success = this.success('UsersRetrieved', usernames);
+      success.authorizedUser = requestingUser.credentials.username;
+      res.status(200).json(success);
     } catch (error: unknown) {
       this.handleAppError(res, error);
     }
@@ -368,29 +361,27 @@ export default class AccountController extends Controller {
    */
   public async searchUsers(req: Request, res: Response): Promise<void> {
     try {
-      const requestingUser = await this.requireRequestingUser(req, res);
+      const requestingUser = await this.requireAdminUser(
+        req,
+        res,
+        'Only administrators can search users'
+      );
       if (!requestingUser) return;
-
-      if (
-        !this.requireAdmin(
-          requestingUser,
-          res,
-          'Only administrators can search users'
-        )
-      )
-        return;
 
       const q = (req.query.q as string | undefined)?.trim() ?? '';
       const context = new SearchContext<string[]>(new UserSearchStrategy());
       const usernames = await context.executeSearch(q);
 
-      this.sendSuccess(res, 200, 'UsersSearchCompleted', usernames, {
-        authorizedUser: requestingUser.credentials.username,
-        message: usernames.length
+      const success = this.success(
+        'UsersSearchCompleted',
+        usernames,
+        usernames.length
           ? `Found ${usernames.length} matching user${usernames.length === 1 ? '' : 's'}`
           : 'No matching users found',
-        metadata: { totalItems: usernames.length }
-      });
+        { totalItems: usernames.length }
+      );
+      success.authorizedUser = requestingUser.credentials.username;
+      res.status(200).json(success);
     } catch (error: unknown) {
       this.handleAppError(res, error);
     }
@@ -405,27 +396,21 @@ export default class AccountController extends Controller {
     if (!this.requireTargetUsername(targetUsername, res)) return;
 
     try {
-      const requestingUser = await this.requireRequestingUser(req, res);
+      const requestingUser = await this.requireAdminOrOwnUser(
+        req,
+        res,
+        targetUsername,
+        'You can only view your own account'
+      );
       if (!requestingUser) return;
 
-      if (
-        !this.requireAdminOrOwn(
-          requestingUser,
-          targetUsername,
-          res,
-          'You can only view your own account'
-        )
-      )
-        return;
-
       const userAccount = await User.getUserAccount(targetUsername);
-      this.sendSuccess(
-        res,
-        200,
-        'AccountRetrieved',
-        this.obfuscatePassword(userAccount),
-        { authorizedUser: requestingUser.credentials.username }
-      );
+      this.sendAccountSuccess(res, {
+        status: 200,
+        name: 'AccountRetrieved',
+        account: userAccount,
+        authorizedUser: requestingUser.credentials.username
+      });
     } catch (error: unknown) {
       this.handleAppError(res, error);
     }
@@ -442,28 +427,25 @@ export default class AccountController extends Controller {
     if (!this.requireTargetUsername(targetUsername, res)) return;
 
     if (!this.isValidStatus(status)) {
-      this.sendClientError(
-        res,
-        400,
-        'UnauthorizedRequest',
-        'Valid status (Active/Inactive) is required'
-      );
+      res
+        .status(400)
+        .json(
+          this.clientError(
+            'UnauthorizedRequest',
+            'Valid status (Active/Inactive) is required'
+          )
+        );
       return;
     }
 
     try {
-      const requestingUser = await this.requireRequestingUser(req, res);
+      const requestingUser = await this.requireAdminOrOwnUser(
+        req,
+        res,
+        targetUsername,
+        'You can only change your own account status'
+      );
       if (!requestingUser) return;
-
-      if (
-        !this.requireAdminOrOwn(
-          requestingUser,
-          targetUsername,
-          res,
-          'You can only change your own account status'
-        )
-      )
-        return;
 
       // Get target user for email notification
       const targetUser = await User.getUserAccount(targetUsername);
@@ -480,13 +462,12 @@ export default class AccountController extends Controller {
         status
       );
 
-      this.sendSuccess(
-        res,
-        200,
-        'StatusUpdated',
-        this.obfuscatePassword(updatedUser),
-        { authorizedUser: requestingUser.credentials.username }
-      );
+      this.sendAccountSuccess(res, {
+        status: 200,
+        name: 'StatusUpdated',
+        account: updatedUser,
+        authorizedUser: requestingUser.credentials.username
+      });
     } catch (error: unknown) {
       this.handleAppError(res, error);
     }
@@ -528,27 +509,24 @@ export default class AccountController extends Controller {
     if (!this.requireTargetUsername(targetUsername, res)) return;
 
     if (!this.isValidPrivilegeLevel(privilegeLevel)) {
-      this.sendClientError(
-        res,
-        400,
-        'UnauthorizedRequest',
-        'Valid privilege level (Administrator/Coordinator/Member) is required'
-      );
+      res
+        .status(400)
+        .json(
+          this.clientError(
+            'UnauthorizedRequest',
+            'Valid privilege level (Administrator/Coordinator/Member) is required'
+          )
+        );
       return;
     }
 
     try {
-      const requestingUser = await this.requireRequestingUser(req, res);
+      const requestingUser = await this.requireAdminUser(
+        req,
+        res,
+        'Only administrators can change privilege levels'
+      );
       if (!requestingUser) return;
-
-      if (
-        !this.requireAdmin(
-          requestingUser,
-          res,
-          'Only administrators can change privilege levels'
-        )
-      )
-        return;
 
       // R1 check is now in User.updatePrivilege (model layer)
       const updatedUser = await User.updatePrivilege(
@@ -559,13 +537,12 @@ export default class AccountController extends Controller {
       // Emit account updated event
       this.emitAccountUpdated(updatedUser);
 
-      this.sendSuccess(
-        res,
-        200,
-        'PrivilegeUpdated',
-        this.obfuscatePassword(updatedUser),
-        { authorizedUser: requestingUser.credentials.username }
-      );
+      this.sendAccountSuccess(res, {
+        status: 200,
+        name: 'PrivilegeUpdated',
+        account: updatedUser,
+        authorizedUser: requestingUser.credentials.username
+      });
     } catch (error: unknown) {
       this.handleAppError(res, error);
     }
@@ -577,34 +554,28 @@ export default class AccountController extends Controller {
    */
   public async updateUsername(req: Request, res: Response): Promise<void> {
     const targetUsername = req.params.username;
-    const { newUsername } = req.body as { newUsername: unknown };
+    const { newUsername: rawNewUsername } = req.body as {
+      newUsername: unknown;
+    };
 
     if (!this.requireTargetUsername(targetUsername, res)) return;
 
-    if (
-      !this.requireTextField(
-        newUsername,
-        res,
-        'MissingUsername',
-        'New username is required'
-      )
-    )
-      return;
+    const newUsername = this.getRequiredTextField({
+      value: rawNewUsername,
+      res,
+      name: 'MissingUsername',
+      message: 'New username is required'
+    });
+    if (!newUsername) return;
 
     try {
-      const requestingUser = await this.requireRequestingUser(req, res);
+      const requestingUser = await this.requireOwnUser(
+        req,
+        res,
+        targetUsername,
+        'You can only change your own username'
+      );
       if (!requestingUser) return;
-
-      // Authorization: Members only (own account). Administrators cannot change usernames.
-      if (
-        !this.requireOwnAccount(
-          requestingUser,
-          targetUsername,
-          res,
-          'You can only change your own username'
-        )
-      )
-        return;
 
       const oldUsername = targetUsername.toLowerCase();
       const updatedUser = await User.updateUsername(
@@ -614,13 +585,12 @@ export default class AccountController extends Controller {
 
       this.emitUsernameChanged(oldUsername, updatedUser, targetUsername);
 
-      this.sendSuccess(
-        res,
-        200,
-        'UsernameUpdated',
-        this.obfuscatePassword(updatedUser),
-        { authorizedUser: updatedUser.credentials.username }
-      );
+      this.sendAccountSuccess(res, {
+        status: 200,
+        name: 'UsernameUpdated',
+        account: updatedUser,
+        authorizedUser: updatedUser.credentials.username
+      });
     } catch (error: unknown) {
       this.handleAppError(res, error);
     }
@@ -632,40 +602,38 @@ export default class AccountController extends Controller {
    */
   public async updateEmail(req: Request, res: Response): Promise<void> {
     const targetUsername = req.params.username;
-    const { email } = req.body as { email: unknown };
+    const { email: rawEmail } = req.body as { email: unknown };
 
     if (!this.requireTargetUsername(targetUsername, res)) return;
 
-    if (!this.requireTextField(email, res, 'MissingEmail', 'Email is required'))
-      return;
+    const email = this.getRequiredTextField({
+      value: rawEmail,
+      res,
+      name: 'MissingEmail',
+      message: 'Email is required'
+    });
+    if (!email) return;
 
     try {
-      const requestingUser = await this.requireRequestingUser(req, res);
+      const requestingUser = await this.requireOwnUser(
+        req,
+        res,
+        targetUsername,
+        'You can only change your own email'
+      );
       if (!requestingUser) return;
-
-      // Authorization: Members only (own account)
-      if (
-        !this.requireOwnAccount(
-          requestingUser,
-          targetUsername,
-          res,
-          'You can only change your own email'
-        )
-      )
-        return;
 
       const updatedUser = await User.updateEmail(targetUsername, email);
 
       // Emit account updated event
       this.emitAccountUpdated(updatedUser);
 
-      this.sendSuccess(
-        res,
-        200,
-        'EmailUpdated',
-        this.obfuscatePassword(updatedUser),
-        { authorizedUser: requestingUser.credentials.username }
-      );
+      this.sendAccountSuccess(res, {
+        status: 200,
+        name: 'EmailUpdated',
+        account: updatedUser,
+        authorizedUser: requestingUser.credentials.username
+      });
     } catch (error: unknown) {
       this.handleAppError(res, error);
     }
@@ -677,33 +645,28 @@ export default class AccountController extends Controller {
    */
   public async updatePassword(req: Request, res: Response): Promise<void> {
     const targetUsername = req.params.username;
-    const { newPassword } = req.body as { newPassword: unknown };
+    const { newPassword: rawNewPassword } = req.body as {
+      newPassword: unknown;
+    };
 
     if (!this.requireTargetUsername(targetUsername, res)) return;
 
-    if (
-      !this.requireTextField(
-        newPassword,
-        res,
-        'MissingPassword',
-        'New password is required'
-      )
-    )
-      return;
+    const newPassword = this.getRequiredTextField({
+      value: rawNewPassword,
+      res,
+      name: 'MissingPassword',
+      message: 'New password is required'
+    });
+    if (!newPassword) return;
 
     try {
-      const requestingUser = await this.requireRequestingUser(req, res);
+      const requestingUser = await this.requireAdminOrOwnUser(
+        req,
+        res,
+        targetUsername,
+        'You can only change your own password'
+      );
       if (!requestingUser) return;
-
-      if (
-        !this.requireAdminOrOwn(
-          requestingUser,
-          targetUsername,
-          res,
-          'You can only change your own password'
-        )
-      )
-        return;
 
       const updatedUser = await User.updatePassword(
         targetUsername,
@@ -713,13 +676,12 @@ export default class AccountController extends Controller {
       // Emit account updated event
       this.emitAccountUpdated(updatedUser);
 
-      this.sendSuccess(
-        res,
-        200,
-        'PasswordUpdated',
-        this.obfuscatePassword(updatedUser),
-        { authorizedUser: requestingUser.credentials.username }
-      );
+      this.sendAccountSuccess(res, {
+        status: 200,
+        name: 'PasswordUpdated',
+        account: updatedUser,
+        authorizedUser: requestingUser.credentials.username
+      });
     } catch (error: unknown) {
       this.handleAppError(res, error);
     }
@@ -741,20 +703,22 @@ export default class AccountController extends Controller {
     try {
       const tokenUser = (req as Request & { user: ITokenPayload }).user;
       if (!tokenUser || !tokenUser.userId) {
-        this.sendClientError(
-          res,
-          401,
-          'UnauthorizedRequest',
-          'Unable to verify requesting user'
-        );
+        res
+          .status(401)
+          .json(
+            this.clientError(
+              'UnauthorizedRequest',
+              'Unable to verify requesting user'
+            )
+          );
         return;
       }
 
       await User.markOnboardingComplete(tokenUser.userId);
 
-      this.sendSuccess(res, 200, 'OnboardingCompleted', null, {
-        authorizedUser: tokenUser.username
-      });
+      const success = this.success('OnboardingCompleted', null);
+      success.authorizedUser = tokenUser.username;
+      res.status(200).json(success);
     } catch (error: unknown) {
       this.handleAppError(res, error);
     }

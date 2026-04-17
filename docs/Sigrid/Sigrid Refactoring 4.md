@@ -103,6 +103,52 @@ Outcomes:
 - More consistent response construction across controllers.
 - Avoided runtime `this`-context middleware failures.
 
+## Peer Review Follow-Up (2026-04-17)
+
+### Teammate 1: JWT middleware duplication across controllers
+
+Assessment:
+
+- Valid. `MapController.authorize` was still a duplicate JWT implementation, and auth behavior was inconsistent across controllers.
+
+Applied fix:
+
+- Added shared JWT middleware in base controller:
+  - `Controller.authenticateToken(req, res, next)`
+  - `Controller.getTokenPayload(req)`
+- Removed duplicated JWT middleware methods from:
+  - `server/controllers/map.controller.ts`
+  - `server/controllers/account.controller.ts`
+  - `server/controllers/notification.controller.ts`
+- Updated map routes to use `this.authenticateToken.bind(this)` directly.
+- Standardized token attachment strategy to typed `req.user` payload handling.
+
+Outcome:
+
+- Removed copy-paste auth logic across controllers.
+- Unified JWT verification and token error responses in one implementation.
+
+### Teammate 2: inconsistent success/error response helper usage
+
+Assessment:
+
+- Valid. Account controller used local `sendSuccess` and `sendClientError` wrappers even though base helper methods already existed.
+
+Applied fix:
+
+- Removed local account-controller wrappers:
+  - `sendSuccess(...)`
+  - `sendClientError(...)`
+- Replaced usage with direct base helpers:
+  - `this.success(...)`
+  - `this.clientError(...)`
+- Kept `sendAccountSuccess(...)` only as a narrow account-payload convenience wrapper (obfuscation + authorized user), backed by `this.success(...)`.
+
+Outcome:
+
+- Standardized success/error shape construction on base-controller primitives.
+- Reduced helper overlap and improved consistency with teammate review guidance.
+
 ## Relevant Files for Next Pass
 
 | File | Role |

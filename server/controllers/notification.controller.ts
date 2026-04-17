@@ -1,14 +1,12 @@
 // Controller for live notification endpoints (TUC3)
 // Base path: /notifications
 
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response } from 'express';
 import Controller from './controller';
 import { ITokenPayload } from '../../common/user.interface';
 import { NotificationModel } from '../models/notification.model';
 import { User } from '../models/user.model';
 import alertsService from '../services/alerts.service';
-import jwt from 'jsonwebtoken';
-import { JWT_KEY as secretKey } from '../env';
 import * as responses from '../../common/server.responses';
 
 export default class NotificationController extends Controller {
@@ -45,40 +43,6 @@ export default class NotificationController extends Controller {
     // Notification/alert routes
     this.router.get('/notifications', this.searchNotifications.bind(this));
     this.router.get('/alerts', this.getAlerts.bind(this));
-  }
-
-  // ── Auth Middleware ────────────────────────────────────────────────
-
-  private async authenticateToken(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.split(' ')[1];
-
-    if (!token) {
-      const error: responses.IAppError = {
-        type: 'ClientError',
-        name: 'MissingToken',
-        message: 'Authentication token is required'
-      };
-      res.status(401).json(error);
-      return;
-    }
-
-    try {
-      const decoded = jwt.verify(token, secretKey) as ITokenPayload;
-      (req as Request & { user: ITokenPayload }).user = decoded;
-      next();
-    } catch {
-      const error: responses.IAppError = {
-        type: 'ClientError',
-        name: 'InvalidToken',
-        message: 'Invalid or expired token'
-      };
-      res.status(401).json(error);
-    }
   }
 
   // ── Subscriptions ──────────────────────────────────────────────────

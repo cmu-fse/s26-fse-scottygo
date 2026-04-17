@@ -499,9 +499,7 @@ class TripShotLiveStatusService {
         minutes: minutesFromNow
       };
 
-      const list = map.get(awaiting.stopId) ?? [];
-      list.push(prediction);
-      map.set(awaiting.stopId, list);
+      this.appendPrediction(map, awaiting.stopId, prediction);
     }
   }
 
@@ -514,50 +512,87 @@ class TripShotLiveStatusService {
     scheduledAt: string,
     rideScheduledStart: string
   ): number {
-    const match = scheduledAt.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-    if (!match) return NaN;
+    const timeParts = this.parseClockTime(scheduledAt);
+    if (!timeParts) return NaN;
 
     const rideStart = new Date(rideScheduledStart);
     if (!Number.isFinite(rideStart.getTime())) return NaN;
 
-    const wantH = parseInt(match[1]);
-    const wantM = parseInt(match[2]);
-    const wantS = match[3] ? parseInt(match[3]) : 0;
-
     // Get the Eastern calendar date ("YYYY-MM-DD") for the ride's start.
-    const dateStr = rideStart.toLocaleDateString('en-CA', {
-      timeZone: 'America/New_York'
-    });
+    const dateStr = this.getEasternRideDateString(rideStart);
 
     // Build a UTC candidate by treating the Eastern local time as if it were UTC.
     const candidate = new Date(
-      `${dateStr}T${String(wantH).padStart(2, '0')}:${String(wantM).padStart(2, '0')}:${String(wantS).padStart(2, '0')}Z`
+      `${dateStr}T${String(timeParts.hour).padStart(2, '0')}:${String(timeParts.minute).padStart(2, '0')}:${String(timeParts.second).padStart(2, '0')}Z`
     );
 
     // Find what Eastern time the candidate actually displays as.
+    const displayParts = this.getEasternClockParts(candidate);
+
+    // Shift the candidate by the difference to land on the correct UTC instant.
+    const diffSec = this.normalizeDayBoundaryOffsetSeconds(
+      (timeParts.hour - displayParts.hour) * 3600 +
+        (timeParts.minute - displayParts.minute) * 60 +
+        (timeParts.second - displayParts.second)
+    );
+
+    return candidate.getTime() + diffSec * 1_000;
+  }
+
+  private parseClockTime(
+    value: string
+  ): { hour: number; minute: number; second: number } | null {
+    const match = value.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+    if (!match) return null;
+
+    return {
+      hour: parseInt(match[1]),
+      minute: parseInt(match[2]),
+      second: match[3] ? parseInt(match[3]) : 0
+    };
+  }
+
+  private getEasternRideDateString(rideStart: Date): string {
+    return rideStart.toLocaleDateString('en-CA', {
+      timeZone: 'America/New_York'
+    });
+  }
+
+  private getEasternClockParts(value: Date): {
+    hour: number;
+    minute: number;
+    second: number;
+  } {
     const parts = new Intl.DateTimeFormat('en-US', {
       timeZone: 'America/New_York',
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
       hour12: false
-    }).formatToParts(candidate);
-    const dispH = parseInt(parts.find((p) => p.type === 'hour')?.value ?? '0');
-    const dispM = parseInt(
-      parts.find((p) => p.type === 'minute')?.value ?? '0'
-    );
-    const dispS = parseInt(
-      parts.find((p) => p.type === 'second')?.value ?? '0'
-    );
+    }).formatToParts(value);
 
-    // Shift the candidate by the difference to land on the correct UTC instant.
-    let diffSec =
-      (wantH - dispH) * 3600 + (wantM - dispM) * 60 + (wantS - dispS);
+    return {
+      hour: parseInt(parts.find((p) => p.type === 'hour')?.value ?? '0'),
+      minute: parseInt(parts.find((p) => p.type === 'minute')?.value ?? '0'),
+      second: parseInt(parts.find((p) => p.type === 'second')?.value ?? '0')
+    };
+  }
+
+  private normalizeDayBoundaryOffsetSeconds(diffSeconds: number): number {
     // Clamp to ±12 h to handle overnight routes that cross midnight.
-    if (diffSec > 43_200) diffSec -= 86_400;
-    if (diffSec < -43_200) diffSec += 86_400;
+    if (diffSeconds > 43_200) return diffSeconds - 86_400;
+    if (diffSeconds < -43_200) return diffSeconds + 86_400;
+    return diffSeconds;
+  }
 
-    return candidate.getTime() + diffSec * 1_000;
+  private appendPrediction(
+    map: Map<string, IPrediction[]>,
+    stopId: string,
+    prediction: IPrediction
+  ): void {
+    const list = map.get(stopId) ?? [];
+    list.push(prediction);
+    map.set(stopId, list);
   }
 
   /** Push one IPrediction derived from an Awaiting stop status into the map. */
@@ -590,9 +625,7 @@ class TripShotLiveStatusService {
       minutes: minutesFromNow
     };
 
-    const list = map.get(awaiting.stopId) ?? [];
-    list.push(prediction);
-    map.set(awaiting.stopId, list);
+    this.appendPrediction(map, awaiting.stopId, prediction);
   }
 }
 

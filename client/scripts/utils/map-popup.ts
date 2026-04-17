@@ -125,18 +125,7 @@ function _minimizeActive(
   type: PopupType,
   params: Omit<SlotState, 'html' | 'scrollTop'>
 ): void {
-  const popup = document.getElementById(MAP_POPUP_ID);
-  const scrollTop = popup?.querySelector('.map-popup__list')?.scrollTop ?? 0;
-  const html = popup?.innerHTML ?? '';
-
-  slotCache.set(type, {
-    html,
-    scrollTop,
-    onRestore: params.onRestore,
-    label: params.label,
-    badgeText: params.badgeText,
-    badgeColor: params.badgeColor
-  });
+  cachePopupState(type, params);
 
   closeMapPopup();
   _createTab(type, params.label, params.badgeText, params.badgeColor);
@@ -160,13 +149,7 @@ export function minimizePopup(
   badgeText?: string,
   badgeColor?: string
 ): void {
-  const popup = document.getElementById(MAP_POPUP_ID);
-  const scrollTop = popup?.querySelector('.map-popup__list')?.scrollTop ?? 0;
-  const html = popup?.innerHTML ?? '';
-
-  slotCache.set(type, {
-    html,
-    scrollTop,
+  cachePopupState(type, {
     onRestore,
     label,
     badgeText,
@@ -184,6 +167,24 @@ export function minimizePopup(
 }
 
 const TAB_ORDER: PopupType[] = ['route', 'stop', 'bus'];
+
+function cachePopupState(
+  type: PopupType,
+  params: Omit<SlotState, 'html' | 'scrollTop'>
+): void {
+  const popup = document.getElementById(MAP_POPUP_ID);
+  const scrollTop = popup?.querySelector('.map-popup__list')?.scrollTop ?? 0;
+  const html = popup?.innerHTML ?? '';
+
+  slotCache.set(type, {
+    html,
+    scrollTop,
+    onRestore: params.onRestore,
+    label: params.label,
+    badgeText: params.badgeText,
+    badgeColor: params.badgeColor
+  });
+}
 
 function _createTab(
   type: PopupType,
