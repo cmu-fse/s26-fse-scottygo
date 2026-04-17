@@ -297,17 +297,26 @@ class TripShotLiveStatusService {
       this.ensureRouteStopsIndexed(newStops, normalizedRouteId, ride);
       this.accumulateRouteSchedule(scheduleAccum, normalizedRouteId, ride);
 
-      if (!this.isActive(ride)) continue;
+      const isActive = this.isActive(ride);
+      const isScheduled = !isActive && this.isScheduledState(ride);
+      if (!isActive && !isScheduled) continue;
 
       const vs = ride.vehicleId ? vsMap.get(ride.vehicleId) : null;
-      if (!vs || !vs.liveDataAvailable) continue;
-
-      const displayVid = this.addRouteVehicle(
-        newVehicles,
-        normalizedRouteId,
-        vs
-      );
-      this.addRidePredictions(newPredictions, ride, displayVid);
+      if (isActive && vs?.liveDataAvailable) {
+        // Live GPS path: use real-time ETAs and show the bus on the map.
+        const displayVid = this.addRouteVehicle(
+          newVehicles,
+          normalizedRouteId,
+          vs
+        );
+        this.addRidePredictions(newPredictions, ride, displayVid);
+      } else if (isScheduled) {
+        // Not-yet-started trip: scheduledAt times are reliable since the bus
+        // hasn't deviated from the schedule yet.  Active rides with no GPS are
+        // intentionally skipped — scheduledAt can't reflect where a mid-run
+        // bus actually is.
+        this.addScheduledRidePredictions(newPredictions, ride);
+      }
     }
 
     const newSchedules = this.finalizeRouteSchedules(scheduleAccum);
@@ -451,6 +460,99 @@ class TripShotLiveStatusService {
   /** True only for rides whose state object contains the "Active" key. */
   private isActive(ride: TsLiveRide): boolean {
     return 'Active' in ride.state;
+  }
+
+  /** True for rides that are scheduled but not yet started. */
+  private isScheduledState(ride: TsLiveRide): boolean {
+    return 'Scheduled' in ride.state;
+  }
+
+  /**
+   * Emit scheduled-time predictions for not-yet-started (Scheduled state) rides.
+   * Uses `scheduledDepartureTime` (ISO UTC) when present, otherwise parses
+   * `scheduledAt` ("HH:MM:SS" Eastern) against the ride's scheduledStart date.
+   */
+  private addScheduledRidePredictions(
+    map: Map<string, IPrediction[]>,
+    ride: TsLiveRide
+  ): void {
+    const now = Date.now();
+    for (const ss of ride.stopStatus) {
+      if (!('Awaiting' in ss)) continue;
+      const awaiting = (ss as Extract<TsStopState, { Awaiting: unknown }>)
+        .Awaiting;
+
+      const eta = awaiting.scheduledDepartureTime
+        ? new Date(awaiting.scheduledDepartureTime).getTime()
+        : this.parseScheduledAt(awaiting.scheduledAt, ride.scheduledStart);
+
+      if (!Number.isFinite(eta)) continue;
+      if (eta < now - STALE_PREDICTION_GRACE_MS) continue;
+
+      const minutesFromNow = Math.max(0, Math.round((eta - now) / 60_000));
+      const prediction: IPrediction = {
+        stopId: awaiting.stopId,
+        routeId: ride.routeId,
+        vid: 'Scheduled',
+        predictedArrivalTime: eta,
+        isDelayed: false,
+        minutes: minutesFromNow
+      };
+
+      const list = map.get(awaiting.stopId) ?? [];
+      list.push(prediction);
+      map.set(awaiting.stopId, list);
+    }
+  }
+
+  /**
+   * Convert a "HH:MM:SS" Eastern-time string to a UTC millisecond timestamp.
+   * The ride's `scheduledStart` (ISO UTC) anchors the calendar date.
+   * Handles overnight routes by clamping the day-boundary offset to ±12 h.
+   */
+  private parseScheduledAt(
+    scheduledAt: string,
+    rideScheduledStart: string
+  ): number {
+    const match = scheduledAt.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+    if (!match) return NaN;
+
+    const rideStart = new Date(rideScheduledStart);
+    if (!Number.isFinite(rideStart.getTime())) return NaN;
+
+    const wantH = parseInt(match[1]);
+    const wantM = parseInt(match[2]);
+    const wantS = match[3] ? parseInt(match[3]) : 0;
+
+    // Get the Eastern calendar date ("YYYY-MM-DD") for the ride's start.
+    const dateStr = rideStart.toLocaleDateString('en-CA', {
+      timeZone: 'America/New_York'
+    });
+
+    // Build a UTC candidate by treating the Eastern local time as if it were UTC.
+    const candidate = new Date(
+      `${dateStr}T${String(wantH).padStart(2, '0')}:${String(wantM).padStart(2, '0')}:${String(wantS).padStart(2, '0')}Z`
+    );
+
+    // Find what Eastern time the candidate actually displays as.
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    }).formatToParts(candidate);
+    const dispH = parseInt(parts.find((p) => p.type === 'hour')?.value ?? '0');
+    const dispM = parseInt(parts.find((p) => p.type === 'minute')?.value ?? '0');
+    const dispS = parseInt(parts.find((p) => p.type === 'second')?.value ?? '0');
+
+    // Shift the candidate by the difference to land on the correct UTC instant.
+    let diffSec = (wantH - dispH) * 3600 + (wantM - dispM) * 60 + (wantS - dispS);
+    // Clamp to ±12 h to handle overnight routes that cross midnight.
+    if (diffSec > 43_200) diffSec -= 86_400;
+    if (diffSec < -43_200) diffSec += 86_400;
+
+    return candidate.getTime() + diffSec * 1_000;
   }
 
   /** Push one IPrediction derived from an Awaiting stop status into the map. */

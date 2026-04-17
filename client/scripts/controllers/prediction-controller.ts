@@ -290,7 +290,7 @@ export class PredictionController {
     const meta = document.createElement('span');
     meta.className = 'map-popup__meta';
     const parts: string[] = [];
-    if (p.vid) parts.push(`Bus ${p.vid}`);
+    if (p.vid) parts.push(p.vid === 'Scheduled' ? 'Scheduled' : `Bus ${p.vid}`);
     if (p.isDelayed) parts.push('Delayed');
     meta.textContent = parts.join(' · ');
 
@@ -415,7 +415,7 @@ export class PredictionController {
       const metaEl = li.querySelector('.map-popup__meta');
       if (metaEl) {
         const parts: string[] = [];
-        if (p.vid) parts.push(`Bus ${p.vid}`);
+        if (p.vid) parts.push(p.vid === 'Scheduled' ? 'Scheduled' : `Bus ${p.vid}`);
         if (p.isDelayed) parts.push('Delayed');
         metaEl.textContent = parts.join(' · ');
       }
