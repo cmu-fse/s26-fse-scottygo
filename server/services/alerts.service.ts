@@ -142,6 +142,16 @@ class AlertsService {
     const descriptionText =
       alert.descriptionText?.translation?.[0]?.text ?? '';
 
+    return {
+      id: entity.id,
+      headerText,
+      descriptionText,
+      routeIds: this.decodeRouteIds(alert),
+      activePeriods: this.decodeActivePeriods(alert)
+    };
+  }
+
+  private decodeRouteIds(alert: transit_realtime.IAlert): string[] {
     const routeIds: string[] = [];
     if (alert.informedEntity) {
       for (const ie of alert.informedEntity) {
@@ -150,7 +160,12 @@ class AlertsService {
         }
       }
     }
+    return routeIds;
+  }
 
+  private decodeActivePeriods(
+    alert: transit_realtime.IAlert
+  ): { start: string; end: string }[] {
     const activePeriods: { start: string; end: string }[] = [];
     if (alert.activePeriod) {
       for (const ap of alert.activePeriod) {
@@ -162,14 +177,7 @@ class AlertsService {
         });
       }
     }
-
-    return {
-      id: entity.id,
-      headerText,
-      descriptionText,
-      routeIds,
-      activePeriods
-    };
+    return activePeriods;
   }
 
   private applyFetchedAlerts(newAlerts: IServiceAlert[]): void {

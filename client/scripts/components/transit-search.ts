@@ -6,9 +6,8 @@
 import { MapStateManager } from '../state/map-state';
 import type { IRoute, IStop } from '../../../common/transit.interface';
 
-export interface ITransitSearchElement extends HTMLElement {
-  setStopsData(stopsData: Record<string, IStop[]>): void;
-}
+/** Fallback color for route badges when the route has no assigned color. */
+const DEFAULT_BADGE_COLOR = '#888888';
 
 export class TransitSearch extends HTMLElement {
   private routes: IRoute[] = [];
@@ -36,14 +35,6 @@ export class TransitSearch extends HTMLElement {
 
   disconnectedCallback(): void {
     this.unsubscribe?.();
-  }
-
-  /**
-   * No-op: stop data is now handled server-side by TransitSearchStrategy.
-   * Kept for interface compatibility with existing callers in map.ts.
-   */
-  setStopsData(_stopsData: Record<string, IStop[]>): void {
-    // Search is now delegated to the backend — no local stop state needed.
   }
 
   private handleInput(): void {
@@ -88,8 +79,8 @@ export class TransitSearch extends HTMLElement {
         matchedRoutes = data.payload?.routes ?? [];
         matchedStops = data.payload?.stops ?? [];
       }
-    } catch {
-      // Network error — show no results
+    } catch (err) {
+      console.warn('Transit search request failed:', err);
     }
 
     if (matchedRoutes.length === 0 && matchedStops.length === 0) {
@@ -108,10 +99,9 @@ export class TransitSearch extends HTMLElement {
   }
 
   private buildRouteItemHTML(r: IRoute): string {
-    // PRT GTFS uses internal numeric route_id; route.name is the
-    // user-facing route number (route_short_name) in that case.
-    // When route_id is alphanumeric (e.g. "61D") it IS the route
-    // identifier and route.name holds the description (e.g. "Murray").
+    // GTFS route_id is numeric (e.g. "2073") → display route.name (the short name).
+    // When route_id is alphanumeric (e.g. "61D") → it is the display name;
+    // route.name holds the long description (e.g. "Murray").
     const isInternalId = /^\d+$/.test(r.id);
     let label: string;
     if (isInternalId) {
@@ -132,7 +122,7 @@ export class TransitSearch extends HTMLElement {
     const badges = (s.routes ?? [])
       .map((routeId: string) => {
         const route = this.routeMap.get(routeId);
-        const color = route?.color ?? '#888888';
+        const color = route?.color ?? DEFAULT_BADGE_COLOR;
         const textColor = this.getTextColor(color);
         return `<span class="route-badge" style="background:${color};color:${textColor}">${routeId}</span>`;
       })
@@ -150,10 +140,12 @@ export class TransitSearch extends HTMLElement {
 
   private attachResultListeners(matchedStops: IStop[]): void {
     if (!this.dropdown) return;
+    this.attachRouteListeners(this.dropdown);
+    this.attachStopListeners(this.dropdown, matchedStops);
+  }
 
-    const stopById = new Map(matchedStops.map((stop) => [stop.stopId, stop]));
-
-    this.dropdown.querySelectorAll('.search-result-route').forEach((el) => {
+  private attachRouteListeners(container: HTMLElement): void {
+    container.querySelectorAll('.search-result-route').forEach((el) => {
       el.addEventListener('click', () => {
         const routeId = (el as HTMLElement).dataset.routeId!;
         this.dispatchEvent(
@@ -165,17 +157,21 @@ export class TransitSearch extends HTMLElement {
         this.hideDropdown();
       });
     });
+  }
 
-    this.dropdown.querySelectorAll('.search-result-stop').forEach((el) => {
+  private attachStopListeners(
+    container: HTMLElement,
+    matchedStops: IStop[]
+  ): void {
+    const stopById = new Map(matchedStops.map((stop) => [stop.stopId, stop]));
+
+    container.querySelectorAll('.search-result-stop').forEach((el) => {
       el.addEventListener('click', () => {
         const stopId = (el as HTMLElement).dataset.stopId!;
         const stop = stopById.get(stopId);
         this.dispatchEvent(
           new CustomEvent('searchSelectStop', {
-            detail: {
-              stopId,
-              stop
-            },
+            detail: { stopId, stop },
             bubbles: true
           })
         );
