@@ -543,11 +543,16 @@ class TripShotLiveStatusService {
       hour12: false
     }).formatToParts(candidate);
     const dispH = parseInt(parts.find((p) => p.type === 'hour')?.value ?? '0');
-    const dispM = parseInt(parts.find((p) => p.type === 'minute')?.value ?? '0');
-    const dispS = parseInt(parts.find((p) => p.type === 'second')?.value ?? '0');
+    const dispM = parseInt(
+      parts.find((p) => p.type === 'minute')?.value ?? '0'
+    );
+    const dispS = parseInt(
+      parts.find((p) => p.type === 'second')?.value ?? '0'
+    );
 
     // Shift the candidate by the difference to land on the correct UTC instant.
-    let diffSec = (wantH - dispH) * 3600 + (wantM - dispM) * 60 + (wantS - dispS);
+    let diffSec =
+      (wantH - dispH) * 3600 + (wantM - dispM) * 60 + (wantS - dispS);
     // Clamp to ±12 h to handle overnight routes that cross midnight.
     if (diffSec > 43_200) diffSec -= 86_400;
     if (diffSec < -43_200) diffSec += 86_400;

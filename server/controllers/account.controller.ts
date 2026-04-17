@@ -141,12 +141,66 @@ export default class AccountController extends Controller {
     name: responses.ClientErrorName,
     message: string
   ): void {
-    const error: responses.IAppError = {
-      type: 'ClientError',
+    res.status(status).json(this.clientError(name, message));
+  }
+
+  private sendSuccess(
+    res: Response,
+    status: number,
+    name: responses.SuccessName,
+    payload: responses.IPayload,
+    options?: {
+      authorizedUser?: string;
+      message?: string;
+      metadata?: Record<string, unknown>;
+    }
+  ): void {
+    const success = this.success(
       name,
-      message
-    };
-    res.status(status).json(error);
+      payload,
+      options?.message,
+      options?.metadata
+    );
+    if (options?.authorizedUser) {
+      success.authorizedUser = options.authorizedUser;
+    }
+    res.status(status).json(success);
+  }
+
+  private requireOwnAccount(
+    requestingUser: IUserAccount,
+    targetUsername: string,
+    res: Response,
+    message: string
+  ): boolean {
+    if (!this.isOwnAccount(requestingUser, targetUsername)) {
+      this.sendClientError(res, 403, 'UnauthorizedRequest', message);
+      return false;
+    }
+    return true;
+  }
+
+  private isValidStatus(status: unknown): status is IAccountStatus {
+    return status === 'Active' || status === 'Inactive';
+  }
+
+  private isValidPrivilegeLevel(value: unknown): value is IPrivilegeLevel {
+    return (
+      value === 'Administrator' || value === 'Coordinator' || value === 'Member'
+    );
+  }
+
+  private requireTextField(
+    value: unknown,
+    res: Response,
+    name: responses.ClientErrorName,
+    message: string
+  ): value is string {
+    if (typeof value !== 'string' || value.trim() === '') {
+      this.sendClientError(res, 400, name, message);
+      return false;
+    }
+    return true;
   }
 
   private async requireRequestingUser(
@@ -299,12 +353,9 @@ export default class AccountController extends Controller {
         return;
 
       const usernames = await User.getAllUsernames();
-      const successRes: responses.ISuccess = {
-        name: 'UsersRetrieved',
-        authorizedUser: requestingUser.credentials.username,
-        payload: usernames
-      };
-      res.status(200).json(successRes);
+      this.sendSuccess(res, 200, 'UsersRetrieved', usernames, {
+        authorizedUser: requestingUser.credentials.username
+      });
     } catch (error: unknown) {
       this.handleAppError(res, error);
     }
@@ -333,16 +384,13 @@ export default class AccountController extends Controller {
       const context = new SearchContext<string[]>(new UserSearchStrategy());
       const usernames = await context.executeSearch(q);
 
-      const successRes: responses.ISuccess = {
-        name: 'UsersSearchCompleted',
+      this.sendSuccess(res, 200, 'UsersSearchCompleted', usernames, {
         authorizedUser: requestingUser.credentials.username,
         message: usernames.length
           ? `Found ${usernames.length} matching user${usernames.length === 1 ? '' : 's'}`
           : 'No matching users found',
-        metadata: { totalItems: usernames.length },
-        payload: usernames
-      };
-      res.status(200).json(successRes);
+        metadata: { totalItems: usernames.length }
+      });
     } catch (error: unknown) {
       this.handleAppError(res, error);
     }
@@ -371,12 +419,13 @@ export default class AccountController extends Controller {
         return;
 
       const userAccount = await User.getUserAccount(targetUsername);
-      const successRes: responses.ISuccess = {
-        name: 'AccountRetrieved',
-        authorizedUser: requestingUser.credentials.username,
-        payload: this.obfuscatePassword(userAccount)
-      };
-      res.status(200).json(successRes);
+      this.sendSuccess(
+        res,
+        200,
+        'AccountRetrieved',
+        this.obfuscatePassword(userAccount),
+        { authorizedUser: requestingUser.credentials.username }
+      );
     } catch (error: unknown) {
       this.handleAppError(res, error);
     }
@@ -388,17 +437,17 @@ export default class AccountController extends Controller {
    */
   public async updateStatus(req: Request, res: Response): Promise<void> {
     const targetUsername = req.params.username;
-    const { status } = req.body as { status: IAccountStatus };
+    const { status } = req.body as { status: unknown };
 
     if (!this.requireTargetUsername(targetUsername, res)) return;
 
-    if (!status || !['Active', 'Inactive'].includes(status)) {
-      const error: responses.IAppError = {
-        type: 'ClientError',
-        name: 'UnauthorizedRequest',
-        message: 'Valid status (Active/Inactive) is required'
-      };
-      res.status(400).json(error);
+    if (!this.isValidStatus(status)) {
+      this.sendClientError(
+        res,
+        400,
+        'UnauthorizedRequest',
+        'Valid status (Active/Inactive) is required'
+      );
       return;
     }
 
@@ -431,12 +480,13 @@ export default class AccountController extends Controller {
         status
       );
 
-      const successRes: responses.ISuccess = {
-        name: 'StatusUpdated',
-        authorizedUser: requestingUser.credentials.username,
-        payload: this.obfuscatePassword(updatedUser)
-      };
-      res.status(200).json(successRes);
+      this.sendSuccess(
+        res,
+        200,
+        'StatusUpdated',
+        this.obfuscatePassword(updatedUser),
+        { authorizedUser: requestingUser.credentials.username }
+      );
     } catch (error: unknown) {
       this.handleAppError(res, error);
     }
@@ -473,21 +523,17 @@ export default class AccountController extends Controller {
    */
   public async updatePrivilege(req: Request, res: Response): Promise<void> {
     const targetUsername = req.params.username;
-    const { privilegeLevel } = req.body as { privilegeLevel: IPrivilegeLevel };
+    const { privilegeLevel } = req.body as { privilegeLevel: unknown };
 
     if (!this.requireTargetUsername(targetUsername, res)) return;
 
-    if (
-      !privilegeLevel ||
-      !['Administrator', 'Coordinator', 'Member'].includes(privilegeLevel)
-    ) {
-      const error: responses.IAppError = {
-        type: 'ClientError',
-        name: 'UnauthorizedRequest',
-        message:
-          'Valid privilege level (Administrator/Coordinator/Member) is required'
-      };
-      res.status(400).json(error);
+    if (!this.isValidPrivilegeLevel(privilegeLevel)) {
+      this.sendClientError(
+        res,
+        400,
+        'UnauthorizedRequest',
+        'Valid privilege level (Administrator/Coordinator/Member) is required'
+      );
       return;
     }
 
@@ -513,12 +559,13 @@ export default class AccountController extends Controller {
       // Emit account updated event
       this.emitAccountUpdated(updatedUser);
 
-      const successRes: responses.ISuccess = {
-        name: 'PrivilegeUpdated',
-        authorizedUser: requestingUser.credentials.username,
-        payload: this.obfuscatePassword(updatedUser)
-      };
-      res.status(200).json(successRes);
+      this.sendSuccess(
+        res,
+        200,
+        'PrivilegeUpdated',
+        this.obfuscatePassword(updatedUser),
+        { authorizedUser: requestingUser.credentials.username }
+      );
     } catch (error: unknown) {
       this.handleAppError(res, error);
     }
@@ -530,34 +577,34 @@ export default class AccountController extends Controller {
    */
   public async updateUsername(req: Request, res: Response): Promise<void> {
     const targetUsername = req.params.username;
-    const { newUsername } = req.body as { newUsername: string };
+    const { newUsername } = req.body as { newUsername: unknown };
 
     if (!this.requireTargetUsername(targetUsername, res)) return;
 
-    if (!newUsername) {
-      this.sendClientError(
+    if (
+      !this.requireTextField(
+        newUsername,
         res,
-        400,
         'MissingUsername',
         'New username is required'
-      );
+      )
+    )
       return;
-    }
 
     try {
       const requestingUser = await this.requireRequestingUser(req, res);
       if (!requestingUser) return;
 
       // Authorization: Members only (own account). Administrators cannot change usernames.
-      if (!this.isOwnAccount(requestingUser, targetUsername)) {
-        this.sendClientError(
+      if (
+        !this.requireOwnAccount(
+          requestingUser,
+          targetUsername,
           res,
-          403,
-          'UnauthorizedRequest',
           'You can only change your own username'
-        );
+        )
+      )
         return;
-      }
 
       const oldUsername = targetUsername.toLowerCase();
       const updatedUser = await User.updateUsername(
@@ -567,12 +614,13 @@ export default class AccountController extends Controller {
 
       this.emitUsernameChanged(oldUsername, updatedUser, targetUsername);
 
-      const successRes: responses.ISuccess = {
-        name: 'UsernameUpdated',
-        authorizedUser: updatedUser.credentials.username,
-        payload: this.obfuscatePassword(updatedUser)
-      };
-      res.status(200).json(successRes);
+      this.sendSuccess(
+        res,
+        200,
+        'UsernameUpdated',
+        this.obfuscatePassword(updatedUser),
+        { authorizedUser: updatedUser.credentials.username }
+      );
     } catch (error: unknown) {
       this.handleAppError(res, error);
     }
@@ -584,41 +632,40 @@ export default class AccountController extends Controller {
    */
   public async updateEmail(req: Request, res: Response): Promise<void> {
     const targetUsername = req.params.username;
-    const { email } = req.body as { email: string };
+    const { email } = req.body as { email: unknown };
 
     if (!this.requireTargetUsername(targetUsername, res)) return;
 
-    if (!email) {
-      this.sendClientError(res, 400, 'MissingEmail', 'Email is required');
+    if (!this.requireTextField(email, res, 'MissingEmail', 'Email is required'))
       return;
-    }
 
     try {
       const requestingUser = await this.requireRequestingUser(req, res);
       if (!requestingUser) return;
 
       // Authorization: Members only (own account)
-      if (!this.isOwnAccount(requestingUser, targetUsername)) {
-        this.sendClientError(
+      if (
+        !this.requireOwnAccount(
+          requestingUser,
+          targetUsername,
           res,
-          403,
-          'UnauthorizedRequest',
           'You can only change your own email'
-        );
+        )
+      )
         return;
-      }
 
       const updatedUser = await User.updateEmail(targetUsername, email);
 
       // Emit account updated event
       this.emitAccountUpdated(updatedUser);
 
-      const successRes: responses.ISuccess = {
-        name: 'EmailUpdated',
-        authorizedUser: requestingUser.credentials.username,
-        payload: this.obfuscatePassword(updatedUser)
-      };
-      res.status(200).json(successRes);
+      this.sendSuccess(
+        res,
+        200,
+        'EmailUpdated',
+        this.obfuscatePassword(updatedUser),
+        { authorizedUser: requestingUser.credentials.username }
+      );
     } catch (error: unknown) {
       this.handleAppError(res, error);
     }
@@ -630,19 +677,19 @@ export default class AccountController extends Controller {
    */
   public async updatePassword(req: Request, res: Response): Promise<void> {
     const targetUsername = req.params.username;
-    const { newPassword } = req.body as { newPassword: string };
+    const { newPassword } = req.body as { newPassword: unknown };
 
     if (!this.requireTargetUsername(targetUsername, res)) return;
 
-    if (!newPassword) {
-      this.sendClientError(
+    if (
+      !this.requireTextField(
+        newPassword,
         res,
-        400,
         'MissingPassword',
         'New password is required'
-      );
+      )
+    )
       return;
-    }
 
     try {
       const requestingUser = await this.requireRequestingUser(req, res);
@@ -666,12 +713,13 @@ export default class AccountController extends Controller {
       // Emit account updated event
       this.emitAccountUpdated(updatedUser);
 
-      const successRes: responses.ISuccess = {
-        name: 'PasswordUpdated',
-        authorizedUser: requestingUser.credentials.username,
-        payload: this.obfuscatePassword(updatedUser)
-      };
-      res.status(200).json(successRes);
+      this.sendSuccess(
+        res,
+        200,
+        'PasswordUpdated',
+        this.obfuscatePassword(updatedUser),
+        { authorizedUser: requestingUser.credentials.username }
+      );
     } catch (error: unknown) {
       this.handleAppError(res, error);
     }
@@ -693,23 +741,20 @@ export default class AccountController extends Controller {
     try {
       const tokenUser = (req as Request & { user: ITokenPayload }).user;
       if (!tokenUser || !tokenUser.userId) {
-        const error: responses.IAppError = {
-          type: 'ClientError',
-          name: 'UnauthorizedRequest',
-          message: 'Unable to verify requesting user'
-        };
-        res.status(401).json(error);
+        this.sendClientError(
+          res,
+          401,
+          'UnauthorizedRequest',
+          'Unable to verify requesting user'
+        );
         return;
       }
 
       await User.markOnboardingComplete(tokenUser.userId);
 
-      const successRes: responses.ISuccess = {
-        name: 'OnboardingCompleted',
-        authorizedUser: tokenUser.username,
-        payload: null
-      };
-      res.status(200).json(successRes);
+      this.sendSuccess(res, 200, 'OnboardingCompleted', null, {
+        authorizedUser: tokenUser.username
+      });
     } catch (error: unknown) {
       this.handleAppError(res, error);
     }

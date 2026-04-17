@@ -7,7 +7,6 @@ import Controller from './controller';
 import { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { JWT_KEY as secretKey, GOOGLE_MAPS_KEY } from '../env';
-import * as responses from '../../common/server.responses';
 import {
   RouteSearchStrategy,
   TransitSearchStrategy,
@@ -40,19 +39,27 @@ export default class MapController extends Controller {
     this.router.get('/', this.mapPage.bind(this));
     this.router.get(
       '/users/:username',
-      this.authorize,
+      this.authorize.bind(this),
       this.getUser.bind(this)
     );
-    this.router.get('/config', this.authorize, this.getMapConfig.bind(this));
+    this.router.get(
+      '/config',
+      this.authorize.bind(this),
+      this.getMapConfig.bind(this)
+    );
 
     // Search endpoints (SearchInfo UC — R1 contextual search)
     // Auth middleware is applied inline so the page route above stays open.
     this.router.get(
       '/routes/search',
-      this.authorize,
+      this.authorize.bind(this),
       this.searchRoutes.bind(this)
     );
-    this.router.get('/search', this.authorize, this.searchTransit.bind(this));
+    this.router.get(
+      '/search',
+      this.authorize.bind(this),
+      this.searchTransit.bind(this)
+    );
   }
 
   public mapPage(req: Request, res: Response): void {
@@ -70,12 +77,9 @@ export default class MapController extends Controller {
 
     // Handle missing token
     if (!token) {
-      const errorRes: responses.IAppError = {
-        type: 'ClientError',
-        name: 'MissingToken',
-        message: 'Token is required'
-      };
-      res.status(401).json(errorRes);
+      res
+        .status(401)
+        .json(this.clientError('MissingToken', 'Token is required'));
       return;
     }
 
@@ -87,12 +91,7 @@ export default class MapController extends Controller {
       next(); // Continue to next middleware
     } catch (error) {
       // Handle JWT verification error (invalid token)
-      const errorRes: responses.IAppError = {
-        type: 'ClientError',
-        name: 'InvalidToken',
-        message: 'Invalid token'
-      };
-      res.status(401).json(errorRes);
+      res.status(401).json(this.clientError('InvalidToken', 'Invalid token'));
       return;
     }
   }
@@ -101,33 +100,32 @@ export default class MapController extends Controller {
   public async getUser(req: Request, res: Response) {
     const username = req.params.username;
     if (!username) {
-      const errorRes: responses.IAppError = {
-        type: 'ClientError',
-        name: 'MissingUsername',
-        message: 'Username is required'
-      };
-      return res.status(400).json(errorRes);
+      return res
+        .status(400)
+        .json(this.clientError('MissingUsername', 'Username is required'));
     }
 
     try {
       const user: IUser | null = await User.getUserForUsername(username);
 
       if (!user) {
-        const errorRes: responses.IAppError = {
-          type: 'ClientError',
-          name: 'UserNotFound',
-          message: `User '${username}' not found`
-        };
-        return res.status(404).json(errorRes);
+        return res
+          .status(404)
+          .json(
+            this.clientError('UserNotFound', `User '${username}' not found`)
+          );
       }
 
       const sanitizedUser = this.sanitizeUser(user);
-      const successRes: responses.ISuccess = {
-        name: 'UserFound',
-        message: 'User retrieved successfully',
-        payload: sanitizedUser
-      };
-      return res.status(200).json(successRes);
+      return res
+        .status(200)
+        .json(
+          this.success(
+            'UserFound',
+            sanitizedUser,
+            'User retrieved successfully'
+          )
+        );
     } catch (error: unknown) {
       return this.handleAppError(
         res,
@@ -152,14 +150,12 @@ export default class MapController extends Controller {
     try {
       const context = new SearchContext<IRoute[]>(new RouteSearchStrategy());
       const results = await context.executeSearch(q);
-      const success: responses.ISuccess = {
-        name: 'SearchTransitCompleted',
-        message: results.length
-          ? `Found ${results.length} route${results.length === 1 ? '' : 's'} matching '${q}'`
-          : `No routes found matching '${q}'`,
-        payload: results
-      };
-      res.status(200).json(success);
+      const message = results.length
+        ? `Found ${results.length} route${results.length === 1 ? '' : 's'} matching '${q}'`
+        : `No routes found matching '${q}'`;
+      res
+        .status(200)
+        .json(this.success('SearchTransitCompleted', results, message));
     } catch (error: unknown) {
       this.handleAppError(res, error, 'Unexpected error during route search');
     }
@@ -181,15 +177,14 @@ export default class MapController extends Controller {
       );
       const results = await context.executeSearch(q);
       const total = results.routes.length + results.stops.length;
-      const success: responses.ISuccess = {
-        name: 'SearchTransitCompleted',
-        message: total
-          ? `Found ${total} result${total === 1 ? '' : 's'} matching '${q}'`
-          : `No results found matching '${q}'`,
-        metadata: { totalItems: total },
-        payload: results
-      };
-      res.status(200).json(success);
+      const message = total
+        ? `Found ${total} result${total === 1 ? '' : 's'} matching '${q}'`
+        : `No results found matching '${q}'`;
+      res.status(200).json(
+        this.success('SearchTransitCompleted', results, message, {
+          totalItems: total
+        })
+      );
     } catch (error: unknown) {
       this.handleAppError(res, error, 'Unexpected error during transit search');
     }
@@ -198,12 +193,14 @@ export default class MapController extends Controller {
   private requireSearchQuery(req: Request, res: Response): string | null {
     const q = (req.query.q as string | undefined)?.trim();
     if (!q) {
-      const error: responses.IAppError = {
-        type: 'ClientError',
-        name: 'MissingSearchQuery',
-        message: 'Query parameter "q" is required'
-      };
-      res.status(400).json(error);
+      res
+        .status(400)
+        .json(
+          this.clientError(
+            'MissingSearchQuery',
+            'Query parameter "q" is required'
+          )
+        );
       return null;
     }
     return q;
@@ -211,16 +208,17 @@ export default class MapController extends Controller {
 
   // Return Google Maps config to the client (API key, default center, zoom)
   public getMapConfig(req: Request, res: Response): void {
-    const successRes: responses.ISuccess = {
-      name: 'ConfigFound',
-      message: 'Google Maps configuration',
-      payload: {
-        apiKey: GOOGLE_MAPS_KEY || '',
-        lat: DEFAULT_MAP_CENTER.lat,
-        lon: DEFAULT_MAP_CENTER.lon,
-        defaultZoom: DEFAULT_MAP_ZOOM
-      }
-    };
-    res.status(200).json(successRes);
+    res.status(200).json(
+      this.success(
+        'ConfigFound',
+        {
+          apiKey: GOOGLE_MAPS_KEY || '',
+          lat: DEFAULT_MAP_CENTER.lat,
+          lon: DEFAULT_MAP_CENTER.lon,
+          defaultZoom: DEFAULT_MAP_ZOOM
+        },
+        'Google Maps configuration'
+      )
+    );
   }
 }

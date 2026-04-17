@@ -5,6 +5,11 @@
 
 export class MapControls extends HTMLElement {
   connectedCallback(): void {
+    this.renderControls();
+    this.bindControlEvents();
+  }
+
+  private renderControls(): void {
     this.innerHTML = `
       <div class="control-panel">
         <button class="circle-btn" id="route-filter-btn" title="Route Filter">
@@ -29,28 +34,30 @@ export class MapControls extends HTMLElement {
         </button>
       </div>
     `;
+  }
 
-    // Add event listeners for each filter button
+  private bindControlEvents(): void {
     const routeBtn = this.querySelector('#route-filter-btn');
     const systemBtn = this.querySelector('#system-filter-btn');
     const directionBtn = this.querySelector('#direction-filter-btn');
-
-    routeBtn?.addEventListener('click', () => {
-      this.dispatchEvent(new CustomEvent('filterRoute', { bubbles: true }));
-    });
-
-    systemBtn?.addEventListener('click', () => {
-      this.dispatchEvent(new CustomEvent('filterSystem', { bubbles: true }));
-    });
-
-    directionBtn?.addEventListener('click', () => {
-      this.dispatchEvent(new CustomEvent('filterDirection', { bubbles: true }));
-    });
-
     const clearBtn = this.querySelector('#clear-filters-btn');
-    clearBtn?.addEventListener('click', () => {
-      this.dispatchEvent(new CustomEvent('clearFilters', { bubbles: true }));
-    });
+
+    routeBtn?.addEventListener('click', () =>
+      this.emitFilterEvent('filterRoute')
+    );
+    systemBtn?.addEventListener('click', () =>
+      this.emitFilterEvent('filterSystem')
+    );
+    directionBtn?.addEventListener('click', () =>
+      this.emitFilterEvent('filterDirection')
+    );
+    clearBtn?.addEventListener('click', () =>
+      this.emitFilterEvent('clearFilters')
+    );
+  }
+
+  private emitFilterEvent(eventName: string): void {
+    this.dispatchEvent(new CustomEvent(eventName, { bubbles: true }));
   }
 }
 

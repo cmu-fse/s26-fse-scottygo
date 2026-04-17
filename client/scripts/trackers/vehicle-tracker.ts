@@ -632,7 +632,13 @@ export class VehicleTracker {
     this.stopPopupUpdatedTicker();
     const label = `Bus ${vehicle.vid}`;
     const routeColor = this.getSelectedRouteColor();
-    minimizePopup('bus', label, () => this.rebindVehiclePopupEvents(vid), undefined, routeColor);
+    minimizePopup(
+      'bus',
+      label,
+      () => this.rebindVehiclePopupEvents(vid),
+      undefined,
+      routeColor
+    );
   }
 
   private handlePopupReport(vid: string, fallbackVehicle: IVehicle): void {

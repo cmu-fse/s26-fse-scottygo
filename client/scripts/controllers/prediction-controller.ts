@@ -417,7 +417,8 @@ export class PredictionController {
       const metaEl = li.querySelector('.map-popup__meta');
       if (metaEl) {
         const parts: string[] = [];
-        if (p.vid) parts.push(p.vid === 'Scheduled' ? 'Scheduled' : `Bus ${p.vid}`);
+        if (p.vid)
+          parts.push(p.vid === 'Scheduled' ? 'Scheduled' : `Bus ${p.vid}`);
         if (p.isDelayed) parts.push('Delayed');
         metaEl.textContent = parts.join(' · ');
       }
@@ -456,9 +457,21 @@ export class PredictionController {
       this.minimisedStop = ctx.stop;
       this.minimisedPredictions = ctx.predictions;
       this.stopPolling();
-      minimizePopup('stop', ctx.stop.stopName, onRestore, undefined, routeColor);
+      minimizePopup(
+        'stop',
+        ctx.stop.stopName,
+        onRestore,
+        undefined,
+        routeColor
+      );
     });
-    registerActivePopup('stop', ctx.stop.stopName, onRestore, undefined, routeColor);
+    registerActivePopup(
+      'stop',
+      ctx.stop.stopName,
+      onRestore,
+      undefined,
+      routeColor
+    );
 
     const closeBtn = popup.querySelector('.map-popup__close');
     if (closeBtn) {

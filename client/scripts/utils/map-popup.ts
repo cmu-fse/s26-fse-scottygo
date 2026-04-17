@@ -164,7 +164,14 @@ export function minimizePopup(
   const scrollTop = popup?.querySelector('.map-popup__list')?.scrollTop ?? 0;
   const html = popup?.innerHTML ?? '';
 
-  slotCache.set(type, { html, scrollTop, onRestore, label, badgeText, badgeColor });
+  slotCache.set(type, {
+    html,
+    scrollTop,
+    onRestore,
+    label,
+    badgeText,
+    badgeColor
+  });
 
   closeMapPopup();
   removeTabForType(type);
@@ -207,7 +214,9 @@ function _createTab(
   // Insert in stable order (route → stop → bus) rather than appending
   const typeRank = TAB_ORDER.indexOf(type);
   const after = Array.from(container.children).find((el) => {
-    const rank = TAB_ORDER.indexOf((el as HTMLElement).dataset.type as PopupType);
+    const rank = TAB_ORDER.indexOf(
+      (el as HTMLElement).dataset.type as PopupType
+    );
     return rank > typeRank;
   });
   if (after) {
@@ -306,7 +315,9 @@ export function dismissPopup(type?: PopupType): void {
 function removeTabForType(type: PopupType): void {
   const container = document.getElementById('map-popup-tabs');
   if (!container) return;
-  const tab = container.querySelector<HTMLElement>(`.map-popup-tab[data-type="${type}"]`);
+  const tab = container.querySelector<HTMLElement>(
+    `.map-popup-tab[data-type="${type}"]`
+  );
   if (tab) tab.remove();
   // Remove container if now empty
   if (!container.hasChildNodes()) container.remove();

@@ -63,6 +63,25 @@ abstract class Controller {
     return null;
   }
 
+  protected clientError(
+    name: responses.ClientErrorName,
+    message: string
+  ): responses.IAppError {
+    return { type: 'ClientError', name, message };
+  }
+
+  protected success(
+    name: responses.SuccessName,
+    payload: responses.IPayload,
+    message?: string,
+    metadata?: Record<string, unknown>
+  ): responses.ISuccess {
+    const response: responses.ISuccess = { name, payload };
+    if (message) response.message = message;
+    if (metadata) response.metadata = metadata;
+    return response;
+  }
+
   /**
    * Uniform error handler for caught exceptions.
    * Forwards known IAppError shapes directly; wraps unknown errors as ServerError.
