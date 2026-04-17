@@ -851,7 +851,9 @@ function requestUserLocation(): void {
               filterController.setUserLocation({ lat, lng });
               filterController.showNearbyStops({ lat, lng });
             } else {
-              console.log('Custom planned location active — GPS blue dot suppressed on load');
+              console.log(
+                'Custom planned location active — GPS blue dot suppressed on load'
+              );
             }
           } else {
             showModal(
@@ -913,7 +915,11 @@ function requestUserLocation(): void {
 function centerOnCmuCampus(): void {
   mapProvider.setCenter(CMU_CAMPUS_DEFAULT);
   mapProvider.setZoom(15);
-  addPlannedLocationMarker(CMU_CAMPUS_DEFAULT.lat, CMU_CAMPUS_DEFAULT.lng, 'CMU Campus');
+  addPlannedLocationMarker(
+    CMU_CAMPUS_DEFAULT.lat,
+    CMU_CAMPUS_DEFAULT.lng,
+    'CMU Campus'
+  );
   filterController.setUserLocation(CMU_CAMPUS_DEFAULT);
   filterController.showNearbyStops(CMU_CAMPUS_DEFAULT);
   directionsController.updatePlannedLocation(CMU_CAMPUS_DEFAULT);

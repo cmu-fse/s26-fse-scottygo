@@ -59,6 +59,14 @@ function buildSampleStops(): IStop[] {
       lon: -79.949,
       dtradd: [],
       dtrrem: []
+    },
+    {
+      stopId: '5005',
+      stopName: 'NEGLEY AVE + ELLSWORTH',
+      lat: 40.451,
+      lon: -79.934,
+      dtradd: [],
+      dtrrem: []
     }
   ];
 }
@@ -315,6 +323,22 @@ describe('SearchInfo REST integration tests', () => {
     const payload = success.payload as { routes: IRoute[]; stops: IStop[] };
     expect(payload.routes.map((r) => r.id)).toEqual(['P1']);
     expect(payload.stops.map((s) => s.stopId)).toEqual(['7079']);
+  });
+
+  test('GET /search matches intersection stops with "and" separator and without requiring street-type suffixes', async () => {
+    const res = await request(
+      'GET',
+      `/search?q=${encodeURIComponent('Ellsworth and Negley')}`,
+      undefined,
+      memberToken
+    );
+
+    expect(res.status).toBe(200);
+    const success = res.data as responses.ISuccess;
+    expect(success.name).toBe('SearchTransitCompleted');
+
+    const payload = success.payload as { routes: IRoute[]; stops: IStop[] };
+    expect(payload.stops.map((s) => s.stopId)).toContain('5005');
   });
 
   test('GET /search returns MissingSearchQuery when q is omitted', async () => {

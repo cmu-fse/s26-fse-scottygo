@@ -129,7 +129,11 @@ export default class MapController extends Controller {
       };
       return res.status(200).json(successRes);
     } catch (error: unknown) {
-      return this.handleAppError(res, error, 'An unexpected error occurred in the database');
+      return this.handleAppError(
+        res,
+        error,
+        'An unexpected error occurred in the database'
+      );
     }
   }
 

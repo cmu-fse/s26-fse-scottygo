@@ -764,7 +764,9 @@ export class FilterController {
       if (!routeDirections.includes(dir)) continue;
       const enabled =
         !isBidirectional ||
-        (dir === 'INBOUND' ? selectedDirections.inbound : selectedDirections.outbound);
+        (dir === 'INBOUND'
+          ? selectedDirections.inbound
+          : selectedDirections.outbound);
       if (enabled) {
         this.routeRenderer.showDirectionPolylines(routeId, dir);
       } else {
@@ -1300,7 +1302,12 @@ export class FilterController {
       (alert) =>
         `<div class="route-info__alert">${this.escapeHtml(alert.headerText)}</div>`
     );
-    return this.buildRouteInfoSection('alerts', 'warning_amber', 'Alerts', items);
+    return this.buildRouteInfoSection(
+      'alerts',
+      'warning_amber',
+      'Alerts',
+      items
+    );
   }
 
   /**

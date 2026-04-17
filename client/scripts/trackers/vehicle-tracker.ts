@@ -444,7 +444,11 @@ export class VehicleTracker {
     dismissPopup();
     this.openPopupVehicleId = vid;
 
-    const { popup, subheader } = createMapPopup('bus', 'directions_bus', `Bus ${vehicle.vid}`);
+    const { popup, subheader } = createMapPopup(
+      'bus',
+      'directions_bus',
+      `Bus ${vehicle.vid}`
+    );
     subheader.textContent = this.getRouteSubheaderText(vehicle.routeId);
 
     // Detail rows

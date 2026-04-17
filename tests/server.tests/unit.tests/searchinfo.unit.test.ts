@@ -115,6 +115,14 @@ const sampleStops: IStop[] = [
     lon: -79.95,
     dtradd: [],
     dtrrem: []
+  },
+  {
+    stopId: '5005',
+    stopName: 'NEGLEY AVE + ELLSWORTH',
+    lat: 40.45,
+    lon: -79.94,
+    dtradd: [],
+    dtrrem: []
   }
 ];
 
@@ -279,6 +287,20 @@ describe('SearchInfo unit tests (R1 + R2)', () => {
 
       expect(result.routes).toHaveLength(5);
       expect(result.stops).toHaveLength(5);
+    });
+
+    test('TransitSearchStrategy matches intersection stops regardless of token order and separator', async () => {
+      const strategy = new TransitSearchStrategy();
+      const result = await strategy.search('Ellsworth and Negley');
+
+      expect(result.stops.map((s) => s.stopId)).toContain('5005');
+    });
+
+    test('TransitSearchStrategy supports searching by stop ID token', async () => {
+      const strategy = new TransitSearchStrategy();
+      const result = await strategy.search('5005');
+
+      expect(result.stops.map((s) => s.stopId)).toContain('5005');
     });
 
     test('NotificationSearchStrategy filters by message/route/vehicle text', async () => {

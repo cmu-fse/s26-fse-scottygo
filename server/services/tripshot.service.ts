@@ -232,14 +232,16 @@ class TripshotService {
   private formatDayRangeLabel(days: number[]): string {
     const SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     if (days.length === 7) return 'Mon–Sun';
-    if (
-      days.length === 5 &&
-      days.every((d, i) => d === i + 1)
-    )
+    if (days.length === 5 && days.every((d, i) => d === i + 1))
       return 'Mon–Fri';
     if (days.length === 2 && days.includes(0) && days.includes(6))
       return 'Sat–Sun';
-    if (days.length === 3 && days.includes(4) && days.includes(5) && days.includes(6))
+    if (
+      days.length === 3 &&
+      days.includes(4) &&
+      days.includes(5) &&
+      days.includes(6)
+    )
       return 'Thu–Sat';
     // Generic: list abbreviated day names
     return days.map((d) => SHORT[d]).join(', ');

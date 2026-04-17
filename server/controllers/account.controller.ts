@@ -289,7 +289,14 @@ export default class AccountController extends Controller {
       const requestingUser = await this.requireRequestingUser(req, res);
       if (!requestingUser) return;
 
-      if (!this.requireAdmin(requestingUser, res, 'Only administrators can view all users')) return;
+      if (
+        !this.requireAdmin(
+          requestingUser,
+          res,
+          'Only administrators can view all users'
+        )
+      )
+        return;
 
       const usernames = await User.getAllUsernames();
       const successRes: responses.ISuccess = {
@@ -313,7 +320,14 @@ export default class AccountController extends Controller {
       const requestingUser = await this.requireRequestingUser(req, res);
       if (!requestingUser) return;
 
-      if (!this.requireAdmin(requestingUser, res, 'Only administrators can search users')) return;
+      if (
+        !this.requireAdmin(
+          requestingUser,
+          res,
+          'Only administrators can search users'
+        )
+      )
+        return;
 
       const q = (req.query.q as string | undefined)?.trim() ?? '';
       const context = new SearchContext<string[]>(new UserSearchStrategy());
@@ -346,7 +360,15 @@ export default class AccountController extends Controller {
       const requestingUser = await this.requireRequestingUser(req, res);
       if (!requestingUser) return;
 
-      if (!this.requireAdminOrOwn(requestingUser, targetUsername, res, 'You can only view your own account')) return;
+      if (
+        !this.requireAdminOrOwn(
+          requestingUser,
+          targetUsername,
+          res,
+          'You can only view your own account'
+        )
+      )
+        return;
 
       const userAccount = await User.getUserAccount(targetUsername);
       const successRes: responses.ISuccess = {
@@ -384,7 +406,15 @@ export default class AccountController extends Controller {
       const requestingUser = await this.requireRequestingUser(req, res);
       if (!requestingUser) return;
 
-      if (!this.requireAdminOrOwn(requestingUser, targetUsername, res, 'You can only change your own account status')) return;
+      if (
+        !this.requireAdminOrOwn(
+          requestingUser,
+          targetUsername,
+          res,
+          'You can only change your own account status'
+        )
+      )
+        return;
 
       // Get target user for email notification
       const targetUser = await User.getUserAccount(targetUsername);
@@ -465,7 +495,14 @@ export default class AccountController extends Controller {
       const requestingUser = await this.requireRequestingUser(req, res);
       if (!requestingUser) return;
 
-      if (!this.requireAdmin(requestingUser, res, 'Only administrators can change privilege levels')) return;
+      if (
+        !this.requireAdmin(
+          requestingUser,
+          res,
+          'Only administrators can change privilege levels'
+        )
+      )
+        return;
 
       // R1 check is now in User.updatePrivilege (model layer)
       const updatedUser = await User.updatePrivilege(
@@ -498,7 +535,12 @@ export default class AccountController extends Controller {
     if (!this.requireTargetUsername(targetUsername, res)) return;
 
     if (!newUsername) {
-      this.sendClientError(res, 400, 'MissingUsername', 'New username is required');
+      this.sendClientError(
+        res,
+        400,
+        'MissingUsername',
+        'New username is required'
+      );
       return;
     }
 
@@ -508,7 +550,12 @@ export default class AccountController extends Controller {
 
       // Authorization: Members only (own account). Administrators cannot change usernames.
       if (!this.isOwnAccount(requestingUser, targetUsername)) {
-        this.sendClientError(res, 403, 'UnauthorizedRequest', 'You can only change your own username');
+        this.sendClientError(
+          res,
+          403,
+          'UnauthorizedRequest',
+          'You can only change your own username'
+        );
         return;
       }
 
@@ -552,7 +599,12 @@ export default class AccountController extends Controller {
 
       // Authorization: Members only (own account)
       if (!this.isOwnAccount(requestingUser, targetUsername)) {
-        this.sendClientError(res, 403, 'UnauthorizedRequest', 'You can only change your own email');
+        this.sendClientError(
+          res,
+          403,
+          'UnauthorizedRequest',
+          'You can only change your own email'
+        );
         return;
       }
 
@@ -583,7 +635,12 @@ export default class AccountController extends Controller {
     if (!this.requireTargetUsername(targetUsername, res)) return;
 
     if (!newPassword) {
-      this.sendClientError(res, 400, 'MissingPassword', 'New password is required');
+      this.sendClientError(
+        res,
+        400,
+        'MissingPassword',
+        'New password is required'
+      );
       return;
     }
 
@@ -591,7 +648,15 @@ export default class AccountController extends Controller {
       const requestingUser = await this.requireRequestingUser(req, res);
       if (!requestingUser) return;
 
-      if (!this.requireAdminOrOwn(requestingUser, targetUsername, res, 'You can only change your own password')) return;
+      if (
+        !this.requireAdminOrOwn(
+          requestingUser,
+          targetUsername,
+          res,
+          'You can only change your own password'
+        )
+      )
+        return;
 
       const updatedUser = await User.updatePassword(
         targetUsername,
