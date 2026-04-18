@@ -1738,6 +1738,15 @@ body.dark .service-status-banner__close:hover {
   white-space: nowrap;
 }
 
+/* When a spacer is present (route popup), title should shrink-wrap its text */
+.map-popup__header:has(.map-popup__header-spacer) .map-popup__title {
+  flex: 0 1 auto;
+}
+
+.map-popup__header-spacer {
+  flex: 1;
+}
+
 .map-popup__close {
   margin-left: auto;
   background: none;
@@ -2418,6 +2427,70 @@ body.dark .bus-report__nav-btn--skip {
 body.dark .bus-report__nav-btn--back:hover:not(:disabled),
 body.dark .bus-report__nav-btn--skip:hover {
   background: #4b5563;
+}
+
+/* ============================================
+   ROUTE POPUP – SUBSCRIBE BELL BUTTON
+   ============================================ */
+
+.map-popup__subscribe {
+  background: none;
+  border: 1px solid #d1d5db;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 2px 8px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-family: inherit;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.map-popup__subscribe-icon {
+  font-size: 16px;
+}
+
+.map-popup__subscribe-label {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.map-popup__subscribe:hover {
+  color: #1f2937;
+  background: rgba(0, 0, 0, 0.06);
+  border-color: #9ca3af;
+}
+
+.map-popup__subscribe--active {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.map-popup__subscribe--active:hover {
+  color: var(--primary);
+  background: rgba(0, 0, 0, 0.06);
+}
+
+body.dark .map-popup__subscribe {
+  color: #9ca3af;
+  border-color: #4b5563;
+}
+
+body.dark .map-popup__subscribe:hover {
+  color: #f3f4f6;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: #6b7280;
+}
+
+body.dark .map-popup__subscribe--active {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+body.dark .map-popup__subscribe--active:hover {
+  color: var(--primary);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 /* ============================================

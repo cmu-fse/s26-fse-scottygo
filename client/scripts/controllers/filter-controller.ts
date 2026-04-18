@@ -40,6 +40,7 @@ import {
   buildServiceBannerMarkup,
   estimateWalkMinutes
 } from './filter-controller.helpers';
+import { AuthService } from '../services/auth.service';
 
 // Augment the global Window interface with the showModal utility
 declare global {
@@ -1058,7 +1059,8 @@ export class FilterController {
     const { routeName, routeColor } = this.getRouteInfoContext(routeId);
     const { popup, body } = this.createRouteInfoPopupShell(
       routeName,
-      routeColor
+      routeColor,
+      routeId
     );
 
     this.attachRouteInfoPopup(popup);
@@ -1087,7 +1089,8 @@ export class FilterController {
    */
   private createRouteInfoPopupShell(
     routeName: string,
-    routeColor: string
+    routeColor: string,
+    routeId: string
   ): {
     popup: HTMLElement;
     body: HTMLElement;
@@ -1096,7 +1099,7 @@ export class FilterController {
     popup.id = MAP_POPUP_ID;
     popup.className = 'map-popup';
 
-    popup.appendChild(this.createRouteInfoHeader(routeName, routeColor));
+    popup.appendChild(this.createRouteInfoHeader(routeName, routeColor, routeId));
 
     const body = this.createRouteInfoBody();
     popup.appendChild(body);
@@ -1109,7 +1112,8 @@ export class FilterController {
    */
   private createRouteInfoHeader(
     routeName: string,
-    routeColor: string
+    routeColor: string,
+    routeId: string
   ): HTMLElement {
     const header = document.createElement('div');
     header.className = 'map-popup__header';
@@ -1124,6 +1128,8 @@ export class FilterController {
     title.className = 'map-popup__title';
     title.textContent = routeName;
 
+    const subscribeBtn = this.createRouteSubscribeButton(routeId);
+
     const minimizeButton = document.createElement('button');
     minimizeButton.className = 'map-popup__minimize';
     minimizeButton.setAttribute('aria-label', 'Minimize');
@@ -1136,10 +1142,61 @@ export class FilterController {
 
     header.appendChild(icon);
     header.appendChild(title);
+    header.appendChild(subscribeBtn);
+    const headerSpacer = document.createElement('span');
+    headerSpacer.className = 'map-popup__header-spacer';
+    header.appendChild(headerSpacer);
     header.appendChild(minimizeButton);
     header.appendChild(closeButton);
 
     return header;
+  }
+
+  /**
+   * Create a subscribe bell button for the route info popup header.
+   */
+  private createRouteSubscribeButton(routeId: string): HTMLButtonElement {
+    const authService = AuthService.getInstance();
+    const isSubscribed = authService.isRouteSubscribed(routeId);
+
+    const btn = document.createElement('button');
+    btn.className = 'map-popup__subscribe';
+    if (isSubscribed) btn.classList.add('map-popup__subscribe--active');
+    btn.setAttribute('aria-label', isSubscribed ? 'Unsubscribe from route' : 'Subscribe to route');
+    btn.title = isSubscribed ? 'Unsubscribe from route' : 'Subscribe to route';
+
+    const bellIcon = document.createElement('span');
+    bellIcon.className = 'material-icons-outlined map-popup__subscribe-icon';
+    bellIcon.textContent = isSubscribed ? 'notifications' : 'notifications_none';
+    btn.appendChild(bellIcon);
+
+    const label = document.createElement('span');
+    label.className = 'map-popup__subscribe-label';
+    label.textContent = isSubscribed ? 'Subscribed' : 'Subscribe';
+    btn.appendChild(label);
+
+    btn.addEventListener('click', () => {
+      const currentlySubscribed = btn.classList.contains('map-popup__subscribe--active');
+      const eventName = currentlySubscribed ? 'bellUnsubscribe' : 'bellSubscribe';
+
+      btn.classList.toggle('map-popup__subscribe--active');
+      const icon = btn.querySelector('.map-popup__subscribe-icon');
+      const lbl = btn.querySelector('.map-popup__subscribe-label');
+      const nowSubscribed = btn.classList.contains('map-popup__subscribe--active');
+      if (icon) icon.textContent = nowSubscribed ? 'notifications' : 'notifications_none';
+      if (lbl) lbl.textContent = nowSubscribed ? 'Subscribed' : 'Subscribe';
+      btn.title = nowSubscribed ? 'Unsubscribe from route' : 'Subscribe to route';
+      btn.setAttribute('aria-label', btn.title);
+
+      document.dispatchEvent(
+        new CustomEvent(eventName, {
+          detail: { routeId },
+          bubbles: true
+        })
+      );
+    });
+
+    return btn;
   }
 
   /**
