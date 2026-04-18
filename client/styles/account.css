@@ -1,46 +1,53 @@
-/* Content Styles */
+body {
+  background-color: #f3f4f6;
+}
+
 .content {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 32px 16px;
+  padding: 40px 16px 32px;
   overflow-y: auto;
 }
 
-/* Account card */
+.page-title {
+  color: #c41230;
+  font-size: 36px;
+  font-weight: 700;
+  margin-bottom: 24px;
+  letter-spacing: -0.5px;
+}
+
 .account-card {
   width: 100%;
-  max-width: 360px;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  padding: 24px;
-  background-color: white;
+  max-width: 400px;
+  border: none;
+  border-radius: 16px;
+  padding: 32px 28px;
+  background-color: #fff;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
   margin-bottom: 16px;
 }
 
-/* Form Styles */
 .form-group {
-  margin-bottom: 16px;
+  margin-bottom: 18px;
   display: flex;
   flex-direction: column;
-  width: 100%;
-  max-width: 360px;
 }
 
 .form-group label {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
-  color: #000;
+  color: #333;
   margin-bottom: 6px;
 }
 
-/* Read-only field value display */
 .field-value {
-  font-size: 16px;
-  color: #333;
+  font-size: 15px;
+  color: #374151;
   padding: 10px 0;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid #e5e7eb;
   min-height: 24px;
 }
 
@@ -56,17 +63,26 @@
 
 .form-input {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #d1d1d1;
-  border-radius: 6px;
-  font-size: 16px;
+  padding: 11px 14px;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  font-size: 15px;
   color: #333;
   line-height: 1.4;
-  height: 48px;
-  background-color: #fff;
+  height: 46px;
+  background-color: #f9fafb;
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #c41230;
+  box-shadow: 0 0 0 3px rgba(196, 18, 48, 0.1);
 }
 
 .form-input--error {
@@ -74,11 +90,10 @@
   border-width: 2px;
 }
 
-.form-group input::placeholder {
-  color: #a0a0a0;
+.form-input::placeholder {
+  color: #aaa;
 }
 
-/* Select dropdown styling */
 select.form-input {
   cursor: pointer;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23333' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
@@ -87,19 +102,36 @@ select.form-input {
   padding-right: 36px;
 }
 
-/* Inline field error text */
+.field-hint {
+  display: none;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.field-hint--valid,
+.field-hint--invalid {
+  display: block;
+}
+
+.field-hint--valid {
+  color: #2e7d32;
+}
+
+.field-hint--invalid {
+  color: #c62828;
+}
+
 .field-error {
   font-size: 13px;
   color: #c62828;
-  min-height: 0;
   margin-top: 4px;
+  min-height: 0;
 }
 
 .field-error:empty {
   display: none;
 }
 
-/* Form action buttons */
 .form-actions {
   display: flex;
   flex-direction: column;
@@ -107,62 +139,56 @@ select.form-input {
   margin-top: 8px;
 }
 
-.submit-btn {
+.submit-btn,
+.cancel-btn {
   width: 100%;
-  background-color: #c41230;
-  color: white;
   border: none;
-  border-radius: 6px;
-  padding: 12px;
+  border-radius: 10px;
+  padding: 13px;
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  transition: background-color 0.2s;
+  transition:
+    background-color 0.2s,
+    box-shadow 0.2s,
+    transform 0.1s;
+}
+
+.submit-btn {
+  background-color: #c41230;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(196, 18, 48, 0.25);
 }
 
 .submit-btn:hover {
-  background-color: #a00f28;
+  background-color: #a50f28;
+  box-shadow: 0 4px 10px rgba(196, 18, 48, 0.3);
 }
 
-.submit-btn:active {
+.cancel-btn {
+  background-color: #f3f4f6;
+  color: #555;
   box-shadow: none;
+}
+
+.cancel-btn:hover {
+  background-color: #e5e7eb;
+}
+
+.submit-btn:active,
+.cancel-btn:active {
   transform: translateY(1px);
 }
 
 .submit-btn:disabled {
-  background-color: #999;
+  background-color: #e0e0e0;
+  color: #999;
   cursor: not-allowed;
   box-shadow: none;
 }
 
-/* Cancel button */
-.cancel-btn {
-  width: 100%;
-  background-color: #6d6d6d;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  padding: 12px;
-  font-size: 16px;
-  font-weight: 500;
-  cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  transition: background-color 0.2s;
-}
-
-.cancel-btn:hover {
-  background-color: #555;
-}
-
-.cancel-btn:active {
-  box-shadow: none;
-  transform: translateY(1px);
-}
-
-/* Global form status message */
 .form-status {
-  margin-top: 12px;
+  margin-top: 14px;
   font-size: 14px;
   color: #2e7d32;
   min-height: 18px;
@@ -173,87 +199,26 @@ select.form-input {
   color: #c62828;
 }
 
-/* Modal Styles */
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  display: none;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  z-index: 20;
-}
-
-.modal-backdrop.is-open {
-  display: flex;
-}
-
-.modal {
-  background: #fff;
-  border: 2px solid #c41230;
-  border-radius: 12px;
-  width: 100%;
-  max-width: 320px;
-  padding: 16px;
-  text-align: center;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
-}
-
-.modal-message {
-  font-size: 14px;
-  line-height: 1.5;
-  color: #333;
-  margin: 0 0 8px 0;
-}
-
-.modal-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 16px;
-}
-
-.modal-btn {
-  border: none;
-  border-radius: 8px;
-  padding: 10px 12px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-.modal-btn--primary {
-  background-color: #c41230;
-  color: #fff;
-}
-
-.modal-btn--secondary {
-  background-color: #6d6d6d;
-  color: #fff;
-}
-
-/* Toggle switch (Member Account Status) */
 .status-toggle-group {
-  max-width: 360px;
-  margin-bottom: 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  width: 100%;
+  max-width: 400px;
+  margin-bottom: 18px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
 }
 
 .toggle-row {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 24px;
+  justify-content: space-between;
 }
 
 .toggle-label {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
-  color: #000;
+  color: #333;
 }
 
 .toggle-switch {
@@ -273,7 +238,7 @@ select.form-input {
 .toggle-slider {
   position: absolute;
   inset: 0;
-  background-color: #ccc;
+  background-color: #d1d5db;
   border-radius: 28px;
   cursor: pointer;
   transition: background-color 0.25s;
@@ -302,15 +267,15 @@ select.form-input {
 
 .toggle-status-text {
   display: block;
-  font-size: 14px;
-  color: #888;
-  margin-top: 4px;
-  align-self: flex-start;
+  font-size: 13px;
+  color: #6b7280;
+  margin-top: 6px;
 }
 
-/* Combobox (Admin username selector) */
 .combobox-wrapper {
   position: relative;
+  max-width: 400px;
+  width: 100%;
 }
 
 .combobox-chevron {
@@ -321,43 +286,212 @@ select.form-input {
   width: 12px;
   height: 12px;
   pointer-events: none;
-  color: #888;
+  color: #9ca3af;
 }
 
 .combobox-listbox {
   position: absolute;
-  top: 100%;
+  top: calc(100% + 6px);
   left: 0;
   right: 0;
-  max-height: 200px;
+  max-height: 210px;
   overflow-y: auto;
   margin: 0;
-  padding: 4px 0;
+  padding: 6px 0;
   list-style: none;
   background: #fff;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
   z-index: 100;
 }
 
 .combobox-option {
-  padding: 8px 14px;
+  padding: 9px 14px;
   cursor: pointer;
-  font-size: 0.95rem;
+  font-size: 14px;
+  color: #374151;
 }
 
 .combobox-option:hover {
-  background: #f0f0f0;
+  background: #f3f4f6;
 }
 
 .combobox-option.combobox-empty {
-  color: #999;
+  color: #9ca3af;
   font-style: italic;
   cursor: default;
 }
 
-/* Hidden utility */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 20;
+  backdrop-filter: blur(2px);
+}
+
+.modal-backdrop.is-open {
+  display: flex;
+}
+
+.modal {
+  background: #fff;
+  border: none;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 340px;
+  padding: 24px;
+  text-align: center;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+}
+
+.modal-message {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #555;
+  margin: 0;
+}
+
+.modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.modal-btn {
+  border: none;
+  border-radius: 10px;
+  padding: 11px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 0.2s,
+    transform 0.1s;
+}
+
+.modal-btn:active {
+  transform: translateY(1px);
+}
+
+.modal-btn--primary {
+  background-color: #c41230;
+  color: #fff;
+}
+
+.modal-btn--primary:hover {
+  background-color: #a50f28;
+}
+
+.modal-btn--secondary {
+  background-color: #f3f4f6;
+  color: #555;
+}
+
+.modal-btn--secondary:hover {
+  background-color: #e5e7eb;
+}
+
+body.dark {
+  background-color: #111827;
+}
+
+body.dark .page-title {
+  color: #e8485e;
+}
+
+body.dark .account-card,
+body.dark .status-toggle-group {
+  background-color: #1f2937;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+}
+
+body.dark .form-group label,
+body.dark .toggle-label,
+body.dark .field-value,
+body.dark .combobox-option {
+  color: #e5e7eb;
+}
+
+body.dark .field-value {
+  border-bottom-color: #374151;
+}
+
+body.dark .form-input {
+  background-color: #374151;
+  border-color: #4b5563;
+  color: #e0e0e0;
+}
+
+body.dark .form-input:focus {
+  border-color: #e8485e;
+  box-shadow: 0 0 0 3px rgba(232, 72, 94, 0.15);
+}
+
+body.dark .form-input::placeholder {
+  color: #9ca3af;
+}
+
+body.dark .field-hint--valid {
+  color: #66bb6a;
+}
+
+body.dark .field-hint--invalid,
+body.dark .field-error,
+body.dark .form-status--error {
+  color: #ef5350;
+}
+
+body.dark .form-status {
+  color: #66bb6a;
+}
+
+body.dark .submit-btn:disabled {
+  background-color: #374151;
+  color: #6b7280;
+}
+
+body.dark .cancel-btn,
+body.dark .modal-btn--secondary {
+  background-color: #374151;
+  color: #e0e0e0;
+}
+
+body.dark .cancel-btn:hover,
+body.dark .modal-btn--secondary:hover {
+  background-color: #4b5563;
+}
+
+body.dark .toggle-status-text,
+body.dark .combobox-chevron,
+body.dark .combobox-option.combobox-empty {
+  color: #9ca3af;
+}
+
+body.dark .combobox-listbox {
+  background: #1f2937;
+  border-color: #374151;
+}
+
+body.dark .combobox-option:hover {
+  background: #374151;
+}
+
+body.dark .modal {
+  background-color: #1f2937;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+}
+
+body.dark .modal-message {
+  color: #d1d5db;
+}
+
 [hidden] {
   display: none !important;
 }
