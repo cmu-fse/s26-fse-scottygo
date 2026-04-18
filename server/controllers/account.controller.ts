@@ -275,39 +275,6 @@ export default class AccountController extends Controller {
     return true;
   }
 
-  /**
-   * Guard: respond 403 and return false unless requestingUser owns the target account.
-   */
-  private requireOwnAccount(
-    requestingUser: IUserAccount,
-    targetUsername: string,
-    res: Response,
-    message: string
-  ): boolean {
-    if (!this.isOwnAccount(requestingUser, targetUsername)) {
-      this.sendClientError(res, 403, 'UnauthorizedRequest', message);
-      return false;
-    }
-    return true;
-  }
-
-  /**
-   * Send a standard 200 success response with an obfuscated user payload.
-   */
-  private sendSuccess(
-    res: Response,
-    name: responses.SuccessName,
-    authorizedUser: string,
-    payload: IUserAccount
-  ): void {
-    const successRes: responses.ISuccess = {
-      name,
-      authorizedUser,
-      payload: this.obfuscatePassword(payload)
-    };
-    res.status(200).json(successRes);
-  }
-
   private async applyStatusTransitionSideEffects(
     updatedUser: IUserAccount,
     previousStatus: IAccountStatus,
@@ -438,21 +405,12 @@ export default class AccountController extends Controller {
       if (!requestingUser) return;
 
       const userAccount = await User.getUserAccount(targetUsername);
-<<<<<<< Sigrid-Refactoring-4-CR
       this.sendAccountSuccess(res, {
         status: 200,
         name: 'AccountRetrieved',
         account: userAccount,
         authorizedUser: requestingUser.credentials.username
       });
-=======
-      this.sendSuccess(
-        res,
-        'AccountRetrieved',
-        requestingUser.credentials.username,
-        userAccount
-      );
->>>>>>> main
     } catch (error: unknown) {
       this.handleAppError(res, error);
     }
@@ -504,21 +462,12 @@ export default class AccountController extends Controller {
         status
       );
 
-<<<<<<< Sigrid-Refactoring-4-CR
       this.sendAccountSuccess(res, {
         status: 200,
         name: 'StatusUpdated',
         account: updatedUser,
         authorizedUser: requestingUser.credentials.username
       });
-=======
-      this.sendSuccess(
-        res,
-        'StatusUpdated',
-        requestingUser.credentials.username,
-        updatedUser
-      );
->>>>>>> main
     } catch (error: unknown) {
       this.handleAppError(res, error);
     }
@@ -588,21 +537,12 @@ export default class AccountController extends Controller {
       // Emit account updated event
       this.emitAccountUpdated(updatedUser);
 
-<<<<<<< Sigrid-Refactoring-4-CR
       this.sendAccountSuccess(res, {
         status: 200,
         name: 'PrivilegeUpdated',
         account: updatedUser,
         authorizedUser: requestingUser.credentials.username
       });
-=======
-      this.sendSuccess(
-        res,
-        'PrivilegeUpdated',
-        requestingUser.credentials.username,
-        updatedUser
-      );
->>>>>>> main
     } catch (error: unknown) {
       this.handleAppError(res, error);
     }
@@ -637,20 +577,6 @@ export default class AccountController extends Controller {
       );
       if (!requestingUser) return;
 
-<<<<<<< Sigrid-Refactoring-4-CR
-=======
-      // Authorization: Members only (own account). Administrators cannot change usernames.
-      if (
-        !this.requireOwnAccount(
-          requestingUser,
-          targetUsername,
-          res,
-          'You can only change your own username'
-        )
-      )
-        return;
-
->>>>>>> main
       const oldUsername = targetUsername.toLowerCase();
       const updatedUser = await User.updateUsername(
         targetUsername,
@@ -659,21 +585,12 @@ export default class AccountController extends Controller {
 
       this.emitUsernameChanged(oldUsername, updatedUser, targetUsername);
 
-<<<<<<< Sigrid-Refactoring-4-CR
       this.sendAccountSuccess(res, {
         status: 200,
         name: 'UsernameUpdated',
         account: updatedUser,
         authorizedUser: updatedUser.credentials.username
       });
-=======
-      this.sendSuccess(
-        res,
-        'UsernameUpdated',
-        updatedUser.credentials.username,
-        updatedUser
-      );
->>>>>>> main
     } catch (error: unknown) {
       this.handleAppError(res, error);
     }
@@ -706,40 +623,17 @@ export default class AccountController extends Controller {
       );
       if (!requestingUser) return;
 
-<<<<<<< Sigrid-Refactoring-4-CR
-=======
-      // Authorization: Members only (own account)
-      if (
-        !this.requireOwnAccount(
-          requestingUser,
-          targetUsername,
-          res,
-          'You can only change your own email'
-        )
-      )
-        return;
-
->>>>>>> main
       const updatedUser = await User.updateEmail(targetUsername, email);
 
       // Emit account updated event
       this.emitAccountUpdated(updatedUser);
 
-<<<<<<< Sigrid-Refactoring-4-CR
       this.sendAccountSuccess(res, {
         status: 200,
         name: 'EmailUpdated',
         account: updatedUser,
         authorizedUser: requestingUser.credentials.username
       });
-=======
-      this.sendSuccess(
-        res,
-        'EmailUpdated',
-        requestingUser.credentials.username,
-        updatedUser
-      );
->>>>>>> main
     } catch (error: unknown) {
       this.handleAppError(res, error);
     }
@@ -782,21 +676,12 @@ export default class AccountController extends Controller {
       // Emit account updated event
       this.emitAccountUpdated(updatedUser);
 
-<<<<<<< Sigrid-Refactoring-4-CR
       this.sendAccountSuccess(res, {
         status: 200,
         name: 'PasswordUpdated',
         account: updatedUser,
         authorizedUser: requestingUser.credentials.username
       });
-=======
-      this.sendSuccess(
-        res,
-        'PasswordUpdated',
-        requestingUser.credentials.username,
-        updatedUser
-      );
->>>>>>> main
     } catch (error: unknown) {
       this.handleAppError(res, error);
     }
@@ -818,7 +703,6 @@ export default class AccountController extends Controller {
     try {
       const tokenUser = (req as Request & { user: ITokenPayload }).user;
       if (!tokenUser || !tokenUser.userId) {
-<<<<<<< Sigrid-Refactoring-4-CR
         res
           .status(401)
           .json(
@@ -827,14 +711,6 @@ export default class AccountController extends Controller {
               'Unable to verify requesting user'
             )
           );
-=======
-        this.sendClientError(
-          res,
-          401,
-          'UnauthorizedRequest',
-          'Unable to verify requesting user'
-        );
->>>>>>> main
         return;
       }
 
