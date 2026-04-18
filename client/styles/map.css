@@ -2444,7 +2444,10 @@ body.dark .bus-report__nav-btn--skip:hover {
   align-items: center;
   gap: 3px;
   font-family: inherit;
-  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s,
+    border-color 0.15s;
 }
 
 .map-popup__subscribe-icon {
