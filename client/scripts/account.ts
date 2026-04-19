@@ -93,6 +93,9 @@ const privilegeGroup = document.getElementById(
 const statusEditGroup = document.getElementById(
   'status-edit-group'
 ) as HTMLDivElement;
+const confirmPasswordGroup = document.getElementById(
+  'confirm-password-group'
+) as HTMLDivElement;
 
 // Editable inputs
 const fieldUsername = document.getElementById(
@@ -101,6 +104,9 @@ const fieldUsername = document.getElementById(
 const fieldEmail = document.getElementById('field-email') as HTMLInputElement;
 const fieldPassword = document.getElementById(
   'field-password'
+) as HTMLInputElement;
+const fieldConfirmPassword = document.getElementById(
+  'field-confirm-password'
 ) as HTMLInputElement;
 const fieldPrivilege = document.getElementById(
   'field-privilege'
@@ -125,6 +131,18 @@ const privilegeError = document.getElementById(
 const statusError = document.getElementById(
   'status-error'
 ) as HTMLParagraphElement;
+
+// Validation hints
+const usernameHint = document.getElementById(
+  'username-hint'
+) as HTMLSpanElement;
+const emailHint = document.getElementById('email-hint') as HTMLSpanElement;
+const passwordHint = document.getElementById(
+  'password-hint'
+) as HTMLSpanElement;
+const confirmPasswordHint = document.getElementById(
+  'confirm-password-hint'
+) as HTMLSpanElement;
 
 // Member status toggle
 const statusToggleGroup = document.getElementById(
@@ -167,6 +185,24 @@ let socket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null;
 let pendingConfirmAction: (() => Promise<void>) | null = null;
 let editing = false;
 
+type ILiveValidationField = 'username' | 'email' | 'password';
+type IValidationField = ILiveValidationField | 'confirmPassword';
+
+const touched: Record<'confirmPassword', boolean> = {
+  confirmPassword: false
+};
+
+const fieldValid: Record<IValidationField, boolean> = {
+  username: true,
+  email: true,
+  password: true,
+  confirmPassword: true
+};
+
+const validateTimers: Partial<
+  Record<ILiveValidationField, ReturnType<typeof setTimeout>>
+> = {};
+
 // ---------------------------------------------------------------------------
 // Utility helpers
 // ---------------------------------------------------------------------------
@@ -184,6 +220,22 @@ const setFieldError = (el: HTMLParagraphElement, message: string): void => {
   el.textContent = message;
 };
 
+const setHint = (
+  el: HTMLSpanElement,
+  valid: boolean,
+  message: string
+): void => {
+  el.textContent = message;
+  el.className = valid
+    ? 'field-hint field-hint--valid'
+    : 'field-hint field-hint--invalid';
+};
+
+const clearHint = (el: HTMLSpanElement): void => {
+  el.textContent = '';
+  el.className = 'field-hint';
+};
+
 const clearFieldErrors = (): void => {
   [
     usernameError,
@@ -194,9 +246,47 @@ const clearFieldErrors = (): void => {
   ].forEach((el) => {
     el.textContent = '';
   });
-  [fieldUsername, fieldEmail, fieldPassword].forEach((el) => {
-    el.classList.remove('form-input--error');
+  [fieldUsername, fieldEmail, fieldPassword, fieldConfirmPassword].forEach(
+    (el) => {
+      el.classList.remove('form-input--error');
+    }
+  );
+};
+
+const clearValidationHints = (): void => {
+  [usernameHint, emailHint, passwordHint, confirmPasswordHint].forEach((el) =>
+    clearHint(el)
+  );
+};
+
+const usingProfileFields = (): boolean => {
+  const adminUser = isAdmin();
+  const ownAcct = isOwnAccount();
+  return !(adminUser && !ownAcct);
+};
+
+const updateSaveButtonState = (): void => {
+  if (!editing) return;
+
+  const profileFieldsValid = usingProfileFields()
+    ? fieldValid.username && fieldValid.email
+    : true;
+  const passwordFieldsValid = fieldValid.password && fieldValid.confirmPassword;
+  saveBtn.disabled = !(profileFieldsValid && passwordFieldsValid);
+};
+
+const resetValidationState = (): void => {
+  fieldValid.username = true;
+  fieldValid.email = true;
+  fieldValid.password = true;
+  fieldValid.confirmPassword = true;
+  touched.confirmPassword = false;
+  Object.values(validateTimers).forEach((timer) => {
+    if (timer) {
+      clearTimeout(timer);
+    }
   });
+  clearValidationHints();
 };
 
 const setFormStatus = (message: string, isError = false): void => {
@@ -215,6 +305,7 @@ const getResponseMessage = (
     LastAdministrator: 'Invalid: at least 1 Administrator always needed',
     UserNotFound: 'User does not exist',
     InvalidPassword: 'Password should be at least 4 characters',
+    WeakPassword: 'Password should be at least 4 characters',
     UsernameExists: 'Username already taken',
     InvalidUsername: 'Username less than 4 characters or invalid',
     InvalidEmail: 'You are ineligible, ScottyGo is CMU ONLY',
@@ -237,6 +328,185 @@ const getResponseMessage = (
     return String(errorName);
   }
   return fallback;
+};
+
+const validateFieldDebounced = (
+  field: ILiveValidationField,
+  value: string,
+  hintEl: HTMLSpanElement,
+  successMsg: string,
+  inputEl: HTMLInputElement
+): void => {
+  if (validateTimers[field]) {
+    clearTimeout(validateTimers[field]);
+  }
+
+  fieldValid[field] = false;
+  updateSaveButtonState();
+
+  validateTimers[field] = setTimeout(async () => {
+    try {
+      const res: AxiosResponse = await axios.post(
+        '/auth/validate',
+        { field, value },
+        { validateStatus: () => true }
+      );
+
+      if (res.status === 200) {
+        fieldValid[field] = true;
+        setHint(hintEl, true, `✓ ${successMsg}`);
+        inputEl.classList.remove('form-input--error');
+      } else {
+        fieldValid[field] = false;
+        const message = res.data?.message || 'Invalid';
+        setHint(hintEl, false, `✗ ${message}`);
+        inputEl.classList.add('form-input--error');
+      }
+    } catch {
+      fieldValid[field] = false;
+      setHint(hintEl, false, '✗ Could not validate');
+      inputEl.classList.add('form-input--error');
+    }
+
+    updateSaveButtonState();
+  }, 300);
+};
+
+const validateUsernameField = (): void => {
+  if (!editing || !usingProfileFields() || !viewingAccount) return;
+
+  const value = fieldUsername.value.trim();
+  const original = viewingAccount.credentials.username;
+
+  if (value.toLowerCase() === original.toLowerCase()) {
+    fieldValid.username = true;
+    clearHint(usernameHint);
+    fieldUsername.classList.remove('form-input--error');
+    updateSaveButtonState();
+    return;
+  }
+
+  if (!value) {
+    fieldValid.username = false;
+    setHint(usernameHint, false, '✗ Missing Username');
+    fieldUsername.classList.add('form-input--error');
+    updateSaveButtonState();
+    return;
+  }
+
+  validateFieldDebounced(
+    'username',
+    value,
+    usernameHint,
+    'Looks good',
+    fieldUsername
+  );
+};
+
+const validateEmailField = (): void => {
+  if (!editing || !usingProfileFields() || !viewingAccount) return;
+
+  const value = fieldEmail.value.trim();
+  const original = viewingAccount.email || '';
+
+  if (value === original) {
+    fieldValid.email = true;
+    clearHint(emailHint);
+    fieldEmail.classList.remove('form-input--error');
+    updateSaveButtonState();
+    return;
+  }
+
+  if (!value) {
+    fieldValid.email = false;
+    setHint(emailHint, false, '✗ Missing Email');
+    fieldEmail.classList.add('form-input--error');
+    updateSaveButtonState();
+    return;
+  }
+
+  validateFieldDebounced(
+    'email',
+    value,
+    emailHint,
+    'Valid CMU email',
+    fieldEmail
+  );
+};
+
+const validateConfirmPassword = (): void => {
+  if (!editing) return;
+
+  const password = fieldPassword.value;
+  const confirmation = fieldConfirmPassword.value;
+  fieldConfirmPassword.classList.remove('form-input--error');
+
+  if (!password) {
+    fieldValid.confirmPassword = true;
+    clearHint(confirmPasswordHint);
+    updateSaveButtonState();
+    return;
+  }
+
+  if (!confirmation) {
+    fieldValid.confirmPassword = false;
+    if (touched.confirmPassword) {
+      setHint(confirmPasswordHint, false, '✗ Please confirm your password');
+      fieldConfirmPassword.classList.add('form-input--error');
+    } else {
+      clearHint(confirmPasswordHint);
+    }
+    updateSaveButtonState();
+    return;
+  }
+
+  if (confirmation === password) {
+    fieldValid.confirmPassword = true;
+    setHint(confirmPasswordHint, true, '✓ Passwords match');
+  } else {
+    fieldValid.confirmPassword = false;
+    setHint(confirmPasswordHint, false, '✗ Passwords do not match');
+    fieldConfirmPassword.classList.add('form-input--error');
+  }
+
+  updateSaveButtonState();
+};
+
+const validatePasswordField = (): void => {
+  if (!editing) return;
+
+  const value = fieldPassword.value;
+
+  if (!value) {
+    fieldValid.password = true;
+    fieldValid.confirmPassword = true;
+    clearHint(passwordHint);
+    clearHint(confirmPasswordHint);
+    fieldPassword.classList.remove('form-input--error');
+    fieldConfirmPassword.classList.remove('form-input--error');
+    touched.confirmPassword = false;
+    fieldConfirmPassword.value = '';
+    updateSaveButtonState();
+    return;
+  }
+
+  validateFieldDebounced(
+    'password',
+    value,
+    passwordHint,
+    'Strong password',
+    fieldPassword
+  );
+  validateConfirmPassword();
+};
+
+const isCurrentEditValid = (): boolean => {
+  const profileFieldsValid = usingProfileFields()
+    ? fieldValid.username && fieldValid.email
+    : true;
+  return (
+    profileFieldsValid && fieldValid.password && fieldValid.confirmPassword
+  );
 };
 
 // ---------------------------------------------------------------------------
@@ -399,6 +669,8 @@ const renderReadMode = (): void => {
   displayPassword.textContent = '••••••••';
   displayPassword.hidden = false;
   fieldPassword.hidden = true;
+  fieldConfirmPassword.hidden = true;
+  confirmPasswordGroup.hidden = true;
 
   // Status display
   if (!isAdmin() && isOwnAccount()) {
@@ -442,6 +714,7 @@ const renderReadMode = (): void => {
   cancelBtn.hidden = true;
 
   clearFieldErrors();
+  resetValidationState();
   setFormStatus('');
 };
 
@@ -454,6 +727,7 @@ const enterEditMode = (): void => {
   editing = true;
 
   clearFieldErrors();
+  resetValidationState();
   setFormStatus('');
 
   const adminUser = isAdmin();
@@ -462,6 +736,7 @@ const enterEditMode = (): void => {
   // Username
   if (adminUser && !ownAcct) {
     usernameGroup.hidden = true;
+    fieldValid.username = true;
   } else {
     usernameGroup.hidden = false;
     displayUsername.hidden = true;
@@ -472,6 +747,7 @@ const enterEditMode = (): void => {
   // Email
   if (adminUser && !ownAcct) {
     emailGroup.hidden = true;
+    fieldValid.email = true;
   } else {
     emailGroup.hidden = false;
     displayEmail.hidden = true;
@@ -484,6 +760,9 @@ const enterEditMode = (): void => {
   displayPassword.hidden = true;
   fieldPassword.hidden = false;
   fieldPassword.value = '';
+  confirmPasswordGroup.hidden = false;
+  fieldConfirmPassword.hidden = false;
+  fieldConfirmPassword.value = '';
 
   // Privilege — Admin only
   if (adminUser) {
@@ -509,6 +788,8 @@ const enterEditMode = (): void => {
   editBtn.hidden = true;
   saveBtn.hidden = false;
   cancelBtn.hidden = false;
+
+  updateSaveButtonState();
 };
 
 // ---------------------------------------------------------------------------
@@ -665,12 +946,12 @@ const updatePasswordIfProvided = async (
     return account;
   }
 
-  if (newPassword.length < 4) {
+  if (fieldConfirmPassword.value !== newPassword) {
     setSaveFieldError(
       state,
       passwordError,
-      'Password should be at least 4 characters',
-      fieldPassword
+      'Passwords do not match',
+      fieldConfirmPassword
     );
     return account;
   }
@@ -806,6 +1087,12 @@ const handleSave = async (): Promise<void> => {
   clearFieldErrors();
   setFormStatus('');
 
+  if (!isCurrentEditValid()) {
+    setFormStatus('Please fix validation issues before saving.', true);
+    updateSaveButtonState();
+    return;
+  }
+
   const adminUser = isAdmin();
   const ownAcct = isOwnAccount();
   const saveState = createSaveState();
@@ -843,7 +1130,7 @@ const handleSave = async (): Promise<void> => {
     if (!saveState.hasError && saveState.saveCount > 0) {
       setFormStatus('Some changes saved. Confirm inactivation in the dialog.');
     }
-    saveBtn.disabled = false;
+    updateSaveButtonState();
     return;
   }
 
@@ -951,6 +1238,40 @@ const populateUserSelector = async (): Promise<void> => {
 // Event listeners
 // ---------------------------------------------------------------------------
 
+fieldUsername.addEventListener('input', () => {
+  validateUsernameField();
+});
+
+fieldUsername.addEventListener('blur', () => {
+  validateUsernameField();
+});
+
+fieldEmail.addEventListener('input', () => {
+  validateEmailField();
+});
+
+fieldEmail.addEventListener('blur', () => {
+  validateEmailField();
+});
+
+fieldPassword.addEventListener('input', () => {
+  validatePasswordField();
+});
+
+fieldPassword.addEventListener('blur', () => {
+  validatePasswordField();
+});
+
+fieldConfirmPassword.addEventListener('input', () => {
+  touched.confirmPassword = true;
+  validateConfirmPassword();
+});
+
+fieldConfirmPassword.addEventListener('blur', () => {
+  touched.confirmPassword = true;
+  validateConfirmPassword();
+});
+
 // Edit button
 editBtn.addEventListener('click', () => {
   enterEditMode();
@@ -964,9 +1285,12 @@ cancelBtn.addEventListener('click', () => {
 // Save button / form submit
 accountForm.addEventListener('submit', async (e: SubmitEvent) => {
   e.preventDefault();
+  if (saveBtn.disabled) return;
   saveBtn.disabled = true;
   await handleSave();
-  saveBtn.disabled = false;
+  if (editing) {
+    updateSaveButtonState();
+  }
 });
 
 // Admin combobox: clear input, refresh user list, and show all options on focus

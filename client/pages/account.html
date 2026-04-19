@@ -79,6 +79,7 @@
               class="form-input"
               hidden
             />
+            <span class="field-hint" id="username-hint"></span>
             <p class="field-error" id="username-error"></p>
           </div>
 
@@ -93,6 +94,7 @@
               class="form-input"
               hidden
             />
+            <span class="field-hint" id="email-hint"></span>
             <p class="field-error" id="email-error"></p>
           </div>
 
@@ -108,7 +110,22 @@
               hidden
               placeholder="Enter new password"
             />
+            <span class="field-hint" id="password-hint"></span>
             <p class="field-error" id="password-error"></p>
+          </div>
+
+          <!-- Confirm Password -->
+          <div class="form-group" id="confirm-password-group" hidden>
+            <label for="field-confirm-password">Confirm Password</label>
+            <input
+              type="password"
+              id="field-confirm-password"
+              name="confirm-password"
+              class="form-input"
+              hidden
+              placeholder="Re-enter new password"
+            />
+            <span class="field-hint" id="confirm-password-hint"></span>
           </div>
 
           <!-- Privilege Level (Admin only) -->

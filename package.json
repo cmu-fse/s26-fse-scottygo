@@ -46,6 +46,7 @@
     "test:integration:livenotification": "jest ./tests/server.tests/integration.tests/livenotification.integration.test.ts --runInBand --detectOpenHandles --forceExit --coverageDirectory=.coverage/integration-livenotification",
     "test:integration:discover-stops": "jest ./tests/server.tests/integration.tests/discover-stops.integration.test.ts --runInBand --detectOpenHandles --forceExit --coverageDirectory=.coverage/integration-discover-stops",
     "test:server": "npm-run-all --continue-on-error test:unit test:integration test:rest",
+    "prepush:check": "node ./tools/prepush-safety-check.mjs",
     "later": "echo \"Some future command...\" && exit 1"
   },
   "dependencies": {

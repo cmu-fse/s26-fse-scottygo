@@ -1099,7 +1099,9 @@ export class FilterController {
     popup.id = MAP_POPUP_ID;
     popup.className = 'map-popup';
 
-    popup.appendChild(this.createRouteInfoHeader(routeName, routeColor, routeId));
+    popup.appendChild(
+      this.createRouteInfoHeader(routeName, routeColor, routeId)
+    );
 
     const body = this.createRouteInfoBody();
     popup.appendChild(body);
@@ -1162,12 +1164,17 @@ export class FilterController {
     const btn = document.createElement('button');
     btn.className = 'map-popup__subscribe';
     if (isSubscribed) btn.classList.add('map-popup__subscribe--active');
-    btn.setAttribute('aria-label', isSubscribed ? 'Unsubscribe from route' : 'Subscribe to route');
+    btn.setAttribute(
+      'aria-label',
+      isSubscribed ? 'Unsubscribe from route' : 'Subscribe to route'
+    );
     btn.title = isSubscribed ? 'Unsubscribe from route' : 'Subscribe to route';
 
     const bellIcon = document.createElement('span');
     bellIcon.className = 'material-icons-outlined map-popup__subscribe-icon';
-    bellIcon.textContent = isSubscribed ? 'notifications' : 'notifications_none';
+    bellIcon.textContent = isSubscribed
+      ? 'notifications'
+      : 'notifications_none';
     btn.appendChild(bellIcon);
 
     const label = document.createElement('span');
@@ -1176,16 +1183,27 @@ export class FilterController {
     btn.appendChild(label);
 
     btn.addEventListener('click', () => {
-      const currentlySubscribed = btn.classList.contains('map-popup__subscribe--active');
-      const eventName = currentlySubscribed ? 'bellUnsubscribe' : 'bellSubscribe';
+      const currentlySubscribed = btn.classList.contains(
+        'map-popup__subscribe--active'
+      );
+      const eventName = currentlySubscribed
+        ? 'bellUnsubscribe'
+        : 'bellSubscribe';
 
       btn.classList.toggle('map-popup__subscribe--active');
       const icon = btn.querySelector('.map-popup__subscribe-icon');
       const lbl = btn.querySelector('.map-popup__subscribe-label');
-      const nowSubscribed = btn.classList.contains('map-popup__subscribe--active');
-      if (icon) icon.textContent = nowSubscribed ? 'notifications' : 'notifications_none';
+      const nowSubscribed = btn.classList.contains(
+        'map-popup__subscribe--active'
+      );
+      if (icon)
+        icon.textContent = nowSubscribed
+          ? 'notifications'
+          : 'notifications_none';
       if (lbl) lbl.textContent = nowSubscribed ? 'Subscribed' : 'Subscribe';
-      btn.title = nowSubscribed ? 'Unsubscribe from route' : 'Subscribe to route';
+      btn.title = nowSubscribed
+        ? 'Unsubscribe from route'
+        : 'Subscribe to route';
       btn.setAttribute('aria-label', btn.title);
 
       document.dispatchEvent(

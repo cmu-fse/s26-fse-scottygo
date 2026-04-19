@@ -30,7 +30,7 @@ export class MapControls extends HTMLElement {
           title="Clear All Filters"
           aria-label="Clear all filters"
         >
-          <span class="material-icons-outlined" aria-hidden="true">filter_alt_off</span>
+          <span class="system-text">CLEAR</span>
         </button>
       </div>
     `;
