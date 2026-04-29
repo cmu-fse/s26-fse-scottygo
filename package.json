@@ -1,7 +1,13 @@
 {
   "name": "scottygo",
   "author": "",
-  "license": "None",
+  "contributors": [
+    "George A Stey",
+    "Anthony Ren",
+    "Charlie Ai",
+    "Ningrui Yang"
+  ],
+  "license": "BSD-3-Clause",
   "version": "0.1.0",
   "private": true,
   "repository": {
