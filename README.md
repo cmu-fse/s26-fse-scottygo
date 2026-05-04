@@ -58,7 +58,10 @@ HTML, CSS : this is the tech stack everyone on the team is comfortable with for 
 ## Policies
 
 1. This repo has main-branch protection: PR and approval are necessary for changes to the main branch.
-2. This repo must remain private at all times. Sharing or publishing it outside your project team or making any clone of it publicly available is strictly prohibited by course policies. Violations are subject to the course and CMU Academic Integrity Policy.
+
+## License
+
+ScottyGo is released under the BSD 3-Clause License. Copyright (c) 2026 George A Stey, Anthony Ren, Charlie Ai, and Ningrui Yang. See [LICENSE](LICENSE).
 
 ## Operational Runbooks
 
