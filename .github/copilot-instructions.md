@@ -54,7 +54,7 @@ END OF CRITICAL INSTRUCTIONS - CONTEXT BEGINS BELOW
 │   │   ├── state/             # State management (map-state, url-sync)
 │   │   ├── trackers/          # Real-time trackers (vehicle-tracker: animated bus markers)
 │   │   └── utils/             # Utilities (csv-parser)
-│   └── styles/                # CSS per page (home, auth, map, account)
+│   └── styles/                # CSS per page (auth, map, account, notifications, subscriptions) + shared
 ├── common/                    # Shared TypeScript interfaces (client + server)
 │   ├── map.interface.ts       # IMapProvider, IMapMarker, ILatLng, IConfig
 │   ├── transit.interface.ts   # IRoute, IVehicle, IStop, IPrediction, IDetour, IPattern, IBulkTransitData
@@ -65,17 +65,26 @@ END OF CRITICAL INSTRUCTIONS - CONTEXT BEGINS BELOW
 │   ├── app.ts                 # Express app setup, middleware, GTFS + GTFS-RT init
 │   ├── serve.ts               # Server entry point
 │   ├── env.ts                 # Environment variables
-│   ├── controllers/           # Route handlers (auth, account, map, transit, notification, subscriptions)
+│   ├── controllers/           # Route handlers (auth, account, map, transit, notification, subscriptions, health)
 │   ├── models/                # Business logic + DB access (user.model, transit.model, notification.model)
 │   ├── search/                # Contextual search (search-strategy: Strategy pattern)
 │   ├── db/                    # Database layer (dac.ts singleton, mongo.db.ts)
+│   ├── views/                 # Server-side view modules (memory dashboard UI)
 │   └── services/              # External integrations
+│       ├── alerts.service.ts          # Live notification alert aggregation
+│       ├── cmu-static-data.service.ts # CMU static data helpers
+│       ├── email.service.ts           # Email notifications
 │       ├── gtfs.service.ts            # GTFS static feed parser (routes, stops, patterns, schedules)
-│       ├── truetime.service.ts        # TrueTime BusTime API v3 (route colors, detours only)
-│       ├── tripshot.service.ts        # CMU Shuttle (Tripshot) API
-│       ├── vehicle-positions.service.ts  # GTFS-RT vehicle positions (30s polling, in-memory)
+│       ├── memory-monitor.service.ts  # Memory usage monitoring
+│       ├── moderation.service.ts      # User report moderation
+│       ├── notification-sources.service.ts # Notification source registry
 │       ├── trip-updates.service.ts    # GTFS-RT trip updates/predictions (30s polling, in-memory)
-│       └── email.service.ts           # Email notifications
+│       ├── tripshot-api.ts            # Tripshot API client
+│       ├── tripshot-livestatus.service.ts # Tripshot vehicle live status
+│       ├── tripshot-metadata.ts       # Tripshot metadata cache
+│       ├── tripshot.service.ts        # CMU Shuttle (Tripshot) API
+│       ├── truetime.service.ts        # TrueTime BusTime API v3 (route colors, detours only)
+│       └── vehicle-positions.service.ts  # GTFS-RT vehicle positions (30s polling, in-memory)
 ├── tests/server.tests/        # Jest tests: unit.tests/, integration.tests/, rest.tests/
 ├── assets/                    # Static CSV data (shuttle routes, stops, shapes)
 ├── private/                   # Internal docs, GTFS static files, UML diagrams
