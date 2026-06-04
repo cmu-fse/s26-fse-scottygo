@@ -43,19 +43,25 @@ ScottyGo is a single TypeScript codebase split into three workspaces:
 
 Requires Node.js `^20.16.0` and npm `>=10.8.0`.
 
-```bash
-npm install          # install dependencies
-npm run watch        # build + run with auto-reload on changes
-```
-
-Or build and start separately:
+Install dependencies:
 
 ```bash
-npm run build        # bundle client + server with Parcel
-npm start            # run the built server
+npm install
 ```
 
-The app expects a `.env` file with MongoDB connection details, a JWT secret, a Google Maps API key, and transit-feed credentials. (See `server/` configuration for the required variables.)
+Create your environment file by copying the template, then fill in the values:
+
+```bash
+cp .env.template .env
+```
+
+See `.env.template` for the full list of required variables (MongoDB connection, JWT secret, Google Maps API key, transit-feed credentials, and Brevo API key for email).
+
+Build and run with auto-reload:
+
+```bash
+npm run watch
+```
 
 ## Testing
 

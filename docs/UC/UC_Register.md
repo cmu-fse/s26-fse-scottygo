@@ -39,7 +39,7 @@ Alternative Flows \[all mandatory\]
 
 Rules
 
-- **R1 Username Rule**: Usernames are provided by users and should be at least 4 characters long. They should not be in the list of [banned usernames](https://drive.google.com/file/d/1SOZeZz8YLAoQtuDHvwNMqkpTwnkHdvIG/view?usp=drive_link). They should not already exist. Usernames are NOT case sensitive.
+- **R1 Username Rule**: Usernames are provided by users and should be at least 4 characters long. They should not be in the list of banned usernames. They should not already exist. Usernames are NOT case sensitive.
 - **R2 Password Rule**: Passwords are provided by users and should be at least 4 characters long. Passwords ARE case sensitive.
 - **R3 Eligibility Rule**: This rule is specific to the application, and includes additional steps to verify that the Member is eligible to join the app community based on the email address provided. You can use any method you like. For example using one of these two options. Option 1: First check that the email belongs to a specific domain/subdomain (e.g., cmu.edu), then send a verification email with a code, and finally ask the user to enter the verification code on the registration page. Option 2: Use a third-party system, like Google, that can authenticate a user (e.g., all ECE users have a CMU Google account that uses Google OAuth sign-in, which in turn uses CMU SSO with an andrew account). You can decide this part, but must prototype with your wireframes required for this use case.
 
