@@ -44,7 +44,7 @@ END OF CRITICAL INSTRUCTIONS - CONTEXT BEGINS BELOW
 
 ```
 ├── client/                    # Frontend (Parcel-bundled)
-│   ├── pages/                 # HTML entry points (home, auth, map, account)
+│   ├── pages/                 # HTML entry points (auth, account, map, notifications, subscriptions)
 │   ├── scripts/
 │   │   ├── components/        # Web components (calendar-picker, route-selector, toggle-panel, etc.)
 │   │   ├── controllers/       # Client-side controllers (filter-controller)
@@ -65,8 +65,9 @@ END OF CRITICAL INSTRUCTIONS - CONTEXT BEGINS BELOW
 │   ├── app.ts                 # Express app setup, middleware, GTFS + GTFS-RT init
 │   ├── serve.ts               # Server entry point
 │   ├── env.ts                 # Environment variables
-│   ├── controllers/           # Route handlers (auth, account, home, map, transit)
-│   ├── models/                # Business logic + DB access (user.model, transit.model)
+│   ├── controllers/           # Route handlers (auth, account, map, transit, notification, subscriptions)
+│   ├── models/                # Business logic + DB access (user.model, transit.model, notification.model)
+│   ├── search/                # Contextual search (search-strategy: Strategy pattern)
 │   ├── db/                    # Database layer (dac.ts singleton, mongo.db.ts)
 │   └── services/              # External integrations
 │       ├── gtfs.service.ts            # GTFS static feed parser (routes, stops, patterns, schedules)
@@ -75,11 +76,11 @@ END OF CRITICAL INSTRUCTIONS - CONTEXT BEGINS BELOW
 │       ├── vehicle-positions.service.ts  # GTFS-RT vehicle positions (30s polling, in-memory)
 │       ├── trip-updates.service.ts    # GTFS-RT trip updates/predictions (30s polling, in-memory)
 │       └── email.service.ts           # Email notifications
-├── tests/rest/                # Jest tests + manual .http files
+├── tests/server.tests/        # Jest tests: unit.tests/, integration.tests/, rest.tests/
 ├── assets/                    # Static CSV data (shuttle routes, stops, shapes)
 ├── private/                   # Internal docs, GTFS static files, UML diagrams
 ├── docs/                      # Project documentation, REST API specs, use cases
-└── tools/                     # Build utilities (pug-compile)
+└── tools/                     # Build utilities (REST doc conversion, CMU static data export)
 ```
 
 ## Architecture Layers
@@ -98,6 +99,7 @@ END OF CRITICAL INSTRUCTIONS - CONTEXT BEGINS BELOW
 - `server/controllers/` - Route requests, delegate to models and services
 - **Important**: Controllers do NOT access database directly
 - Transit controller serves: bulk data, routes, patterns, stops, vehicles, predictions, detours
+- Notification + subscription controllers: user-submitted bus condition reports, route subscriptions, real-time notification delivery
 
 ### Business Logic Layer
 
@@ -182,6 +184,9 @@ END OF CRITICAL INSTRUCTIONS - CONTEXT BEGINS BELOW
 8. User registration/login/logout
 9. Account management
 10. User search functionality
+11. Nearby stop discovery with walking estimates and pedestrian navigation (real-time GPS, auto-rerouting)
+12. Live notifications: user-submitted bus condition reports and route subscriptions
+13. Contextual keyword search with real-time autocomplete (Strategy pattern)
 
 ## Code Generation Guidelines
 
@@ -203,3 +208,4 @@ When generating code:
 14. Use singletons for shared instances (RouteRenderer, VehicleTracker, FilterController, etc.)
 15. Prefer in-memory caching for high-frequency real-time data (vehicles, predictions)
 16. Use MongoDB TTL-indexed caching for daily-refresh static data (routes, patterns, stops)
+17. Use the Observer pattern for live-notification subscriber updates; use the Strategy pattern for contextual search
