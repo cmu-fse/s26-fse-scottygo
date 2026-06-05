@@ -50,9 +50,9 @@ Rules
 | --- | --- | --- | --- | --- |
 | Account Status | Allowed to switch any user’s account between **Active** & **Inactive** | Allowed to switch own account between **Active** & **Inactive** | Any change from one status to another is valid. | Refer to the **Active/Inactive Rule** |
 | Privilege Level | Allowed to switch any user’s account among **Administrator, Coordinator**, **Member**. By default, any new account created has the **Member** privilege | Not allowed | Any change from one Privilege Level to another is valid. | Refer to the **Privilege Rule** |
-| Username | Not allowed | Allowed to change own username only | Validate that the change follows the Username Rule (under [Register](https://docs.google.com/document/u/1/d/1nkOc5AwekO9czdm5eg_4xqN-WfSP6z9b0HZIXe62GDw/edit) use case) including proper format and that the proposed new username does not already exist. |  |
-| Email | Not allowed | Allowed to change own email only | Validate that the change follows the Eligibility Rule (under [Register](https://docs.google.com/document/u/1/d/1nkOc5AwekO9czdm5eg_4xqN-WfSP6z9b0HZIXe62GDw/edit) use case). |  |
-| Password (current password not to be displayed on screen) | Allowed to change any user’s password | Allowed to change own password only | Validate that the change follows the Password Rule (under [Register](https://docs.google.com/document/u/1/d/1nkOc5AwekO9czdm5eg_4xqN-WfSP6z9b0HZIXe62GDw/edit) use case). |  |
+| Username | Not allowed | Allowed to change own username only | Validate that the change follows the Username Rule including proper format and that the proposed new username does not already exist. |  |
+| Email | Not allowed | Allowed to change own email only | Validate that the change follows the Eligibility Rule. |  |
+| Password (current password not to be displayed on screen) | Allowed to change any user’s password | Allowed to change own password only | Validate that the change follows the Password Rule. |  |
 
 - **R4 Privilege Rule**:  
   A privilege change takes effect only next time the user logs into the app.  
@@ -60,9 +60,9 @@ Rules
 
 | Privilege Level | Possible Actions |
 | --- | --- |
-| Member | Users at this level of privilege can perform all the use cases that the **Member** actor can initiate (refer to [Use Case Survey](https://docs.google.com/document/u/1/d/1Bwin1rn23aZQoTPRZ8Rxr1I3MnKJN5BnN2VXz6-Ux3g/edit)) |
-| Coordinator | Users at this level of privilege can perform all the use cases that the **Member & Coordinator** actors can initiate (refer to [Use Case Survey](https://docs.google.com/document/u/1/d/1Bwin1rn23aZQoTPRZ8Rxr1I3MnKJN5BnN2VXz6-Ux3g/edit)) |
-| Administrator | Users at this level of privilege can perform all the use cases that the **Member, Coordinator & Administrator** actors can initiate (refer to [Use Case Survey](https://docs.google.com/document/u/1/d/1Bwin1rn23aZQoTPRZ8Rxr1I3MnKJN5BnN2VXz6-Ux3g/edit)) |
+| Member | Users at this level of privilege can perform all the use cases that the **Member** actor can initiate |
+| Coordinator | Users at this level of privilege can perform all the use cases that the **Member & Coordinator** actors can initiate |
+| Administrator | Users at this level of privilege can perform all the use cases that the **Member, Coordinator & Administrator** actors can initiate |
 
 - **R5 Active/Inactive Rule**:
   - **Active** is the default status of an account
