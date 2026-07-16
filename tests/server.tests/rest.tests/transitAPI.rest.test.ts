@@ -616,35 +616,24 @@ describeE2E('E2E: GET /map/config', () => {
 
 describeE2E('E2E: Cross-endpoint consistency', () => {
   test('a route from /routes has geometry, stops, and accepts vehicles request', async () => {
-    // 1. Get real PRT route IDs (CMU upstream can return routes without geometry)
-    const routesRes = await request('GET', '/transit/routes?system=PRT');
+    // 1. Get a real route ID
+    const routesRes = await request('GET', '/transit/routes');
     const routes = (routesRes.data as responses.ISuccess).payload as IRoute[];
     expect(routes.length).toBeGreaterThan(0);
 
-    let routeId: string | undefined;
-    let direction = 'INBOUND';
-    let patterns: IPattern[] = [];
+    const routeId = routes[0].id;
 
-    // 2. Pick a route that currently has geometry
-    for (const route of routes) {
-      const geoRes = await request('GET', `/transit/routes/${route.id}`);
-      if (geoRes.status !== 200) continue;
-
-      const candidate = (geoRes.data as responses.ISuccess).payload as IPattern[];
-      if (candidate.length === 0) continue;
-
-      routeId = route.id;
-      patterns = candidate;
-      direction = candidate[0].direction;
-      break;
-    }
-
-    expect(routeId).toBeDefined();
+    // 2. That route should have geometry
+    const geoRes = await request('GET', `/transit/routes/${routeId}`);
+    expect(geoRes.status).toBe(200);
+    const patterns = (geoRes.data as responses.ISuccess).payload as IPattern[];
     expect(patterns.length).toBeGreaterThan(0);
-    if (!routeId) return;
 
     // 3. That route should have stops
-    const stopsRes = await request('GET', `/transit/stops/${routeId}?dir=${direction}`);
+    const stopsRes = await request(
+      'GET',
+      `/transit/stops/${routeId}?dir=INBOUND`
+    );
     expect(stopsRes.status).toBe(200);
     const stops = (stopsRes.data as responses.ISuccess).payload as IStop[];
     expect(stops.length).toBeGreaterThan(0);
