@@ -616,23 +616,47 @@ describeE2E('E2E: GET /map/config', () => {
 
 describeE2E('E2E: Cross-endpoint consistency', () => {
   test('a route from /routes has geometry, stops, and accepts vehicles request', async () => {
-    // 1. Get a real route ID
-    const routesRes = await request('GET', '/transit/routes');
+    // 1. Get real PRT route IDs (CMU routes need TripShot and are covered
+    //    elsewhere; PRT geometry is served from the GTFS cache)
+    const routesRes = await request('GET', '/transit/routes?system=PRT');
     const routes = (routesRes.data as responses.ISuccess).payload as IRoute[];
     expect(routes.length).toBeGreaterThan(0);
 
-    const routeId = routes[0].id;
+    // 2. Pick a route that currently has geometry. Edge-case routes in the
+    //    live GTFS feed (detours, suspended lines) can lack a shape, in which
+    //    case the API correctly 404s — probe a bounded set of candidates
+    //    instead of assuming routes[0] has a shape.
+    const MAX_CANDIDATES = 10;
+    const candidates = routes.slice(0, MAX_CANDIDATES);
+    let routeId: string | undefined;
+    let patterns: IPattern[] = [];
 
-    // 2. That route should have geometry
-    const geoRes = await request('GET', `/transit/routes/${routeId}`);
-    expect(geoRes.status).toBe(200);
-    const patterns = (geoRes.data as responses.ISuccess).payload as IPattern[];
+    for (const route of candidates) {
+      const geoRes = await request('GET', `/transit/routes/${route.id}`);
+      if (geoRes.status !== 200) continue;
+
+      const candidate = (geoRes.data as responses.ISuccess)
+        .payload as IPattern[];
+      if (candidate.length === 0) continue;
+
+      routeId = route.id;
+      patterns = candidate;
+      break;
+    }
+
+    if (!routeId) {
+      throw new Error(
+        `No route with geometry among the first ${candidates.length} PRT routes ` +
+          `(${candidates.map((r) => r.id).join(', ')}) — GTFS shape data may not be loaded`
+      );
+    }
     expect(patterns.length).toBeGreaterThan(0);
 
-    // 3. That route should have stops
+    // 3. That route should have stops in a direction it actually serves
+    const direction = patterns[0].direction;
     const stopsRes = await request(
       'GET',
-      `/transit/stops/${routeId}?dir=INBOUND`
+      `/transit/stops/${routeId}?dir=${direction}`
     );
     expect(stopsRes.status).toBe(200);
     const stops = (stopsRes.data as responses.ISuccess).payload as IStop[];
