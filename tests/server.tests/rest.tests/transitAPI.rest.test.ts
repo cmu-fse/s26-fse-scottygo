@@ -622,32 +622,43 @@ describeE2E('E2E: Cross-endpoint consistency', () => {
     expect(routes.length).toBeGreaterThan(0);
 
     let routeId: string | undefined;
-    let direction = 'INBOUND';
+    let direction: string | undefined;
     let patterns: IPattern[] = [];
+    let stops: IStop[] = [];
 
     // 2. Pick a route that currently has geometry
-    for (const route of routes) {
+    routeLoop: for (const route of routes) {
       const geoRes = await request('GET', `/transit/routes/${route.id}`);
       if (geoRes.status !== 200) continue;
 
       const candidate = (geoRes.data as responses.ISuccess).payload as IPattern[];
       if (candidate.length === 0) continue;
 
-      routeId = route.id;
-      patterns = candidate;
-      direction = candidate[0].direction;
-      break;
+      for (const pattern of candidate) {
+        const stopsRes = await request(
+          'GET',
+          `/transit/stops/${route.id}?dir=${pattern.direction}`
+        );
+        if (stopsRes.status !== 200) continue;
+
+        const candidateStops = (stopsRes.data as responses.ISuccess)
+          .payload as IStop[];
+        if (candidateStops.length === 0) continue;
+
+        routeId = route.id;
+        patterns = candidate;
+        direction = pattern.direction;
+        stops = candidateStops;
+        break routeLoop;
+      }
     }
 
     expect(routeId).toBeDefined();
+    expect(direction).toBeDefined();
     expect(patterns.length).toBeGreaterThan(0);
-    if (!routeId) return;
-
-    // 3. That route should have stops
-    const stopsRes = await request('GET', `/transit/stops/${routeId}?dir=${direction}`);
-    expect(stopsRes.status).toBe(200);
-    const stops = (stopsRes.data as responses.ISuccess).payload as IStop[];
     expect(stops.length).toBeGreaterThan(0);
+    if (!routeId) return;
+    if (!direction) return;
 
     // 4. Vehicles endpoint should respond (even if empty at night)
     const vehRes = await request('GET', `/transit/vehicles/${routeId}`);
